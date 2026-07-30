@@ -1,0 +1,176 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Settings form for a moodlereader activity instance.
+ *
+ * @package    mod_moodlereader
+ * @copyright  2026 Adam Jenkins <adam@wisecat.net>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+defined('MOODLE_INTERNAL') || die();
+
+require_once($CFG->dirroot . '/course/moodleform_mod.php');
+
+/**
+ * The moodlereader instance settings form.
+ *
+ * @package    mod_moodlereader
+ * @copyright  2026 Adam Jenkins <adam@wisecat.net>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class mod_moodlereader_mod_form extends moodleform_mod {
+    /**
+     * Define the form.
+     *
+     * @return void
+     */
+    public function definition() {
+        $mform = $this->_form;
+
+        $mform->addElement('header', 'general', get_string('general', 'form'));
+
+        $mform->addElement('text', 'name', get_string('name'), ['size' => 64]);
+        $mform->setType('name', PARAM_TEXT);
+        $mform->addRule('name', null, 'required', null, 'client');
+        $mform->addRule('name', get_string('maximumchars', '', 255), 'maxlength', 255, 'client');
+
+        $this->standard_intro_elements();
+
+        // Reading target.
+        $mform->addElement('header', 'gradingheader', get_string('gradingheader', 'mod_moodlereader'));
+
+        $mform->addElement('text', 'goal', get_string('goal', 'mod_moodlereader'), ['size' => 8]);
+        $mform->setType('goal', PARAM_INT);
+        $mform->setDefault('goal', 30000);
+        $mform->addHelpButton('goal', 'goal', 'mod_moodlereader');
+
+        $mform->addElement('select', 'wordsorpoints', get_string('wordsorpoints', 'mod_moodlereader'), [
+            0 => get_string('words', 'mod_moodlereader'),
+            1 => get_string('points', 'mod_moodlereader'),
+        ]);
+
+        $mform->addElement('text', 'minpassgrade', get_string('minpassgrade', 'mod_moodlereader'), ['size' => 4]);
+        $mform->setType('minpassgrade', PARAM_INT);
+        $mform->setDefault('minpassgrade', 60);
+        $mform->addHelpButton('minpassgrade', 'minpassgrade', 'mod_moodlereader');
+
+        $mform->addElement('advcheckbox', 'showprogressbar', get_string('showprogressbar', 'mod_moodlereader'));
+        $mform->setDefault('showprogressbar', 1);
+
+        // Reading-level control.
+        $mform->addElement('header', 'levelheader', get_string('levelheader', 'mod_moodlereader'));
+
+        $mform->addElement('advcheckbox', 'levelcheck', get_string('levelcheck', 'mod_moodlereader'));
+        $mform->addHelpButton('levelcheck', 'levelcheck', 'mod_moodlereader');
+
+        $mform->addElement('advcheckbox', 'prevlevel', get_string('allowprevlevel', 'mod_moodlereader'));
+        $mform->setDefault('prevlevel', 0);
+        $mform->disabledIf('prevlevel', 'levelcheck');
+        $mform->addElement('advcheckbox', 'thislevel', get_string('allowthislevel', 'mod_moodlereader'));
+        $mform->setDefault('thislevel', 1);
+        $mform->disabledIf('thislevel', 'levelcheck');
+        $mform->addElement('advcheckbox', 'nextlevel', get_string('allownextlevel', 'mod_moodlereader'));
+        $mform->setDefault('nextlevel', 1);
+        $mform->disabledIf('nextlevel', 'levelcheck');
+
+        // Availability window.
+        $mform->addElement('header', 'availabilityheader', get_string('availability'));
+        $mform->addElement(
+            'date_time_selector',
+            'availablefrom',
+            get_string('availablefrom', 'mod_moodlereader'),
+            ['optional' => true]
+        );
+        $mform->addElement(
+            'date_time_selector',
+            'availableuntil',
+            get_string('availableuntil', 'mod_moodlereader'),
+            ['optional' => true]
+        );
+
+        // Standard grade element (drives $data->maxgrade via 'grade').
+        $this->standard_grading_coursemodule_elements();
+
+        $this->standard_coursemodule_elements();
+        $this->add_action_buttons();
+    }
+
+    /**
+     * Add custom completion rules.
+     *
+     * @return array Element names.
+     */
+    public function add_completion_rules() {
+        $mform = $this->_form;
+        $mform->addElement(
+            'advcheckbox',
+            'completionpass',
+            '',
+            get_string('completionpass', 'mod_moodlereader')
+        );
+        $group = [
+            $mform->createElement(
+                'advcheckbox',
+                'completiontotalwordsenabled',
+                '',
+                get_string('completiontotalwords', 'mod_moodlereader')
+            ),
+            $mform->createElement('text', 'completiontotalwords', '', ['size' => 8]),
+        ];
+        $mform->addGroup(
+            $group,
+            'completiontotalwordsgroup',
+            get_string('completiontotalwords', 'mod_moodlereader'),
+            [' '],
+            false
+        );
+        $mform->setType('completiontotalwords', PARAM_INT);
+        $mform->disabledIf('completiontotalwords', 'completiontotalwordsenabled', 'notchecked');
+        return ['completionpass', 'completiontotalwordsgroup'];
+    }
+
+    /**
+     * Whether any custom completion rule is enabled.
+     *
+     * @param array $data Form data.
+     * @return bool
+     */
+    public function completion_rule_enabled($data) {
+        return !empty($data['completionpass']) ||
+            (!empty($data['completiontotalwordsenabled']) && $data['completiontotalwords'] > 0);
+    }
+
+    /**
+     * Normalise submitted completion data.
+     *
+     * @return stdClass|null
+     */
+    public function get_data() {
+        $data = parent::get_data();
+        if ($data && !empty($data->completionunlocked)) {
+            $autocompletion = !empty($data->completion) && $data->completion == COMPLETION_TRACKING_AUTOMATIC;
+            if (empty($data->completiontotalwordsenabled) || !$autocompletion) {
+                $data->completiontotalwords = 0;
+            }
+            if (!$autocompletion) {
+                $data->completionpass = 0;
+            }
+        }
+        return $data;
+    }
+}
