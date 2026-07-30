@@ -52,7 +52,9 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
             'fiction', 'points', 'image', 'sametitle', 'hidden', 'time',
         ]);
 
-        $bookinstances = new backup_nested_element('bookinstances');
+        // Named 'bookinstancelinks' (not 'bookinstances') to avoid colliding with the
+        // moodlereader.bookinstances flag column, which is also a final element here.
+        $bookinstances = new backup_nested_element('bookinstancelinks');
         $bookinstance = new backup_nested_element(
             'bookinstance',
             ['id'],

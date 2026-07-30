@@ -16,19 +16,22 @@ mreader.org iframe model).
 - An account on mreader.org, used once to register the site (Site administration →
   Plugins → Activity modules → Moodle Reader → *Register this site*).
 
-## What it does (this release — secure core)
+## What it does
 
-- Students see the books available to them (filtered by reading level) and launch a
-  book quiz, delivered by mreader.org in an iframe.
+- Students see the books available to them (filtered by reading level), launch a
+  book quiz delivered by mreader.org in an iframe, watch a reading-progress bar
+  advance as they pass books, and review their own **reading records**.
 - The signed grade callback from mreader.org is verified (constant-time token check)
-  and recorded; passed books contribute their word count to the gradebook grade.
-- Teachers can sync the book catalogue from mreader.org and view a report of
-  attempts.
-- Per-user reading levels, reading goal, and progress bar.
-- Full privacy provider, backup/restore, activity completion, and events.
+  and recorded; each passed book's word count contributes once to the gradebook
+  grade.
+- Teachers can **sync the book catalogue** from mreader.org, **enable/disable**
+  individual books, view **reports** (attempts, per-student and per-book summaries),
+  run **cheating detection**, and **message** students.
+- Per-user reading levels, reading goal, availability window, and activity
+  completion rules (pass a book / read N words).
+- Full privacy provider, backup/restore, and events.
 
-Deferred to later releases (present in the legacy plugin): cheating detection, the
-additional report types, student import/export, messaging, goals/rates, and
+Not yet ported from the legacy plugin: student import/export, goals/rates, and
 view-as-student.
 
 ## Migrating from mod_reader

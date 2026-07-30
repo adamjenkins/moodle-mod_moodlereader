@@ -45,7 +45,7 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         );
         $paths[] = new restore_path_element(
             'moodlereader_bookinstance',
-            '/activity/moodlereader/bookinstances/bookinstance'
+            '/activity/moodlereader/bookinstancelinks/bookinstance'
         );
         if ($userinfo) {
             $paths[] = new restore_path_element(
