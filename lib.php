@@ -34,11 +34,11 @@ function moodlereader_supports($feature) {
         case FEATURE_GRADE_HAS_GRADE:
         case FEATURE_COMPLETION_HAS_RULES:
         case FEATURE_BACKUP_MOODLE2:
-        case FEATURE_GROUPS:
-        case FEATURE_GROUPINGS:
             return true;
         case FEATURE_GRADE_OUTCOMES:
         case FEATURE_COMPLETION_TRACKS_VIEWS:
+        case FEATURE_GROUPS:
+        case FEATURE_GROUPINGS:
             return false;
         case FEATURE_MOD_PURPOSE:
             return MOD_PURPOSE_ASSESSMENT;
@@ -58,9 +58,28 @@ function moodlereader_add_instance($data, $mform = null) {
     global $DB;
     $data->timecreated = time();
     $data->timemodified = $data->timecreated;
+    $data->maxgrade = moodlereader_maxgrade_from_form($data);
     $data->id = $DB->insert_record('moodlereader', $data);
     moodlereader_grade_item_update($data);
     return $data->id;
+}
+
+/**
+ * Resolve the maxgrade column from the standard grade form element.
+ *
+ * The grade element yields a positive point value, a negative scale id, or 0
+ * (no grade). This plugin grades by word count, so scales are not supported and
+ * are treated as "no grade".
+ *
+ * @param stdClass $data Form data.
+ * @return int
+ */
+function moodlereader_maxgrade_from_form($data) {
+    if (!isset($data->grade)) {
+        // No grade element (e.g. programmatic creation): keep any maxgrade already set.
+        return isset($data->maxgrade) ? (int) $data->maxgrade : 100;
+    }
+    return $data->grade > 0 ? (int) $data->grade : 0;
 }
 
 /**
@@ -74,6 +93,7 @@ function moodlereader_update_instance($data, $mform = null) {
     global $DB;
     $data->timemodified = time();
     $data->id = $data->instance;
+    $data->maxgrade = moodlereader_maxgrade_from_form($data);
     $result = $DB->update_record('moodlereader', $data);
     moodlereader_grade_item_update($data);
     moodlereader_update_grades($data);
@@ -119,7 +139,15 @@ function moodlereader_get_user_grades($instance, $userid = 0) {
         return [];
     }
 
-    $countfield = empty($instance->wordsorpoints) ? 'b.words' : 'b.points';
+    // Per-instance overrides take precedence over the catalogue values when set.
+    if (empty($instance->wordsorpoints)) {
+        $countfield = empty($instance->bookinstances) ? 'b.words' : 'COALESCE(bi.words, b.words)';
+    } else {
+        $countfield = empty($instance->bookinstances) ? 'b.points' : 'COALESCE(bi.points, b.points)';
+    }
+    $bijoin = empty($instance->bookinstances) ? ''
+        : 'LEFT JOIN {moodlereader_bookinstances} bi ON bi.bookid = b.id AND bi.readerid = a.readerid';
+
     $params = ['readerid' => $instance->id, 'ignoredate' => $instance->ignoredate];
     $usersql = '';
     if ($userid) {
@@ -127,17 +155,26 @@ function moodlereader_get_user_grades($instance, $userid = 0) {
         $params['userid'] = $userid;
     }
 
-    $sql = "SELECT a.userid,
-                   SUM($countfield) AS totalcount,
-                   MAX(a.timefinish) AS datesubmitted,
-                   MAX(a.timemodified) AS dategraded
-              FROM {moodlereader_attempts} a
-              JOIN {moodlereader_books} b ON b.id = a.bookid
-             WHERE a.readerid = :readerid
-                   AND (a.passed = 1 OR a.credit = 1)
-                   AND a.deleted = 0 AND a.cheated = 0
-                   AND a.timefinish >= :ignoredate $usersql
-          GROUP BY a.userid";
+    // Inner query counts each book once per user (a re-passed book is not doubled);
+    // the outer query aggregates per user.
+    $sql = "SELECT userid,
+                   SUM(bookcount) AS totalcount,
+                   MAX(datesubmitted) AS datesubmitted,
+                   MAX(dategraded) AS dategraded
+              FROM (SELECT a.userid,
+                           a.bookid,
+                           MAX($countfield) AS bookcount,
+                           MAX(a.timefinish) AS datesubmitted,
+                           MAX(a.timemodified) AS dategraded
+                      FROM {moodlereader_attempts} a
+                      JOIN {moodlereader_books} b ON b.id = a.bookid
+                      $bijoin
+                     WHERE a.readerid = :readerid
+                           AND (a.passed = 1 OR a.credit = 1)
+                           AND a.deleted = 0 AND a.cheated = 0
+                           AND a.timefinish >= :ignoredate $usersql
+                  GROUP BY a.userid, a.bookid) perbook
+          GROUP BY userid";
 
     $grades = [];
     foreach ($DB->get_records_sql($sql, $params) as $row) {
@@ -161,7 +198,25 @@ function moodlereader_get_user_grades($instance, $userid = 0) {
  * @return void
  */
 function moodlereader_update_grades($instance, $userid = 0, $nullifnone = true) {
+    global $DB;
     $grades = moodlereader_get_user_grades($instance, $userid);
+
+    // Maintain the cached moodlereader_grades rows so exports/reports match the gradebook.
+    $selector = ['readerid' => $instance->id];
+    if ($userid) {
+        $selector['userid'] = $userid;
+    }
+    $DB->delete_records('moodlereader_grades', $selector);
+    foreach ($grades as $grade) {
+        $DB->insert_record('moodlereader_grades', (object) [
+            'readerid'      => $instance->id,
+            'userid'        => $grade->userid,
+            'rawgrade'      => $grade->rawgrade,
+            'datesubmitted' => $grade->datesubmitted ?? 0,
+            'dategraded'    => $grade->dategraded ?? 0,
+        ]);
+    }
+
     if ($grades) {
         moodlereader_grade_item_update($instance, $grades);
     } else if ($userid && $nullifnone) {
@@ -261,6 +316,7 @@ function moodlereader_reset_userdata($data) {
         $DB->delete_records('moodlereader_grades', $params);
         $DB->delete_records('moodlereader_levels', $params);
         $DB->delete_records('moodlereader_cheatlog', $params);
+        $DB->delete_records('moodlereader_messages', $params);
         moodlereader_grade_item_update($instance, 'reset');
     }
     $status[] = [
@@ -300,4 +356,32 @@ function moodlereader_pluginfile($course, $cm, $context, $filearea, $args, $forc
     }
     // Book covers are curated (synced from mreader.org), so may be served inline.
     send_stored_file($file, 86400, 0, $forcedownload, $options);
+}
+
+/**
+ * Expose custom completion rules and intro to the course-module cache.
+ *
+ * @param stdClass $coursemodule
+ * @return cached_cm_info|null
+ */
+function moodlereader_get_coursemodule_info($coursemodule) {
+    global $DB;
+
+    $fields = 'id, name, intro, introformat, completionpass, completiontotalwords';
+    if (!$instance = $DB->get_record('moodlereader', ['id' => $coursemodule->instance], $fields)) {
+        return null;
+    }
+
+    $info = new cached_cm_info();
+    $info->name = $instance->name;
+    if ($coursemodule->showdescription) {
+        $info->content = format_module_intro('moodlereader', $instance, $coursemodule->id, false);
+    }
+
+    if ($coursemodule->completion == COMPLETION_TRACKING_AUTOMATIC) {
+        $info->customdata['customcompletionrules']['completionpass'] = (int) $instance->completionpass;
+        $info->customdata['customcompletionrules']['completiontotalwords'] = (int) $instance->completiontotalwords;
+    }
+
+    return $info;
 }

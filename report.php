@@ -58,15 +58,17 @@ foreach (['attempts', 'users', 'books'] as $t) {
 }
 echo $OUTPUT->tabtree($tabs, $mode);
 
+$namefieldsql = \core_user\fields::for_name()->get_sql('u', false, '', '', false)->selects;
+$namegroupby = 'u.' . implode(', u.', \core_user\fields::get_name_fields());
+
 $table = new html_table();
 
 if ($mode === 'attempts') {
     $table->head = [
         get_string('fullname'), get_string('book', 'mod_moodlereader'),
-        get_string('score', 'mod_moodlereader'), get_string('passed', 'core'), get_string('date'),
+        get_string('score', 'mod_moodlereader'), get_string('passed', 'mod_moodlereader'), get_string('date'),
     ];
-    $sql = "SELECT a.id, a.percentgrade, a.passed, a.timefinish, b.name AS bookname,
-                   u.id AS uid, u.firstname, u.lastname
+    $sql = "SELECT a.id, a.percentgrade, a.passed, a.timefinish, b.name AS bookname, u.id AS uid $namefieldsql
               FROM {moodlereader_attempts} a
               JOIN {moodlereader_books} b ON b.id = a.bookid
               JOIN {user} u ON u.id = a.userid
@@ -84,16 +86,17 @@ if ($mode === 'attempts') {
         get_string('fullname'), get_string('bookspassed', 'mod_moodlereader'),
         get_string('wordsread', 'mod_moodlereader'), get_string('currentlevel', 'mod_moodlereader'),
     ];
-    $sql = "SELECT u.id, u.firstname, u.lastname,
-                   COUNT(DISTINCT CASE WHEN a.passed = 1 AND a.deleted = 0 AND a.cheated = 0 THEN a.id END) AS passes,
-                   COALESCE(SUM(CASE WHEN a.passed = 1 AND a.deleted = 0 AND a.cheated = 0 THEN $countfield ELSE 0 END), 0) AS total,
+    $ok = 'a.passed = 1 AND a.deleted = 0 AND a.cheated = 0';
+    $sql = "SELECT u.id $namefieldsql,
+                   COUNT(DISTINCT CASE WHEN $ok THEN a.bookid END) AS passes,
+                   COALESCE(SUM(CASE WHEN $ok THEN $countfield ELSE 0 END), 0) AS total,
                    MAX(l.currentlevel) AS currentlevel
               FROM {moodlereader_attempts} a
               JOIN {user} u ON u.id = a.userid
               JOIN {moodlereader_books} b ON b.id = a.bookid
          LEFT JOIN {moodlereader_levels} l ON l.readerid = a.readerid AND l.userid = a.userid
              WHERE a.readerid = :readerid
-          GROUP BY u.id, u.firstname, u.lastname
+          GROUP BY u.id, $namegroupby
           ORDER BY total DESC";
     foreach ($DB->get_records_sql($sql, ['readerid' => $readerid]) as $r) {
         $table->data[] = [

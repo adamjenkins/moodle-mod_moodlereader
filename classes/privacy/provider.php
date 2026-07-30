@@ -71,12 +71,15 @@ class provider implements
         ], 'privacy:metadata:moodlereader_levels');
 
         $collection->add_database_table('moodlereader_users', [
-            'uniqueid' => 'privacy:metadata:moodlereader_users:uniqueid',
+            'uniqueid'   => 'privacy:metadata:moodlereader_users:uniqueid',
+            'uniquename' => 'privacy:metadata:moodlereader_users:uniquename',
         ], 'privacy:metadata:moodlereader_users');
 
         $collection->add_external_location_link('mreader.org', [
             'uname' => 'privacy:metadata:mreader.org:uname',
+            'sname' => 'privacy:metadata:mreader.org:sname',
             'book'  => 'privacy:metadata:mreader.org:book',
+            'grade' => 'privacy:metadata:mreader.org:grade',
         ], 'privacy:metadata:mreader.org');
 
         $collection->link_subsystem('core_grades', 'privacy:metadata:core_grades');
@@ -189,6 +192,8 @@ class provider implements
                         'bookid'       => $a->bookid,
                         'percentgrade' => $a->percentgrade,
                         'passed'       => $a->passed,
+                        'cheated'      => $a->cheated,
+                        'ip'           => $a->ip,
                         'timestart'    => $a->timestart ? \core_privacy\local\request\transform::datetime($a->timestart) : null,
                         'timefinish'   => $a->timefinish ? \core_privacy\local\request\transform::datetime($a->timefinish) : null,
                     ];

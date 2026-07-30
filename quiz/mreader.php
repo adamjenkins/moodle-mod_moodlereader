@@ -52,6 +52,12 @@ if ((int) $attempt->userid !== (int) $USER->id) {
 $site = new mreader_site();
 $book = $DB->get_record('moodlereader_books', ['id' => $attempt->bookid], '*', MUST_EXIST);
 
+// Both the launch and the grade callback require a registered site: an empty
+// site key would otherwise make the callback token trivially forgeable.
+if (!$site->is_configured()) {
+    throw new moodle_exception('notconfigured', 'mod_moodlereader', $reader->view_url());
+}
+
 if ($customid) {
     // Grade callback from mreader.org.
     $url = new moodle_url($FULLME);
@@ -83,9 +89,7 @@ if ($customid) {
 }
 
 // Launch the quiz iframe.
-if (!$site->is_configured()) {
-    throw new moodle_exception('notconfigured', 'mod_moodlereader', $reader->view_url());
-}
+$reader->require_available();
 
 $identity = $site->get_identity($USER->id);
 $quizurl = $site->takequiz_url($attempt, $book->image, $identity);

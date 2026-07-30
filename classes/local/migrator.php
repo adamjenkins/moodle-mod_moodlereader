@@ -39,6 +39,9 @@ class migrator {
     /** @var int[] Map of legacy reader_books.id => new moodlereader_books.id. */
     protected $bookmap = [];
 
+    /** @var array<array{0:int,1:int}> [courseid, new reader id] pairs migrated this run. */
+    protected $migrated = [];
+
     /**
      * Constructor.
      *
@@ -74,6 +77,7 @@ class migrator {
         $counts = ['config' => 0, 'books' => 0, 'identities' => 0,
             'activities' => 0, 'attempts' => 0, 'grades' => 0, 'levels' => 0];
 
+        $this->migrated = [];
         $transaction = $this->dryrun ? null : $DB->start_delegated_transaction();
 
         $counts['config'] = $this->migrate_config();
@@ -92,6 +96,23 @@ class migrator {
 
         if ($transaction) {
             $transaction->allow_commit();
+        }
+
+        // Rebuild caches and push grades only after the data is committed — never
+        // inside the transaction (a rollback would leave poisoned MUC/gradebook state).
+        if (!$this->dryrun) {
+            require_once($GLOBALS['CFG']->dirroot . '/mod/moodlereader/lib.php');
+            $courses = [];
+            foreach ($this->migrated as [$courseid, $newreaderid]) {
+                $courses[$courseid] = true;
+                if ($instance = $DB->get_record('moodlereader', ['id' => $newreaderid])) {
+                    \moodlereader_grade_item_update($instance);
+                    \moodlereader_update_grades($instance);
+                }
+            }
+            foreach (array_keys($courses) as $courseid) {
+                rebuild_course_cache($courseid, true);
+            }
         }
         return $counts;
     }
@@ -137,11 +158,19 @@ class migrator {
                 'hidden'     => (int) $old->hidden,
                 'time'       => (int) $old->time,
             ];
-            $newid = $this->write(fn() => $DB->insert_record('moodlereader_books', $new), $count + 1);
-            $this->bookmap[$old->id] = $newid;
-            $count++;
+            // Upsert by natural key so re-running (or running after a sync) does not duplicate.
+            $existing = $DB->get_record('moodlereader_books', [
+                'publisher' => $new->publisher, 'series' => $new->series, 'name' => $new->name,
+            ]);
+            if ($existing) {
+                $this->bookmap[$old->id] = $existing->id;
+            } else {
+                $newid = $this->write(fn() => $DB->insert_record('moodlereader_books', $new), $count + 1);
+                $this->bookmap[$old->id] = $newid;
+                $count++;
+            }
         }
-        ($this->log)("Books: migrated $count.");
+        ($this->log)("Books: migrated $count new (existing reused).");
         return $count;
     }
 
@@ -154,7 +183,7 @@ class migrator {
         global $DB;
         $count = 0;
         foreach ($DB->get_recordset('reader_users') as $old) {
-            if (!$this->dryrun && $DB->record_exists('moodlereader_users', ['userid' => $old->userid])) {
+            if ($DB->record_exists('moodlereader_users', ['userid' => $old->userid])) {
                 continue;
             }
             $new = (object) [
@@ -184,6 +213,17 @@ class migrator {
         $oldcm = get_coursemodule_from_instance('reader', $oldreader->id, 0, false, IGNORE_MISSING);
         if (!$oldcm) {
             ($this->log)("  Skipped reader id {$oldreader->id}: no course module.");
+            return null;
+        }
+
+        // Idempotency: skip a reader already migrated (same course + name + created time).
+        if (
+            $DB->record_exists('moodlereader', [
+            'course' => $oldreader->course, 'name' => $oldreader->name,
+            'timecreated' => $oldreader->timecreated ?? 0,
+            ])
+        ) {
+            ($this->log)("  Skipped '{$oldreader->name}': already migrated.");
             return null;
         }
 
@@ -289,11 +329,8 @@ class migrator {
             ]));
         }
 
-        if (!$this->dryrun) {
-            $newinstance = $DB->get_record('moodlereader', ['id' => $newreaderid]);
-            \moodlereader_grade_item_update($newinstance);
-            \moodlereader_update_grades($newinstance);
-        }
+        // Grade push + cache rebuild happen after the transaction commits (see run()).
+        $this->migrated[] = [(int) $oldreader->course, (int) $newreaderid];
 
         ($this->log)("  Activity '{$oldreader->name}': {$attempts} attempts, {$grades} grades, {$levels} levels.");
         return ['attempts' => $attempts, 'grades' => $grades, 'levels' => $levels];
@@ -326,7 +363,7 @@ class migrator {
         $cmid = add_course_module($newcm);
         $sectionnum = $DB->get_field('course_sections', 'section', ['id' => $oldcm->section]);
         course_add_cm_to_section($courseid, $cmid, $sectionnum);
-        rebuild_course_cache($courseid, true);
+        // The course cache is rebuilt once, after the transaction commits (see run()).
     }
 
     /**

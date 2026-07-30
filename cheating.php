@@ -66,8 +66,10 @@ echo $OUTPUT->single_button(
     'post'
 );
 
-$sql = "SELECT c.id, c.attemptid, a.cheated, a.userid, ub.id AS ubid, ob.id AS obid,
-               b.name AS bookname, a.ip, a.timefinish, c.otheruserid
+$ubfields = \core_user\fields::for_name()->get_sql('ub', false, '', 'ubid', false)->selects;
+$obfields = \core_user\fields::for_name()->get_sql('ob', false, 'other', 'obid', false)->selects;
+$sql = "SELECT c.id, c.attemptid, a.cheated, a.userid, c.otheruserid,
+               b.name AS bookname, a.ip, a.timefinish $ubfields $obfields
           FROM {moodlereader_cheatlog} c
           JOIN {moodlereader_attempts} a ON a.id = c.attemptid
           JOIN {moodlereader_books} b ON b.id = a.bookid
@@ -81,12 +83,24 @@ if ($rows) {
     $table = new html_table();
     $table->head = [
         get_string('fullname'), get_string('book', 'mod_moodlereader'),
-        get_string('sharedwith', 'mod_moodlereader'), 'IP',
+        get_string('sharedwith', 'mod_moodlereader'), get_string('ipaddress', 'mod_moodlereader'),
         get_string('date'), get_string('cheated', 'mod_moodlereader'), '',
     ];
     foreach ($rows as $r) {
-        $user = $DB->get_record('user', ['id' => $r->userid]);
-        $other = $DB->get_record('user', ['id' => $r->otheruserid]);
+        $user = (object) ['id' => $r->userid];
+        username_load_fields_from_object(
+            $user,
+            $r,
+            null,
+            \core_user\fields::get_name_fields()
+        );
+        $other = (object) ['id' => $r->otheruserid];
+        username_load_fields_from_object(
+            $other,
+            $r,
+            'other',
+            \core_user\fields::get_name_fields()
+        );
         if ($r->cheated) {
             $action = $OUTPUT->single_button(
                 new moodle_url($pageurl, ['unmarkattempt' => $r->attemptid, 'sesskey' => sesskey()]),

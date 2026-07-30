@@ -156,6 +156,23 @@ class mod_moodlereader_mod_form extends moodleform_mod {
     }
 
     /**
+     * Preload derived fields when editing an existing instance.
+     *
+     * @param array $defaultvalues
+     * @return void
+     */
+    public function data_preprocessing(&$defaultvalues) {
+        // The gradebook element is 'grade'; the DB column is 'maxgrade'.
+        if (isset($defaultvalues['maxgrade'])) {
+            $defaultvalues['grade'] = $defaultvalues['maxgrade'];
+        }
+        // Reflect the stored word threshold in its enable checkbox.
+        if (!empty($defaultvalues['completiontotalwords'])) {
+            $defaultvalues['completiontotalwordsenabled'] = 1;
+        }
+    }
+
+    /**
      * Normalise submitted completion data.
      *
      * @return stdClass|null

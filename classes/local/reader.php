@@ -194,8 +194,10 @@ class reader {
     /**
      * Books the given user may attempt right now.
      *
-     * Excludes hidden books, books already attempted (by title), and books outside
-     * the user's reading level when level checking is enabled.
+     * Excludes hidden books, books the user has already *finished* an attempt on
+     * (by book id, and by shared title for title-groups), and books outside the
+     * user's reading level when level checking is enabled. Books with only an
+     * in-progress attempt stay listed so the user can resume them.
      *
      * @param int $userid
      * @return stdClass[] Keyed by book id.
@@ -205,11 +207,18 @@ class reader {
 
         $params = ['readerid' => $this->instance->id, 'userid' => $userid];
 
-        // Books whose title this user has already attempted.
-        $attemptedsql = "SELECT b.sametitle
-                           FROM {moodlereader_attempts} a
-                           JOIN {moodlereader_books} b ON b.id = a.bookid
-                          WHERE a.readerid = :readerid AND a.userid = :userid AND a.deleted = 0";
+        // Finished attempts by this user (the ones that "use up" a book).
+        $finished = "FROM {moodlereader_attempts} a
+                    WHERE a.readerid = :readerid AND a.userid = :userid
+                          AND a.deleted = 0 AND a.state = 'finished'";
+        $doneids = "SELECT a.bookid $finished";
+        $donetitles = "SELECT b2.sametitle
+                         FROM {moodlereader_attempts} a
+                         JOIN {moodlereader_books} b2 ON b2.id = a.bookid
+                        WHERE a.readerid = :readerid2 AND a.userid = :userid2
+                              AND a.deleted = 0 AND a.state = 'finished' AND b2.sametitle <> ''";
+        $params['readerid2'] = $this->instance->id;
+        $params['userid2'] = $userid;
 
         $from = '{moodlereader_books} b';
         $where = ['b.hidden = 0'];
@@ -219,8 +228,9 @@ class reader {
             $params['bireaderid'] = $this->instance->id;
         }
 
-        // Exclude already-attempted titles.
-        $where[] = "(b.sametitle = '' OR b.sametitle NOT IN ($attemptedsql))";
+        // Exclude books already finished — by book id, and by shared title.
+        $where[] = "b.id NOT IN ($doneids)";
+        $where[] = "(b.sametitle = '' OR b.sametitle NOT IN ($donetitles))";
 
         // Level filtering.
         $difficulties = $this->allowed_difficulties($userid);
@@ -232,6 +242,33 @@ class reader {
 
         $sql = "SELECT b.* FROM $from WHERE " . implode(' AND ', $where) . ' ORDER BY b.publisher, b.series, b.name';
         return $DB->get_records_sql($sql, $params);
+    }
+
+    /**
+     * Whether the current time is inside the activity's availability window.
+     *
+     * @return bool
+     */
+    public function within_availability_window(): bool {
+        $now = time();
+        if (!empty($this->instance->availablefrom) && $now < $this->instance->availablefrom) {
+            return false;
+        }
+        if (!empty($this->instance->availableuntil) && $now > $this->instance->availableuntil) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Require that quizzes can be attempted now, unless the user manages the activity.
+     *
+     * @return void
+     */
+    public function require_available(): void {
+        if (!$this->within_availability_window() && !$this->can('manageusers')) {
+            throw new \moodle_exception('notavailablenow', 'mod_moodlereader', $this->view_url()->out());
+        }
     }
 
     /**

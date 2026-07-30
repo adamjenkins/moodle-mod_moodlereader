@@ -81,7 +81,7 @@ if ($messages) {
             s($to),
             format_text($m->messagetext, $m->messageformat, ['context' => $reader->get_context()]),
             userdate($m->timecreated),
-            $OUTPUT->action_icon($delurl, new pix_icon('t/delete', get_string('delete'))),
+            $OUTPUT->single_button($delurl, get_string('delete'), 'post'),
         ];
     }
     echo html_writer::table($table);

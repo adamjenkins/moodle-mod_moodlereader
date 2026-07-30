@@ -95,7 +95,8 @@ class attempt {
     public static function finish(reader $reader, stdClass $attempt, float $percentgrade): void {
         global $DB;
 
-        if ($attempt->state === 'finished') {
+        // Re-read the authoritative state: a repeated callback must not re-finish.
+        if ($DB->get_field('moodlereader_attempts', 'state', ['id' => $attempt->id]) === 'finished') {
             return;
         }
 
@@ -108,7 +109,14 @@ class attempt {
         $attempt->passed = $percentgrade >= $minpass ? 1 : 0;
         $attempt->timefinish = $now;
         $attempt->timemodified = $now;
-        $DB->update_record('moodlereader_attempts', $attempt);
+
+        // Guarded update: once finished, a later/replayed callback cannot overwrite the grade.
+        $DB->execute(
+            "UPDATE {moodlereader_attempts}
+                SET state = ?, percentgrade = ?, passed = ?, timefinish = ?, timemodified = ?
+              WHERE id = ? AND state = 'inprogress'",
+            ['finished', $attempt->percentgrade, $attempt->passed, $now, $now, $attempt->id]
+        );
 
         \mod_moodlereader\event\attempt_submitted::create_from_attempt($reader, $attempt)->trigger();
 

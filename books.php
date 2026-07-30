@@ -42,6 +42,8 @@ $PAGE->set_heading(format_string($reader->get_course()->fullname));
 
 if ($sync) {
     require_sesskey();
+    // Syncing mutates the site-wide catalogue, so require the system-level capability.
+    require_capability('mod/moodlereader:manageremotesites', context_system::instance());
     $count = downloader::sync_books();
     redirect(
         $pageurl,
@@ -54,10 +56,15 @@ if ($sync) {
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('managebooks', 'mod_moodlereader'));
 
-$syncurl = new moodle_url($pageurl, ['sync' => 1, 'sesskey' => sesskey()]);
-echo $OUTPUT->single_button($syncurl, get_string('syncbooks', 'mod_moodlereader'), 'post');
+if (has_capability('mod/moodlereader:manageremotesites', context_system::instance())) {
+    $syncurl = new moodle_url($pageurl, ['sync' => 1, 'sesskey' => sesskey()]);
+    echo $OUTPUT->single_button($syncurl, get_string('syncbooks', 'mod_moodlereader'), 'post');
+}
 
-$books = $DB->get_records('moodlereader_books', null, 'publisher, series, name', '*', 0, 500);
+$perpage = 100;
+$page = optional_param('page', 0, PARAM_INT);
+$totalbooks = $DB->count_records('moodlereader_books');
+$books = $DB->get_records('moodlereader_books', null, 'publisher, series, name', '*', $page * $perpage, $perpage);
 if ($books) {
     $table = new html_table();
     $table->head = [
@@ -75,6 +82,7 @@ if ($books) {
         ];
     }
     echo html_writer::table($table);
+    echo $OUTPUT->paging_bar($totalbooks, $page, $perpage, $pageurl);
 } else {
     echo $OUTPUT->notification(get_string('nobooksavailable', 'mod_moodlereader'), 'info');
 }

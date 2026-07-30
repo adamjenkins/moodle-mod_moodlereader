@@ -104,8 +104,16 @@ class mreader_site {
             'uniqueid'   => $this->generate_uniqueid(),
             'uniquename' => random_string(2) . ' ' . random_string(4),
         ];
-        $record->id = $DB->insert_record('moodlereader_users', $record);
-        return $record;
+        try {
+            $record->id = $DB->insert_record('moodlereader_users', $record);
+            return $record;
+        } catch (\dml_exception $e) {
+            // A concurrent first launch won the unique index; re-read the winner.
+            if ($existing = $DB->get_record('moodlereader_users', ['userid' => $userid])) {
+                return $existing;
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -223,6 +231,8 @@ class mreader_site {
             'CURLOPT_SSL_VERIFYHOST' => 2,
             'CURLOPT_RETURNTRANSFER' => 1,
             'CURLOPT_FRESH_CONNECT'  => 1,
+            'CURLOPT_CONNECTTIMEOUT' => 10,
+            'CURLOPT_TIMEOUT'        => 30,
         ]);
         if ($curl->get_errno()) {
             return get_string('registrationfailed', 'mod_moodlereader', $curl->error);

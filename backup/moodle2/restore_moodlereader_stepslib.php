@@ -38,6 +38,11 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         $userinfo = $this->get_setting_value('userinfo');
         $paths = [];
         $paths[] = new restore_path_element('moodlereader', '/activity/moodlereader');
+        // Books are processed first so bookinstances/attempts can remap their bookid.
+        $paths[] = new restore_path_element(
+            'moodlereader_book',
+            '/activity/moodlereader/books/book'
+        );
         $paths[] = new restore_path_element(
             'moodlereader_bookinstance',
             '/activity/moodlereader/bookinstances/bookinstance'
@@ -80,7 +85,25 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
     }
 
     /**
-     * Restore a book-instance link (book ids are global; kept as-is).
+     * Restore a book: re-link to a matching catalogue book, or create it, and map its id.
+     *
+     * @param array $data
+     * @return void
+     */
+    protected function process_moodlereader_book($data) {
+        global $DB;
+        $data = (object) $data;
+        $oldid = $data->id;
+        unset($data->id);
+        $existing = $DB->get_record('moodlereader_books', [
+            'publisher' => $data->publisher, 'series' => $data->series, 'name' => $data->name,
+        ]);
+        $newid = $existing ? $existing->id : $DB->insert_record('moodlereader_books', $data);
+        $this->set_mapping('moodlereader_book', $oldid, $newid);
+    }
+
+    /**
+     * Restore a book-instance link, remapping the book id by identity.
      *
      * @param array $data
      * @return void
@@ -89,6 +112,7 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         global $DB;
         $data = (object) $data;
         $data->readerid = $this->get_new_parentid('moodlereader');
+        $data->bookid = $this->get_mappingid('moodlereader_book', $data->bookid) ?: $data->bookid;
         if ($DB->record_exists('moodlereader_books', ['id' => $data->bookid])) {
             $DB->insert_record('moodlereader_bookinstances', $data);
         }
@@ -105,6 +129,12 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         $data = (object) $data;
         $data->readerid = $this->get_new_parentid('moodlereader');
         $data->userid = $this->get_mappingid('user', $data->userid);
+        $data->bookid = $this->get_mappingid('moodlereader_book', $data->bookid) ?: $data->bookid;
+        // Skip attempts whose book could not be resolved on the target site.
+        if (!$DB->record_exists('moodlereader_books', ['id' => $data->bookid])) {
+            $this->log("skipped attempt for unresolved book", backup::LOG_WARNING);
+            return;
+        }
         $data->timestart = $this->apply_date_offset($data->timestart);
         $data->timefinish = $this->apply_date_offset($data->timefinish);
         $data->timemodified = $this->apply_date_offset($data->timemodified);

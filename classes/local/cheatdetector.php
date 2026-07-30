@@ -48,11 +48,13 @@ class cheatdetector {
                   JOIN {moodlereader_attempts} b
                     ON b.readerid = a.readerid AND b.bookid = a.bookid
                    AND b.ip = a.ip AND b.userid <> a.userid
+                   AND b.passed = 1 AND b.deleted = 0 AND b.cheated = 0
                    AND b.timefinish > 0
                    AND b.timefinish >= a.timefinish - :window
                    AND b.timefinish <= a.timefinish + :window2
                  WHERE a.readerid = :readerid
-                       AND a.passed = 1 AND a.deleted = 0 AND a.timefinish > 0 AND a.ip <> ''";
+                       AND a.passed = 1 AND a.deleted = 0 AND a.cheated = 0
+                       AND a.timefinish > 0 AND a.ip <> ''";
         $params = ['readerid' => $readerid, 'window' => $window, 'window2' => $window];
 
         $now = time();

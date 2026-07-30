@@ -39,7 +39,7 @@ echo $OUTPUT->heading(get_string('modulenameplural', 'mod_moodlereader'));
 
 if (!$instances = get_all_instances_in_course('moodlereader', $course)) {
     notice(
-        get_string('noinstances', 'core', get_string('modulenameplural', 'mod_moodlereader')),
+        get_string('thereareno', 'moodle', get_string('modulenameplural', 'mod_moodlereader')),
         new moodle_url('/course/view.php', ['id' => $course->id])
     );
 }

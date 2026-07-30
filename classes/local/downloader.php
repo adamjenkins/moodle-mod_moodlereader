@@ -48,6 +48,8 @@ class downloader {
             'CURLOPT_SSL_VERIFYPEER' => 1,
             'CURLOPT_SSL_VERIFYHOST' => 2,
             'CURLOPT_RETURNTRANSFER' => 1,
+            'CURLOPT_CONNECTTIMEOUT' => 10,
+            'CURLOPT_TIMEOUT'        => 60,
         ]);
         if ($curl->get_errno() || $response === false) {
             throw new \moodle_exception('registrationfailed', 'mod_moodlereader', '', $curl->error);
@@ -64,6 +66,8 @@ class downloader {
             $book->time = time();
             if ($existing) {
                 $book->id = $existing->id;
+                // Never override a teacher's curation of the 'hidden' flag on re-sync.
+                unset($book->hidden);
                 $DB->update_record('moodlereader_books', $book);
             } else {
                 $DB->insert_record('moodlereader_books', $book);

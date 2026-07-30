@@ -34,6 +34,7 @@ $reader = reader::from_cmid($id);
 require_login($reader->get_course(), false, $reader->get_cm());
 require_sesskey();
 $reader->require_cap('attempt');
+$reader->require_available();
 
 // Server-side availability gate: never trust the submitted book id.
 if (!$reader->book_is_available($bookid, $USER->id)) {

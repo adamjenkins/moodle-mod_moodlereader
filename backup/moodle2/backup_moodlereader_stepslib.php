@@ -44,6 +44,14 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
             'completiontotalwords', 'timecreated', 'timemodified',
         ]);
 
+        // The books this activity references, carried by natural identity so the
+        // restore can re-link to (or recreate) the right book on another site.
+        $books = new backup_nested_element('books');
+        $book = new backup_nested_element('book', ['id'], [
+            'publisher', 'series', 'difficulty', 'name', 'words', 'genre',
+            'fiction', 'points', 'image', 'sametitle', 'hidden', 'time',
+        ]);
+
         $bookinstances = new backup_nested_element('bookinstances');
         $bookinstance = new backup_nested_element(
             'bookinstance',
@@ -78,6 +86,8 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
             ['userid', 'messagetext', 'messageformat', 'timecreated', 'timemodified']
         );
 
+        $reader->add_child($books);
+        $books->add_child($book);
         $reader->add_child($bookinstances);
         $bookinstances->add_child($bookinstance);
         $reader->add_child($attempts);
@@ -91,6 +101,14 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
 
         $reader->set_source_table('moodlereader', ['id' => backup::VAR_ACTIVITYID]);
         $bookinstance->set_source_table('moodlereader_bookinstances', ['readerid' => backup::VAR_PARENTID]);
+
+        // Books referenced by this activity's bookinstances or (when included) attempts.
+        $book->set_source_sql(
+            "SELECT b.* FROM {moodlereader_books} b
+              WHERE b.id IN (SELECT bookid FROM {moodlereader_bookinstances} WHERE readerid = ?)
+                 OR b.id IN (SELECT bookid FROM {moodlereader_attempts} WHERE readerid = ?)",
+            [backup::VAR_ACTIVITYID, backup::VAR_ACTIVITYID]
+        );
 
         if ($userinfo) {
             $attempt->set_source_table('moodlereader_attempts', ['readerid' => backup::VAR_PARENTID]);

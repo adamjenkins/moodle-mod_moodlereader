@@ -44,7 +44,7 @@ class renderer extends \plugin_renderer_base {
         }
         $out = '';
         foreach ($messages as $message) {
-            // format_text() sanitises the stored HTML on output.
+            // The stored HTML is sanitised by format_text() on output.
             $body = format_text(
                 $message->messagetext,
                 $message->messageformat,
@@ -68,13 +68,17 @@ class renderer extends \plugin_renderer_base {
         $goal = (int) $instance->goal;
 
         $countfield = empty($instance->wordsorpoints) ? 'b.words' : 'b.points';
+        // Count each passed book once, honouring ignoredate — matches the gradebook.
         $total = (int) $DB->get_field_sql(
-            "SELECT COALESCE(SUM($countfield), 0)
-               FROM {moodlereader_attempts} a
-               JOIN {moodlereader_books} b ON b.id = a.bookid
-              WHERE a.readerid = :readerid AND a.userid = :userid
-                    AND (a.passed = 1 OR a.credit = 1) AND a.deleted = 0 AND a.cheated = 0",
-            ['readerid' => $instance->id, 'userid' => $userid]
+            "SELECT COALESCE(SUM(bookcount), 0) FROM (
+                SELECT MAX($countfield) AS bookcount
+                  FROM {moodlereader_attempts} a
+                  JOIN {moodlereader_books} b ON b.id = a.bookid
+                 WHERE a.readerid = :readerid AND a.userid = :userid
+                       AND (a.passed = 1 OR a.credit = 1) AND a.deleted = 0 AND a.cheated = 0
+                       AND a.timefinish >= :ignoredate
+              GROUP BY a.bookid) perbook",
+            ['readerid' => $instance->id, 'userid' => $userid, 'ignoredate' => $instance->ignoredate]
         );
 
         $percent = $goal > 0 ? min(100, (int) round(100 * $total / $goal)) : 0;
