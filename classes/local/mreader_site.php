@@ -222,6 +222,8 @@ class mreader_site {
      * @return string '' on success, or an error message.
      */
     public static function register(string $username, string $password): string {
+        global $CFG;
+        require_once($CFG->libdir . '/filelib.php');
         $site = new self(self::DEFAULT_BASEURL);
         $url = $site->siteid_url($username, $password);
 

@@ -93,7 +93,8 @@ class attempt {
      * @return void
      */
     public static function finish(reader $reader, stdClass $attempt, float $percentgrade): void {
-        global $DB;
+        global $CFG, $DB;
+        require_once($CFG->dirroot . '/mod/moodlereader/lib.php');
 
         // Re-read the authoritative state: a repeated callback must not re-finish.
         if ($DB->get_field('moodlereader_attempts', 'state', ['id' => $attempt->id]) === 'finished') {

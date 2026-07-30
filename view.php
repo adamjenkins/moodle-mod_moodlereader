@@ -87,6 +87,17 @@ if ($links) {
 // Teacher messages, student progress and book list.
 echo $output->messages($reader, $USER->id);
 echo $output->progress($reader, $USER->id);
+
+echo html_writer::div(
+    html_writer::link(
+        new moodle_url('/mod/moodlereader/records.php', ['id' => $id]),
+        get_string('myrecords', 'mod_moodlereader'),
+        ['class' => 'btn btn-outline-secondary btn-sm']
+    ),
+    'mod-moodlereader-recordslink mb-3'
+);
+
+echo $output->heading(get_string('choosebook', 'mod_moodlereader'), 4);
 echo $output->book_list($reader, $reader->available_books($USER->id));
 
 echo $output->footer();
