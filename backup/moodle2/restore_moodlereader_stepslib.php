@@ -55,6 +55,10 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
                 'moodlereader_level',
                 '/activity/moodlereader/levels/level'
             );
+            $paths[] = new restore_path_element(
+                'moodlereader_message',
+                '/activity/moodlereader/messages/message'
+            );
         }
         return $this->prepare_activity_structure($paths);
     }
@@ -133,6 +137,22 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         $data->readerid = $this->get_new_parentid('moodlereader');
         $data->userid = $this->get_mappingid('user', $data->userid);
         $DB->insert_record('moodlereader_levels', $data);
+    }
+
+    /**
+     * Restore a teacher message.
+     *
+     * @param array $data
+     * @return void
+     */
+    protected function process_moodlereader_message($data) {
+        global $DB;
+        $data = (object) $data;
+        $data->readerid = $this->get_new_parentid('moodlereader');
+        if (!empty($data->userid)) {
+            $data->userid = $this->get_mappingid('user', $data->userid);
+        }
+        $DB->insert_record('moodlereader_messages', $data);
     }
 
     /**

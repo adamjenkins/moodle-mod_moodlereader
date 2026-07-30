@@ -1,0 +1,90 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Teacher messaging: compose and delete messages shown to students.
+ *
+ * @package    mod_moodlereader
+ * @copyright  2026 Adam Jenkins <adam@wisecat.net>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+require(__DIR__ . '/../../config.php');
+require_once($CFG->libdir . '/formslib.php');
+
+use mod_moodlereader\local\reader;
+use mod_moodlereader\local\message;
+use mod_moodlereader\form\message_form;
+
+$id = required_param('id', PARAM_INT);
+$delete = optional_param('delete', 0, PARAM_INT);
+
+$reader = reader::from_cmid($id);
+require_login($reader->get_course(), true, $reader->get_cm());
+$reader->require_cap('manageusers');
+
+$readerid = $reader->get_instance()->id;
+$pageurl = new moodle_url('/mod/moodlereader/messages.php', ['id' => $id]);
+$PAGE->set_url($pageurl);
+$PAGE->set_context($reader->get_context());
+$PAGE->set_title(get_string('messages', 'mod_moodlereader'));
+$PAGE->set_heading(format_string($reader->get_course()->fullname));
+
+if ($delete) {
+    require_sesskey();
+    message::delete($delete, $readerid);
+    redirect($pageurl, get_string('messagedeleted', 'mod_moodlereader'));
+}
+
+// Build the recipient menu: everyone, plus each enrolled student.
+$recipients = [0 => get_string('everyone', 'mod_moodlereader')];
+$enrolled = get_enrolled_users($reader->get_context(), 'mod/moodlereader:attempt', 0, 'u.*', 'u.lastname', 0, 250);
+foreach ($enrolled as $student) {
+    $recipients[$student->id] = fullname($student);
+}
+
+$mform = new message_form($pageurl->out(false), ['cmid' => $id, 'recipients' => $recipients]);
+if ($data = $mform->get_data()) {
+    $target = array_key_exists($data->target, $recipients) ? (int) $data->target : 0;
+    message::create($readerid, $target, $data->messagetext['text'], (int) $data->messagetext['format']);
+    redirect($pageurl, get_string('messagesent', 'mod_moodlereader'));
+}
+
+echo $OUTPUT->header();
+echo $OUTPUT->heading(get_string('messages', 'mod_moodlereader'));
+$mform->display();
+
+$messages = message::all($readerid);
+if ($messages) {
+    echo $OUTPUT->heading(get_string('existingmessages', 'mod_moodlereader'), 4);
+    $table = new html_table();
+    $table->head = [get_string('messagetarget', 'mod_moodlereader'), get_string('message', 'mod_moodlereader'),
+        get_string('date'), ''];
+    foreach ($messages as $m) {
+        $to = $m->userid == 0 ? get_string('everyone', 'mod_moodlereader')
+            : fullname($DB->get_record('user', ['id' => $m->userid]));
+        $delurl = new moodle_url($pageurl, ['delete' => $m->id, 'sesskey' => sesskey()]);
+        $table->data[] = [
+            s($to),
+            format_text($m->messagetext, $m->messageformat, ['context' => $reader->get_context()]),
+            userdate($m->timecreated),
+            $OUTPUT->action_icon($delurl, new pix_icon('t/delete', get_string('delete'))),
+        ];
+    }
+    echo html_writer::table($table);
+}
+
+echo $OUTPUT->footer();

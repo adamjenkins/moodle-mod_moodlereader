@@ -235,9 +235,15 @@ class migrator {
                 'timestart'    => (int) $old->timestart,
                 'timefinish'   => (int) $old->timefinish,
                 'timemodified' => (int) $old->timemodified,
+                'ip'           => (string) ($old->ip ?? ''),
             ],
             fn($old) => isset($this->bookmap[$old->bookid])
         );
+
+        // Note: the legacy reader_cheated_log and reader_messages tables use a
+        // different data model and are not migrated. The per-attempt "cheated"
+        // flag above is preserved (so grade effects carry over), and a cheating
+        // re-scan regenerates the cheat log; teacher messages are transient.
 
         $grades = $this->migrate_per_user(
             'reader_grades',

@@ -23,6 +23,7 @@
  */
 
 require(__DIR__ . '/../../../config.php');
+require_once($CFG->libdir . '/formslib.php');
 
 use mod_moodlereader\local\mreader_site;
 

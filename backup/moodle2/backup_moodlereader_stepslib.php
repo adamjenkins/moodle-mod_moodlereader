@@ -54,7 +54,7 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         $attempts = new backup_nested_element('attempts');
         $attempt = new backup_nested_element('attempt', ['id'], [
             'userid', 'bookid', 'attempt', 'state', 'percentgrade', 'passed', 'credit',
-            'cheated', 'deleted', 'bookrating', 'timestart', 'timefinish', 'timemodified',
+            'cheated', 'deleted', 'bookrating', 'timestart', 'timefinish', 'timemodified', 'ip',
         ]);
 
         $grades = new backup_nested_element('grades');
@@ -71,6 +71,13 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
             ['userid', 'startlevel', 'currentlevel', 'stoplevel', 'allowpromotion', 'time']
         );
 
+        $messages = new backup_nested_element('messages');
+        $message = new backup_nested_element(
+            'message',
+            ['id'],
+            ['userid', 'messagetext', 'messageformat', 'timecreated', 'timemodified']
+        );
+
         $reader->add_child($bookinstances);
         $bookinstances->add_child($bookinstance);
         $reader->add_child($attempts);
@@ -79,6 +86,8 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         $grades->add_child($grade);
         $reader->add_child($levels);
         $levels->add_child($level);
+        $reader->add_child($messages);
+        $messages->add_child($message);
 
         $reader->set_source_table('moodlereader', ['id' => backup::VAR_ACTIVITYID]);
         $bookinstance->set_source_table('moodlereader_bookinstances', ['readerid' => backup::VAR_PARENTID]);
@@ -87,11 +96,13 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
             $attempt->set_source_table('moodlereader_attempts', ['readerid' => backup::VAR_PARENTID]);
             $grade->set_source_table('moodlereader_grades', ['readerid' => backup::VAR_PARENTID]);
             $level->set_source_table('moodlereader_levels', ['readerid' => backup::VAR_PARENTID]);
+            $message->set_source_table('moodlereader_messages', ['readerid' => backup::VAR_PARENTID]);
         }
 
         $attempt->annotate_ids('user', 'userid');
         $grade->annotate_ids('user', 'userid');
         $level->annotate_ids('user', 'userid');
+        $message->annotate_ids('user', 'userid');
 
         $reader->annotate_files('mod_moodlereader', 'intro', null);
 

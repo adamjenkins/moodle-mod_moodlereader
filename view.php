@@ -58,26 +58,34 @@ if (!empty($reader->get_instance()->intro)) {
 }
 
 // Teacher tools.
-if ($reader->can('viewreports') || $reader->can('managebooks')) {
-    $links = [];
-    if ($reader->can('viewreports')) {
+$tools = [
+    'viewreports' => ['report.php', 'report'],
+    'managebooks' => ['books.php', 'managebooks'],
+    'manageusers' => ['messages.php', 'messages'],
+];
+$links = [];
+foreach ($tools as $capability => [$script, $stringid]) {
+    if ($reader->can($capability)) {
         $links[] = html_writer::link(
-            new moodle_url('/mod/moodlereader/report.php', ['id' => $id]),
-            get_string('report', 'mod_moodlereader'),
+            new moodle_url("/mod/moodlereader/$script", ['id' => $id]),
+            get_string($stringid, 'mod_moodlereader'),
             ['class' => 'btn btn-secondary']
         );
     }
-    if ($reader->can('managebooks')) {
-        $links[] = html_writer::link(
-            new moodle_url('/mod/moodlereader/books.php', ['id' => $id]),
-            get_string('managebooks', 'mod_moodlereader'),
-            ['class' => 'btn btn-secondary']
-        );
-    }
+}
+if ($reader->can('manageusers')) {
+    $links[] = html_writer::link(
+        new moodle_url('/mod/moodlereader/cheating.php', ['id' => $id]),
+        get_string('cheating', 'mod_moodlereader'),
+        ['class' => 'btn btn-secondary']
+    );
+}
+if ($links) {
     echo html_writer::div(implode(' ', $links), 'mod-moodlereader-teachertools mb-3');
 }
 
-// Student progress + book list.
+// Teacher messages, student progress and book list.
+echo $output->messages($reader, $USER->id);
 echo $output->progress($reader, $USER->id);
 echo $output->book_list($reader, $reader->available_books($USER->id));
 

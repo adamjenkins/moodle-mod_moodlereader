@@ -74,6 +74,7 @@ class attempt {
             'timestart'    => $now,
             'timefinish'   => 0,
             'timemodified' => $now,
+            'ip'           => getremoteaddr('', ''),
         ];
         $attempt->id = $DB->insert_record('moodlereader_attempts', $attempt);
 

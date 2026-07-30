@@ -50,7 +50,17 @@ class provider implements
             'percentgrade' => 'privacy:metadata:moodlereader_attempts:percentgrade',
             'timestart'    => 'privacy:metadata:moodlereader_attempts:timestart',
             'timefinish'   => 'privacy:metadata:moodlereader_attempts:timefinish',
+            'ip'           => 'privacy:metadata:moodlereader_attempts:ip',
         ], 'privacy:metadata:moodlereader_attempts');
+
+        $collection->add_database_table('moodlereader_cheatlog', [
+            'userid' => 'privacy:metadata:moodlereader_cheatlog:userid',
+            'reason' => 'privacy:metadata:moodlereader_cheatlog:reason',
+        ], 'privacy:metadata:moodlereader_cheatlog');
+
+        $collection->add_database_table('moodlereader_messages', [
+            'messagetext' => 'privacy:metadata:moodlereader_messages:messagetext',
+        ], 'privacy:metadata:moodlereader_messages');
 
         $collection->add_database_table('moodlereader_grades', [
             'rawgrade' => 'privacy:metadata:moodlereader_grades:rawgrade',
@@ -92,10 +102,14 @@ class provider implements
              LEFT JOIN {moodlereader_attempts} a ON a.readerid = r.id AND a.userid = :uid1
              LEFT JOIN {moodlereader_grades} g ON g.readerid = r.id AND g.userid = :uid2
              LEFT JOIN {moodlereader_levels} l ON l.readerid = r.id AND l.userid = :uid3
-                 WHERE a.id IS NOT NULL OR g.id IS NOT NULL OR l.id IS NOT NULL";
+             LEFT JOIN {moodlereader_cheatlog} c ON c.readerid = r.id AND (c.userid = :uid4 OR c.otheruserid = :uid5)
+             LEFT JOIN {moodlereader_messages} msg ON msg.readerid = r.id AND msg.userid = :uid6
+                 WHERE a.id IS NOT NULL OR g.id IS NOT NULL OR l.id IS NOT NULL
+                       OR c.id IS NOT NULL OR msg.id IS NOT NULL";
         $contextlist->add_from_sql($sql, [
             'modulelevel' => CONTEXT_MODULE,
             'uid1' => $userid, 'uid2' => $userid, 'uid3' => $userid,
+            'uid4' => $userid, 'uid5' => $userid, 'uid6' => $userid,
         ]);
 
         // Site-wide identity map lives in the user's own context.
@@ -124,9 +138,21 @@ class provider implements
                       JOIN {moodlereader} r ON r.id = cm.instance
                       JOIN {%s} t ON t.readerid = r.id
                      WHERE cm.id = :cmid";
-            foreach (['moodlereader_attempts', 'moodlereader_grades', 'moodlereader_levels'] as $table) {
+            foreach (
+                ['moodlereader_attempts', 'moodlereader_grades', 'moodlereader_levels',
+                    'moodlereader_messages'] as $table
+            ) {
                 $userlist->add_from_sql('userid', sprintf($sql, 't.userid', $table), $params);
             }
+            // Cheat-log rows reference two users.
+            $cheatsql = "SELECT %s
+                           FROM {course_modules} cm
+                           JOIN {modules} m ON m.id = cm.module AND m.name = 'moodlereader'
+                           JOIN {moodlereader} r ON r.id = cm.instance
+                           JOIN {moodlereader_cheatlog} t ON t.readerid = r.id
+                          WHERE cm.id = :cmid";
+            $userlist->add_from_sql('userid', sprintf($cheatsql, 't.userid'), $params);
+            $userlist->add_from_sql('otheruserid', sprintf($cheatsql, 't.otheruserid'), $params);
         } else if ($context instanceof context_user) {
             global $DB;
             if ($DB->record_exists('moodlereader_users', ['userid' => $context->instanceid])) {
@@ -174,6 +200,26 @@ class provider implements
                 if ($grade = $DB->get_record('moodlereader_grades', ['readerid' => $cm->instance, 'userid' => $userid])) {
                     $data->grade = $grade->rawgrade;
                 }
+
+                $cheats = $DB->get_records_select(
+                    'moodlereader_cheatlog',
+                    'readerid = :readerid AND (userid = :uid1 OR otheruserid = :uid2)',
+                    ['readerid' => $cm->instance, 'uid1' => $userid, 'uid2' => $userid]
+                );
+                $data->flaggedforcheating = array_values(array_map(fn($c) => [
+                    'reason'      => $c->reason,
+                    'timecreated' => \core_privacy\local\request\transform::datetime($c->timecreated),
+                ], $cheats));
+
+                $messages = $DB->get_records(
+                    'moodlereader_messages',
+                    ['readerid' => $cm->instance, 'userid' => $userid]
+                );
+                $data->messages = array_values(array_map(fn($m) => [
+                    'message'     => format_text($m->messagetext, $m->messageformat, ['context' => $context]),
+                    'timecreated' => \core_privacy\local\request\transform::datetime($m->timecreated),
+                ], $messages));
+
                 writer::with_context($context)->export_data([], $data);
             } else if ($context instanceof context_user && $context->instanceid == $userid) {
                 if ($identity = $DB->get_record('moodlereader_users', ['userid' => $userid])) {
@@ -204,6 +250,8 @@ class provider implements
         $DB->delete_records('moodlereader_attempts', $params);
         $DB->delete_records('moodlereader_grades', $params);
         $DB->delete_records('moodlereader_levels', $params);
+        $DB->delete_records('moodlereader_cheatlog', $params);
+        $DB->delete_records('moodlereader_messages', $params);
     }
 
     /**
@@ -225,6 +273,12 @@ class provider implements
                 $DB->delete_records('moodlereader_attempts', $params);
                 $DB->delete_records('moodlereader_grades', $params);
                 $DB->delete_records('moodlereader_levels', $params);
+                $DB->delete_records('moodlereader_messages', $params);
+                $DB->delete_records_select(
+                    'moodlereader_cheatlog',
+                    'readerid = :readerid AND (userid = :uid1 OR otheruserid = :uid2)',
+                    ['readerid' => $cm->instance, 'uid1' => $userid, 'uid2' => $userid]
+                );
             } else if ($context instanceof context_user && $context->instanceid == $userid) {
                 $DB->delete_records('moodlereader_users', ['userid' => $userid]);
             }
@@ -251,9 +305,17 @@ class provider implements
             }
             [$insql, $inparams] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED);
             $params = ['readerid' => $cm->instance] + $inparams;
-            foreach (['moodlereader_attempts', 'moodlereader_grades', 'moodlereader_levels'] as $table) {
+            foreach (
+                ['moodlereader_attempts', 'moodlereader_grades', 'moodlereader_levels',
+                    'moodlereader_messages'] as $table
+            ) {
                 $DB->delete_records_select($table, "readerid = :readerid AND userid $insql", $params);
             }
+            $DB->delete_records_select(
+                'moodlereader_cheatlog',
+                "readerid = :readerid AND (userid $insql OR otheruserid $insql)",
+                $params
+            );
         } else if ($context instanceof context_user) {
             if (in_array($context->instanceid, $userids)) {
                 $DB->delete_records('moodlereader_users', ['userid' => $context->instanceid]);

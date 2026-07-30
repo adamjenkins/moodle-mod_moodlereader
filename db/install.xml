@@ -104,11 +104,49 @@
         <FIELD NAME="timestart" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timefinish" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="ip" TYPE="char" LENGTH="45" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="Remote address at attempt time, used by cheating detection."/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
         <KEY NAME="readerid" TYPE="foreign" FIELDS="readerid" REFTABLE="moodlereader" REFFIELDS="id"/>
         <KEY NAME="bookid" TYPE="foreign" FIELDS="bookid" REFTABLE="moodlereader_books" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="readerid_userid" UNIQUE="false" FIELDS="readerid, userid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="moodlereader_cheatlog" COMMENT="Suspected-cheating clusters flagged for teacher review.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="readerid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="attemptid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="otherattemptid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="otheruserid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="reason" TYPE="char" LENGTH="40" NOTNULL="true" DEFAULT="" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="readerid" TYPE="foreign" FIELDS="readerid" REFTABLE="moodlereader" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="attemptid" UNIQUE="false" FIELDS="attemptid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="moodlereader_messages" COMMENT="Teacher messages shown to students on the activity page.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="readerid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Target user, or 0 for everyone in the instance."/>
+        <FIELD NAME="messagetext" TYPE="text" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="messageformat" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="readerid" TYPE="foreign" FIELDS="readerid" REFTABLE="moodlereader" REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
         <INDEX NAME="readerid_userid" UNIQUE="false" FIELDS="readerid, userid"/>

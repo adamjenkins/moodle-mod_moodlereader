@@ -96,6 +96,8 @@ function moodlereader_delete_instance($id) {
     $DB->delete_records('moodlereader_grades', $params);
     $DB->delete_records('moodlereader_levels', $params);
     $DB->delete_records('moodlereader_bookinstances', $params);
+    $DB->delete_records('moodlereader_cheatlog', $params);
+    $DB->delete_records('moodlereader_messages', $params);
     $DB->delete_records('moodlereader', ['id' => $id]);
     moodlereader_grade_item_delete($instance);
     return true;
@@ -258,6 +260,7 @@ function moodlereader_reset_userdata($data) {
         $DB->delete_records('moodlereader_attempts', $params);
         $DB->delete_records('moodlereader_grades', $params);
         $DB->delete_records('moodlereader_levels', $params);
+        $DB->delete_records('moodlereader_cheatlog', $params);
         moodlereader_grade_item_update($instance, 'reset');
     }
     $status[] = [

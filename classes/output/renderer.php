@@ -31,6 +31,31 @@ use mod_moodlereader\local\reader;
  */
 class renderer extends \plugin_renderer_base {
     /**
+     * The teacher messages currently visible to a user.
+     *
+     * @param reader $reader
+     * @param int $userid
+     * @return string HTML.
+     */
+    public function messages(reader $reader, int $userid): string {
+        $messages = \mod_moodlereader\local\message::for_user($reader->get_instance()->id, $userid);
+        if (!$messages) {
+            return '';
+        }
+        $out = '';
+        foreach ($messages as $message) {
+            // format_text() sanitises the stored HTML on output.
+            $body = format_text(
+                $message->messagetext,
+                $message->messageformat,
+                ['context' => $reader->get_context()]
+            );
+            $out .= $this->output->notification($body, 'info', false);
+        }
+        return html_writer::div($out, 'mod-moodlereader-messages mb-3');
+    }
+
+    /**
      * The reading-progress panel for a user.
      *
      * @param reader $reader
