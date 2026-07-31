@@ -24,10 +24,13 @@ Feature: Moodle Reader activity
       | The Red Kite | Acme      | Level 1 | 1          | 3000  |
       | Blue Hills   | Acme      | Level 1 | 1          | 4000  |
 
-  Scenario: A student sees available books and their reading progress
+  Scenario: A student sees their progress and can search for available books
     When I am on the "Reader 1" "moodlereader activity" page logged in as student1
     Then I should see "Reading progress: 0 of 5,000 words"
-    And I should see "The Red Kite"
+    And I should see "Search for a book to read"
+    And I should not see "The Red Kite"
+    When I press "Search"
+    Then I should see "The Red Kite"
     And I should see "Blue Hills"
     And "Take the quiz" "button" should exist
 
@@ -53,6 +56,7 @@ Feature: Moodle Reader activity
   Scenario: A student launches a quiz and is taken to the mreader.org quiz page
     Given the site is registered with mreader.org
     When I am on the "Reader 1" "moodlereader activity" page logged in as student1
+    And I press "Search"
     And I press "Take the quiz"
     Then I should see "Take the quiz for"
     And "iframe" "css_element" should exist
