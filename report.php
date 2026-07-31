@@ -58,7 +58,7 @@ foreach (['attempts', 'users', 'books'] as $t) {
 }
 echo $OUTPUT->tabtree($tabs, $mode);
 
-$namefieldsql = \core_user\fields::for_name()->get_sql('u', false, '', '', false)->selects;
+$namefieldsql = \core_user\fields::for_name()->get_sql('u')->selects;
 $namegroupby = 'u.' . implode(', u.', \core_user\fields::get_name_fields());
 
 $table = new html_table();

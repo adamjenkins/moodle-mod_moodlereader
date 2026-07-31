@@ -40,7 +40,8 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         $reader = new backup_nested_element('moodlereader', ['id'], [
             'name', 'intro', 'introformat', 'availablefrom', 'availableuntil', 'maxgrade',
             'goal', 'wordsorpoints', 'minpassgrade', 'ignoredate', 'levelcheck', 'thislevel',
-            'prevlevel', 'nextlevel', 'bookinstances', 'showprogressbar', 'completionpass',
+            'prevlevel', 'nextlevel', 'bookinstances', 'showprogressbar', 'showlevel',
+            'showbooksread', 'showreport', 'showsearch', 'completionpass',
             'completiontotalwords', 'timecreated', 'timemodified',
         ]);
 
@@ -48,7 +49,7 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         // restore can re-link to (or recreate) the right book on another site.
         $books = new backup_nested_element('books');
         $book = new backup_nested_element('book', ['id'], [
-            'publisher', 'series', 'difficulty', 'name', 'words', 'genre',
+            'remoteid', 'publisher', 'series', 'difficulty', 'name', 'words', 'genre',
             'fiction', 'points', 'image', 'sametitle', 'hidden', 'time',
         ]);
 
@@ -78,7 +79,7 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         $level = new backup_nested_element(
             'level',
             ['id'],
-            ['userid', 'startlevel', 'currentlevel', 'stoplevel', 'allowpromotion', 'time']
+            ['userid', 'goal', 'startlevel', 'currentlevel', 'stoplevel', 'allowpromotion', 'time']
         );
 
         $messages = new backup_nested_element('messages');

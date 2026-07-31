@@ -76,5 +76,36 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026073001, 'moodlereader');
     }
 
+    if ($oldversion < 2026073002) {
+        // Store the mreader.org book id so covers can be fetched on demand.
+        $table = new xmldb_table('moodlereader_books');
+        $field = new xmldb_field('remoteid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'id');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_mod_savepoint(true, 2026073002, 'moodlereader');
+    }
+
+    if ($oldversion < 2026073003) {
+        // Appearance toggles: which activity-page sections a teacher shows.
+        $table = new xmldb_table('moodlereader');
+        foreach (['showlevel', 'showbooksread', 'showreport', 'showsearch'] as $name) {
+            $field = new xmldb_field($name, XMLDB_TYPE_INTEGER, '2', null, XMLDB_NOTNULL, null, '1');
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+
+        // Per-user reading-goal override (0 = use the activity default).
+        $table = new xmldb_table('moodlereader_levels');
+        $field = new xmldb_field('goal', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'userid');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_mod_savepoint(true, 2026073003, 'moodlereader');
+    }
+
     return true;
 }

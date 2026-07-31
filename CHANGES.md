@@ -1,49 +1,38 @@
 # Changelog — mod_moodlereader
 
-## 1.1.0 (2026-07-30)
+The plugin is in pre-release development. The version stays at `0.0.z` until a
+`1.0.0` release is explicitly cut; `x`/`y` are not bumped without sign-off.
 
-Feature pass, independent-review fixes, and the corrections found by running the
-plugin end-to-end.
+## 0.0.1 (unreleased)
 
-Features:
-- Expanded teacher reports: attempts, per-student summary, per-book summary.
+A security-focused, single-purpose rebuild of the legacy `mod_reader` plugin,
+keeping the mreader.org iframe quiz integration and removing the obsolete local
+Moodle-quiz engine.
+
+Student activity page (rebuilt to match the original mod_reader experience):
+- Reading-progress bar toward a per-user reading goal.
+- "Books read this term" and "…previous terms" book-cover galleries (covers are
+  fetched from mreader.org on demand and cached via the Files API).
+- Reading report of this term's finished attempts with a running word total.
+- Current reading-level panel.
+- Book search (title, publisher, series, genre, reading level) — results are
+  shown only after a search and include a cover thumbnail and a "take the quiz"
+  button. Books already read, hidden books, and out-of-level books are excluded.
+
+Teacher tools:
+- Reports: attempts, per-student summary, per-book summary.
 - Cheating detection: records attempt IP; flags same-book / same-IP / close-time
-  passes; teacher mark/unmark (cheated words are excluded from the grade).
+  passes; mark/unmark (cheated words are excluded from the grade).
 - Teacher-to-student messaging shown on the activity page.
-- Teacher enable/disable of books in the catalogue.
-- Student "My reading records" page (per-book results and running total).
+- Enable/disable individual books in the catalogue.
+- Per-student reading-goal overrides (default applies to everyone).
+- Appearance settings: choose which activity-page sections students see.
 
-Correctness & security fixes (from an independent review and live testing):
-- Grade integrity: a finished attempt excludes its book; each book's words count
-  once; in-progress books stay listed to resume.
-- Custom completion rules now evaluate (custom_completion class + coursemodule
-  info); the form grade element maps to the gradebook max.
-- Availability window enforced; migration made idempotent; restore remaps book
-  ids by identity (cross-site safe); backup element renamed to avoid a
-  final-element name collision.
-- Book sync rewritten to mreader.org's real JSON response (was expecting the
-  legacy XML); required libraries (`filelib`, plugin `lib.php`) loaded on the
-  live curl/grade paths.
-- Privacy metadata completed; progress bar and reset aligned; misc hardening.
-
-Schema: added `moodlereader_attempts.ip`, `moodlereader_cheatlog`,
-`moodlereader_messages` (with an upgrade step).
-
-Tests: PHPUnit 24 tests; Behat 4 scenarios.
-
-## 1.0.0 (2026-07-30)
-
-Initial release. A security-focused, single-purpose rebuild of the legacy
-`mod_reader` plugin, keeping the mreader.org iframe quiz integration and removing
-the obsolete local Moodle-quiz engine.
-
-- Student book-quiz flow via the mreader.org iframe, with a constant-time
-  verified grade callback.
-- Reading goal, per-user reading levels and level-filtered book availability.
-- Grades pushed to the gradebook (words in passed books ÷ goal).
-- Book catalogue sync and registration with mreader.org (TLS-verified).
-- Teacher attempts report.
-- Files-API book covers, full privacy provider, backup/restore, completion, events.
-- PHPUnit tests for token verification, grading and identity.
+Platform:
+- mreader.org iframe quiz flow with a constant-time verified grade callback.
+- Level-filtered book availability; grades pushed to the gradebook.
+- Book catalogue sync from mreader.org's JSON API (TLS-verified).
+- Full privacy provider, backup/restore, activity completion, and events.
 - CLI migration from `mod_reader` (config, catalogue, identity map, activities,
-  attempts, grades, levels).
+  attempts, grades, levels) — read-only on the legacy data, idempotent.
+- PHPUnit and Behat coverage.

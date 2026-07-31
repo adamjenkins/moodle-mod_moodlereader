@@ -66,8 +66,8 @@ echo $OUTPUT->single_button(
     'post'
 );
 
-$ubfields = \core_user\fields::for_name()->get_sql('ub', false, '', 'ubid', false)->selects;
-$obfields = \core_user\fields::for_name()->get_sql('ob', false, 'other', 'obid', false)->selects;
+$ubfields = \core_user\fields::for_name()->get_sql('ub', false, '', 'ubid')->selects;
+$obfields = \core_user\fields::for_name()->get_sql('ob', false, 'other', 'obid')->selects;
 $sql = "SELECT c.id, c.attemptid, a.cheated, a.userid, c.otheruserid,
                b.name AS bookname, a.ip, a.timefinish $ubfields $obfields
           FROM {moodlereader_cheatlog} c

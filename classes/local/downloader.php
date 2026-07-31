@@ -19,9 +19,9 @@ namespace mod_moodlereader\local;
 /**
  * Synchronises the local book catalogue from mreader.org.
  *
- * mreader.org's api.php returns an XML list of books. The field mapping below
- * follows the legacy plugin's contract; if mreader.org changes its response
- * schema this is the single place to adjust.
+ * mreader.org's api.php returns a JSON object of books keyed by remote book id.
+ * The field mapping in {@see self::extract_books()} is the single place to adjust
+ * if mreader.org changes its response schema.
  *
  * @package    mod_moodlereader
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -119,6 +119,7 @@ class downloader {
             }
             $get = fn($k) => isset($row[$k]) ? trim((string) $row[$k]) : '';
             $books[] = (object) [
+                'remoteid'   => (int) clean_param($get('id'), PARAM_INT),
                 'publisher'  => clean_param($get('publisher'), PARAM_TEXT),
                 'series'     => clean_param($get('level'), PARAM_TEXT),
                 'difficulty' => (int) clean_param($get('difficulty'), PARAM_INT),

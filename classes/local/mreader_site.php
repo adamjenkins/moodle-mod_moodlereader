@@ -54,6 +54,9 @@ class mreader_site {
     /** @var string Book-list selector: books that have no quiz. */
     const BOOKS_WITHOUT_QUIZZES = 'bookswithoutquizzes';
 
+    /** @var string api.php action that returns a book cover image (books with quizzes). */
+    const IMAGE_WITH_QUIZ = 'imagewithquiz';
+
     /** @var string Base URL of the remote service. */
     protected $baseurl;
 
@@ -196,6 +199,46 @@ class mreader_site {
             't'   => time(),
             'sid' => $this->siteid,
         ]);
+    }
+
+    /**
+     * Fetch a book's cover image bytes from mreader.org.
+     *
+     * The cover is requested with a signed api.php call (token in the query string)
+     * and the remote book id posted as `imageid`. Returns null if the site is not
+     * registered, the id is unknown, the request fails, or the response is not an image.
+     *
+     * @param int $remoteid The book's mreader.org id (moodlereader_books.remoteid).
+     * @return string|null Raw image bytes, or null on any failure.
+     */
+    public function fetch_cover(int $remoteid): ?string {
+        global $CFG;
+        if (!$this->is_configured() || $remoteid <= 0) {
+            return null;
+        }
+        require_once($CFG->libdir . '/filelib.php');
+
+        $url = $this->signed_url(self::SCRIPT_API, [
+            'a'   => self::IMAGE_WITH_QUIZ,
+            't'   => time(),
+            'sid' => $this->siteid,
+        ]);
+        $curl = new \curl();
+        $body = $curl->post($url->out(false), ['imageid' => $remoteid], [
+            'CURLOPT_SSL_VERIFYPEER' => 1,
+            'CURLOPT_SSL_VERIFYHOST' => 2,
+            'CURLOPT_RETURNTRANSFER' => 1,
+            'CURLOPT_CONNECTTIMEOUT' => 10,
+            'CURLOPT_TIMEOUT'        => 30,
+        ]);
+        if ($curl->get_errno() || $body === false || $body === '') {
+            return null;
+        }
+        $info = $curl->get_info();
+        if (strpos($info['content_type'] ?? '', 'image/') !== 0) {
+            return null;
+        }
+        return $body;
     }
 
     /**

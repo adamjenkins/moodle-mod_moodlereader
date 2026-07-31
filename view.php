@@ -79,14 +79,34 @@ if ($reader->can('manageusers')) {
         get_string('cheating', 'mod_moodlereader'),
         ['class' => 'btn btn-secondary']
     );
+    $links[] = html_writer::link(
+        new moodle_url('/mod/moodlereader/goals.php', ['id' => $id]),
+        get_string('setgoals', 'mod_moodlereader'),
+        ['class' => 'btn btn-secondary']
+    );
 }
 if ($links) {
     echo html_writer::div(implode(' ', $links), 'mod-moodlereader-teachertools mb-3');
 }
 
-// Teacher messages, student progress and book list.
+// Teacher messages.
 echo $output->messages($reader, $USER->id);
-echo $output->progress($reader, $USER->id);
+
+// Reading progress, current level, book covers and this-term reading report —
+// each section is shown only when the teacher has enabled it (Appearance settings).
+$instance = $reader->get_instance();
+if (!empty($instance->showprogressbar)) {
+    echo $output->progress($reader, $USER->id);
+}
+if (!empty($instance->showlevel)) {
+    echo $output->level_panel($reader, $USER->id);
+}
+if (!empty($instance->showbooksread)) {
+    echo $output->books_read($reader, $USER->id);
+}
+if (!empty($instance->showreport)) {
+    echo $output->reading_report($reader, $USER->id, fullname($USER));
+}
 
 echo html_writer::div(
     html_writer::link(
@@ -97,7 +117,30 @@ echo html_writer::div(
     'mod-moodlereader-recordslink mb-3'
 );
 
-echo $output->heading(get_string('choosebook', 'mod_moodlereader'), 4);
-echo $output->book_list($reader, $reader->available_books($USER->id));
+// Search for the next book to read. Filters are layered on top of the availability
+// gate, so students only ever see books they may actually attempt. Results are shown
+// only once the student runs a search (the form does not list books by default).
+if (!empty($instance->showsearch)) {
+    $difficulty = optional_param('searchdifficulty', -1, PARAM_INT);
+    $filters = [
+        'name'       => optional_param('searchname', '', PARAM_TEXT),
+        'publisher'  => optional_param('searchpublisher', '', PARAM_TEXT),
+        'series'     => optional_param('searchseries', '', PARAM_TEXT),
+        'genre'      => optional_param('searchgenre', '', PARAM_ALPHA),
+        'difficulty' => $difficulty,
+    ];
+    $searched = optional_param('searchsubmit', 0, PARAM_INT);
+    $hasfilter = trim($filters['name']) !== '' || $filters['publisher'] !== '' || trim($filters['series']) !== ''
+        || $filters['genre'] !== '' || $difficulty >= 0;
+
+    echo $output->search_form($reader, $USER->id, $filters);
+
+    if ($searched) {
+        $limit = $hasfilter ? 200 : 50;
+        $total = 0;
+        $books = $reader->search_books($USER->id, $filters, $limit, $total);
+        echo $output->search_results($reader, $books, $total, $limit);
+    }
+}
 
 echo $output->footer();

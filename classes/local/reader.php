@@ -170,6 +170,22 @@ class reader {
     }
 
     /**
+     * A user's effective reading goal: their per-user override, or the activity default.
+     *
+     * @param int $userid
+     * @return int Number of words (or points) for full marks.
+     */
+    public function get_goal(int $userid): int {
+        global $DB;
+        $override = (int) $DB->get_field(
+            'moodlereader_levels',
+            'goal',
+            ['readerid' => $this->instance->id, 'userid' => $userid]
+        );
+        return $override > 0 ? $override : (int) $this->instance->goal;
+    }
+
+    /**
      * The book difficulties a user is currently allowed to attempt.
      *
      * @param int $userid
@@ -192,33 +208,37 @@ class reader {
     }
 
     /**
-     * Books the given user may attempt right now.
+     * The FROM/WHERE that select the books a user may attempt right now.
      *
      * Excludes hidden books, books the user has already *finished* an attempt on
      * (by book id, and by shared title for title-groups), and books outside the
      * user's reading level when level checking is enabled. Books with only an
-     * in-progress attempt stay listed so the user can resume them.
+     * in-progress attempt stay listed so the user can resume them. Shared by
+     * {@see available_books()}, {@see search_books()} and {@see available_publishers()}.
      *
      * @param int $userid
-     * @return stdClass[] Keyed by book id.
+     * @return array [string $from, string[] $where, array $params]
      */
-    public function available_books(int $userid): array {
+    protected function available_where(int $userid): array {
         global $DB;
 
-        $params = ['readerid' => $this->instance->id, 'userid' => $userid];
+        $params = [
+            'readerid'  => $this->instance->id,
+            'userid'    => $userid,
+            'readerid2' => $this->instance->id,
+            'userid2'   => $userid,
+        ];
 
         // Finished attempts by this user (the ones that "use up" a book).
-        $finished = "FROM {moodlereader_attempts} a
-                    WHERE a.readerid = :readerid AND a.userid = :userid
-                          AND a.deleted = 0 AND a.state = 'finished'";
-        $doneids = "SELECT a.bookid $finished";
+        $doneids = "SELECT a.bookid
+                      FROM {moodlereader_attempts} a
+                     WHERE a.readerid = :readerid AND a.userid = :userid
+                           AND a.deleted = 0 AND a.state = 'finished'";
         $donetitles = "SELECT b2.sametitle
                          FROM {moodlereader_attempts} a
                          JOIN {moodlereader_books} b2 ON b2.id = a.bookid
                         WHERE a.readerid = :readerid2 AND a.userid = :userid2
                               AND a.deleted = 0 AND a.state = 'finished' AND b2.sametitle <> ''";
-        $params['readerid2'] = $this->instance->id;
-        $params['userid2'] = $userid;
 
         $from = '{moodlereader_books} b';
         $where = ['b.hidden = 0'];
@@ -240,8 +260,103 @@ class reader {
             $params += $inparams;
         }
 
+        return [$from, $where, $params];
+    }
+
+    /**
+     * Books the given user may attempt right now.
+     *
+     * @param int $userid
+     * @return stdClass[] Keyed by book id.
+     */
+    public function available_books(int $userid): array {
+        global $DB;
+        [$from, $where, $params] = $this->available_where($userid);
         $sql = "SELECT b.* FROM $from WHERE " . implode(' AND ', $where) . ' ORDER BY b.publisher, b.series, b.name';
         return $DB->get_records_sql($sql, $params);
+    }
+
+    /**
+     * Search the books a user may attempt, applying optional filters.
+     *
+     * Filters (all optional): 'name', 'publisher', 'series' (partial, case-insensitive),
+     * 'genre' (a genre code, matched within the book's comma-separated genre list) and
+     * 'difficulty' (exact reading level; a value below 0 means "any"). Every filter is
+     * layered on top of the same availability gate as {@see available_books()}.
+     *
+     * @param int $userid
+     * @param array $filters
+     * @param int $limit Maximum rows to return (0 = no limit).
+     * @param int|null $total Set by reference to the full match count (ignoring $limit).
+     * @return stdClass[] Keyed by book id.
+     */
+    public function search_books(int $userid, array $filters, int $limit = 0, ?int &$total = null): array {
+        global $DB;
+        [$from, $where, $params] = $this->available_where($userid);
+
+        $i = 0;
+        foreach (['name', 'publisher', 'series', 'genre'] as $field) {
+            $value = trim((string) ($filters[$field] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+            $where[] = $DB->sql_like("b.$field", ":s$i", false, false);
+            $params["s$i"] = '%' . $DB->sql_like_escape($value) . '%';
+            $i++;
+        }
+        $difficulty = $filters['difficulty'] ?? -1;
+        if (is_numeric($difficulty) && (int) $difficulty >= 0) {
+            $where[] = 'b.difficulty = :sdiff';
+            $params['sdiff'] = (int) $difficulty;
+        }
+
+        $wheresql = implode(' AND ', $where);
+        $total = $DB->count_records_sql("SELECT COUNT(1) FROM $from WHERE $wheresql", $params);
+        $sql = "SELECT b.* FROM $from WHERE $wheresql ORDER BY b.publisher, b.series, b.name";
+        return $DB->get_records_sql($sql, $params, 0, $limit);
+    }
+
+    /**
+     * The publishers that currently have books available to a user, with counts.
+     *
+     * @param int $userid
+     * @return array Map of publisher name => number of available books.
+     */
+    public function available_publishers(int $userid): array {
+        global $DB;
+        [$from, $where, $params] = $this->available_where($userid);
+        $sql = "SELECT b.publisher, COUNT(1) AS cnt
+                  FROM $from WHERE " . implode(' AND ', $where) . '
+              GROUP BY b.publisher ORDER BY b.publisher';
+        $out = [];
+        foreach ($DB->get_records_sql($sql, $params) as $row) {
+            $out[$row->publisher] = (int) $row->cnt;
+        }
+        return $out;
+    }
+
+    /**
+     * The reading difficulties present among the books available to a user.
+     *
+     * @param int $userid
+     * @return int[] Sorted ascending.
+     */
+    public function available_difficulties(int $userid): array {
+        global $DB;
+        [$from, $where, $params] = $this->available_where($userid);
+        $sql = "SELECT DISTINCT b.difficulty
+                  FROM $from WHERE " . implode(' AND ', $where) . ' ORDER BY b.difficulty';
+        return array_map('intval', array_keys($DB->get_records_sql($sql, $params)));
+    }
+
+    /**
+     * The URL that serves (and lazily caches) a book's cover image.
+     *
+     * @param int $bookid
+     * @return moodle_url
+     */
+    public function cover_url(int $bookid): moodle_url {
+        return new moodle_url('/mod/moodlereader/cover.php', ['id' => $this->cm->id, 'book' => $bookid]);
     }
 
     /**

@@ -69,8 +69,13 @@ class mod_moodlereader_mod_form extends moodleform_mod {
         $mform->setDefault('minpassgrade', 60);
         $mform->addHelpButton('minpassgrade', 'minpassgrade', 'mod_moodlereader');
 
-        $mform->addElement('advcheckbox', 'showprogressbar', get_string('showprogressbar', 'mod_moodlereader'));
-        $mform->setDefault('showprogressbar', 1);
+        // Appearance: which sections of the activity page students see.
+        $mform->addElement('header', 'appearanceheader', get_string('appearanceheader', 'mod_moodlereader'));
+        $mform->addElement('static', 'appearancedesc', '', get_string('appearancedesc', 'mod_moodlereader'));
+        foreach (['showprogressbar', 'showlevel', 'showbooksread', 'showreport', 'showsearch'] as $toggle) {
+            $mform->addElement('advcheckbox', $toggle, get_string($toggle, 'mod_moodlereader'));
+            $mform->setDefault($toggle, 1);
+        }
 
         // Reading-level control.
         $mform->addElement('header', 'levelheader', get_string('levelheader', 'mod_moodlereader'));

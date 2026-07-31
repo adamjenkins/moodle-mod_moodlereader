@@ -176,9 +176,18 @@ function moodlereader_get_user_grades($instance, $userid = 0) {
                   GROUP BY a.userid, a.bookid) perbook
           GROUP BY userid";
 
+    // Per-user reading-goal overrides (0 = use the activity default).
+    $goaloverrides = $DB->get_records_menu(
+        'moodlereader_levels',
+        ['readerid' => $instance->id],
+        '',
+        'userid, goal'
+    );
+
     $grades = [];
     foreach ($DB->get_records_sql($sql, $params) as $row) {
-        $rawgrade = $instance->maxgrade * min(1, $row->totalcount / $instance->goal);
+        $goal = !empty($goaloverrides[$row->userid]) ? $goaloverrides[$row->userid] : $instance->goal;
+        $rawgrade = $instance->maxgrade * min(1, $row->totalcount / $goal);
         $grades[$row->userid] = (object) [
             'userid'        => $row->userid,
             'rawgrade'      => round($rawgrade, 2),
@@ -340,7 +349,7 @@ function moodlereader_reset_userdata($data) {
  * @return bool False on failure; otherwise sends the file and exits.
  */
 function moodlereader_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = []) {
-    if ($context->contextlevel != CONTEXT_MODULE || $filearea !== 'bookcover') {
+    if ($context->contextlevel != CONTEXT_MODULE || !in_array($filearea, ['bookcover', 'intro'], true)) {
         return false;
     }
     require_login($course, true, $cm);
@@ -348,14 +357,14 @@ function moodlereader_pluginfile($course, $cm, $context, $filearea, $args, $forc
         return false;
     }
     $relativepath = implode('/', $args);
-    $fullpath = "/{$context->id}/mod_moodlereader/bookcover/$relativepath";
+    $fullpath = "/{$context->id}/mod_moodlereader/$filearea/$relativepath";
     $fs = get_file_storage();
     $file = $fs->get_file_by_hash(sha1($fullpath));
     if (!$file || $file->is_directory()) {
         return false;
     }
-    // Book covers are curated (synced from mreader.org), so may be served inline.
-    send_stored_file($file, 86400, 0, $forcedownload, $options);
+    // Book covers and intro media are curated content, so may be served inline.
+    send_stored_file($file, DAYSECS, 0, $forcedownload, $options);
 }
 
 /**
