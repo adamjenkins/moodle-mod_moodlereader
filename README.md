@@ -18,20 +18,27 @@ mreader.org iframe model).
 
 ## What it does
 
-- Students see the books available to them (filtered by reading level), launch a
-  book quiz delivered by mreader.org in an iframe, watch a reading-progress bar
-  advance as they pass books, and review their own **reading records**.
+- The student activity page shows a reading-progress bar, the student's current
+  reading level, a **"books read this term"** cover gallery (covers fetched from
+  mreader.org and cached), a reading report of this term's attempts, and a **book
+  search** (title, publisher, series, genre, reading level). Search results appear
+  only after a search and each carries a cover thumbnail and a "take the quiz"
+  button; the quiz is delivered by mreader.org in an iframe.
 - The signed grade callback from mreader.org is verified (constant-time token check)
   and recorded; each passed book's word count contributes once to the gradebook
   grade.
-- Teachers can **sync the book catalogue** from mreader.org, **enable/disable**
-  individual books, view **reports** (attempts, per-student and per-book summaries),
-  run **cheating detection**, and **message** students.
-- Per-user reading levels, reading goal, availability window, and activity
-  completion rules (pass a book / read N words).
+- Teachers can **manage the catalogue** (filter by publisher/series/level/status and
+  enable or disable books individually or in bulk), **sync** it from mreader.org,
+  view **reports** (attempts, per-student and per-book summaries), run **cheating
+  detection**, **message** students, and set **per-student reading goals**.
+- **Appearance** settings let a teacher choose which sections of the activity page
+  students see.
+- Per-user reading levels, a reading goal (default for everyone, overridable per
+  student), availability window, and activity completion rules (pass a book /
+  read N words).
 - Full privacy provider, backup/restore, and events.
 
-Not yet ported from the legacy plugin: student import/export, goals/rates, and
+Not yet ported from the legacy plugin: student import/export, reading rates, and
 view-as-student.
 
 ## Migrating from mod_reader
@@ -42,12 +49,41 @@ mreader.org registration, book catalogue, the **mreader.org identity map**
 levels — into `mod_moodlereader`:
 
 ```
-php mod/moodlereader/cli/migrate.php --dry-run   # report only
-php mod/moodlereader/cli/migrate.php --run        # apply
+php mod/moodlereader/cli/migrate.php --dry-run   # report only, writes nothing
+php mod/moodlereader/cli/migrate.php --run        # apply the migration
+php mod/moodlereader/cli/migrate.php --help       # (also -h) show usage
 ```
 
-After migrating and confirming, the legacy `mod_reader` plugin can be uninstalled.
-The local-quiz-only artefacts of `mod_reader` are intentionally not migrated.
+`--dry-run` (the default if you pass neither flag) reports what would be migrated
+without writing anything. `--run` performs the migration inside a single database
+transaction, so it either completes fully or rolls back — you are never left with a
+half-migrated site.
+
+**Read-only on the legacy data.** The tool only ever *reads* from the `reader_*`
+tables and *writes* to the `moodlereader_*` tables. It never deletes, drops or
+alters anything in `mod_reader`, so your original data stays intact. After
+migrating and confirming the result, you can uninstall the legacy `mod_reader`
+plugin yourself — that is a separate, manual step. The local-quiz-only artefacts of
+`mod_reader` are intentionally not migrated.
+
+**Safe to re-run.** The migration is idempotent: books are matched on their natural
+key (publisher / series / title), and identities and activities that were already
+migrated are skipped, so running `--run` twice does not create duplicates. A second
+run also acts as a partial sync — it imports **new** activities, books and identity
+mappings added to `mod_reader` since the last run. Note, however, that new attempts,
+grades or levels added to an activity that was *already* migrated are not
+back-filled: re-running skips such activities whole. Migrate once `mod_reader` is no
+longer being actively used, or delete a partially-migrated activity and re-run to
+refresh it.
+
+**No built-in undo.** There is no rollback or undo command. To reverse a completed
+migration you would remove the migrated rows from the `moodlereader`,
+`moodlereader_books`, `moodlereader_users`, `moodlereader_attempts`,
+`moodlereader_grades`, `moodlereader_levels` and `moodlereader_bookinstances`
+tables, along with the course modules and gradebook items the migration created and
+the copied mreader.org settings. In practice, uninstalling the `mod_moodlereader`
+plugin is the cleanest way to start over — your untouched `mod_reader` data remains
+the source of truth until you choose to remove it.
 
 ## Security
 
