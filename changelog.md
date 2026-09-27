@@ -36,3 +36,6 @@ Platform:
 - CLI migration from `mod_reader` (config, catalogue, identity map, activities,
   attempts, grades, levels) — read-only on the legacy data, idempotent.
 - PHPUnit and Behat coverage.
+- Declare Moodle 5.3 support (`supported = [502, 503]`), audited against 5.3beta.
+- Schema definitions no longer give CHAR NOT NULL columns an empty-string default
+  (XMLDB already stored them without one), so installs no longer print XMLDB debugging.
