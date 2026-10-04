@@ -13,8 +13,8 @@ mreader.org iframe model).
 ## Requirements
 
 - Moodle 5.2 – 5.3.
-  CI-tested (GitHub Actions, moodle-plugin-ci) on MOODLE_502_STABLE with PHP 8.3 and 8.4;
-  moodle.git main (5.3) as a non-blocking job.
+  CI-tested (GitHub Actions, moodle-plugin-ci) on MOODLE_502_STABLE and MOODLE_503_STABLE
+  with PHP 8.3 and 8.4.
 - An account on mreader.org, used once to register the site (Site administration →
   Plugins → Activity modules → Moodle Reader → *Register this site*).
 

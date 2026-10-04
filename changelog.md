@@ -3,6 +3,16 @@
 The plugin is in pre-release development. The version stays at `0.0.z` until a
 `1.0.0` release is explicitly cut; `x`/`y` are not bumped without sign-off.
 
+## [0.0.3] - 2026-10-04
+
+### Changed
+
+- Maturity is now Beta (`MATURITY_BETA`); it was Alpha.
+- composer.json requires `moodle/moodle` `^5.2` instead of `>=5.2 <5.4`: the
+  explicit upper cap is dropped so later Moodle 5.x releases are not excluded.
+- CI tests `MOODLE_503_STABLE` (PHP 8.3–8.4, PostgreSQL 17, MariaDB 11.4)
+  instead of Moodle `main`, now that Moodle 5.3 is released.
+
 ## [0.0.2] - 2026-10-04
 
 First release.
