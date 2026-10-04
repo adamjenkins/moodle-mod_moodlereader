@@ -1,0 +1,10 @@
+{
+    "name": "adamjenkins/moodle-mod_moodlereader",
+    "description": "A Moodle activity module for extensive-reading programmes: students read graded books and take a short comprehension quiz hosted on mreader.org",
+    "type": "moodle-mod",
+    "require": {
+        "moodle/moodle": ">=5.2 <5.4",
+        "moodle/composer-installer": "^1.0"
+    },
+    "license": "GPL-3.0-or-later"
+}

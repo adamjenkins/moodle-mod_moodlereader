@@ -3,7 +3,9 @@
 The plugin is in pre-release development. The version stays at `0.0.z` until a
 `1.0.0` release is explicitly cut; `x`/`y` are not bumped without sign-off.
 
-## 0.0.1 (unreleased)
+## [0.0.2] - 2026-10-04
+
+First release.
 
 A security-focused, single-purpose rebuild of the legacy `mod_reader` plugin,
 keeping the mreader.org iframe quiz integration and removing the obsolete local
@@ -39,3 +41,5 @@ Platform:
 - Declare Moodle 5.3 support (`supported = [502, 503]`), audited against 5.3beta.
 - Schema definitions no longer give CHAR NOT NULL columns an empty-string default
   (XMLDB already stored them without one), so installs no longer print XMLDB debugging.
+- composer.json, so the plugin can be installed with Composer as
+  `adamjenkins/moodle-mod_moodlereader` (Moodle 5.2 – 5.3).
