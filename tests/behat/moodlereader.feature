@@ -145,3 +145,24 @@ Feature: Moodle Reader activity
     Then I should not see "The Red Kite"
     And I should not see "Night Train"
     And I should not see "Blue Hills"
+
+  Scenario: A teacher awards credit for a book without a quiz, and the student's totals change
+    Given the following moodlereader books exist:
+      | name          | publisher | series  | difficulty | words | hasquiz | hidden |
+      | Quiet Harbour | Acme      | Level 1 | 1          | 2200  | 0       | 0      |
+      | Hidden Valley | Acme      | Level 1 | 1          | 1800  | 1       | 1      |
+    When I am on the "Reader 1" "moodlereader activity" page logged in as teacher1
+    And I follow "Reading report"
+    And I set the field "Student One" to "1"
+    And I press "Award credit for a book…"
+    Then I should see "For: Student One."
+    When I press "Search"
+    Then I should see "Quiet Harbour"
+    And I should see "No quiz" in the "Quiet Harbour" "table_row"
+    And I should not see "Hidden Valley"
+    When I press "Award credit for Quiet Harbour"
+    Then I should see "Credit for \"Quiet Harbour\" awarded to 1 student(s)."
+    And I should see "2,200" in the "Student One" "table_row"
+    And I log out
+    When I am on the "Reader 1" "moodlereader activity" page logged in as student1
+    Then I should see "Reading progress: 2,200 of 5,000 words"

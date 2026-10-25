@@ -50,7 +50,7 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         $books = new backup_nested_element('books');
         $book = new backup_nested_element('book', ['id'], [
             'remoteid', 'publisher', 'series', 'difficulty', 'name', 'words', 'genre',
-            'fiction', 'points', 'image', 'sametitle', 'language', 'hidden', 'time',
+            'fiction', 'points', 'image', 'sametitle', 'language', 'hasquiz', 'hidden', 'time',
         ]);
 
         // Named 'bookinstancelinks' (not 'bookinstances') to avoid colliding with the

@@ -74,7 +74,11 @@ final class downloader_test extends \advanced_testcase {
         $this->assertSame(0, $book->withdrawn);
         $this->assertNull(downloader::clean_book(['title' => 'No id']));
         $this->assertNull(downloader::clean_book(['id' => 3]));
-        $this->assertSame(1, downloader::clean_book($this->book(8, ['has_quiz' => false]))->withdrawn);
+        // A book without a quiz is not withdrawn: credit can still be awarded for it.
+        $noquiz = downloader::clean_book($this->book(8, ['has_quiz' => false]));
+        $this->assertSame(0, $noquiz->withdrawn);
+        $this->assertSame(0, $noquiz->hasquiz);
+        $this->assertSame(1, $book->hasquiz);
         // Language: sent by newer servers, unknown ('') when missing or malformed.
         $this->assertSame('', $book->language);
         $this->assertSame('es', downloader::clean_book($this->book(9, ['language' => 'ES']))->language);
@@ -98,22 +102,29 @@ final class downloader_test extends \advanced_testcase {
         $client = (new fake_client())
             ->queue('GET', '/books', 200, ['books' => [$this->book(1)], 'next_cursor' => 'c2'])
             ->queue('GET', '/books', 200, ['books' => [$this->book(2), ['id' => 0, 'title' => 'bad']],
+                'next_cursor' => null])
+            // A book without a quiz, numbered 1 in mreader.org's separate no-quiz list.
+            ->queue('GET', '/books-noquiz', 200, ['books' => [$this->book(1, ['title' => 'No Quiz Book'])],
                 'next_cursor' => null]);
-        $this->assertSame(2, downloader::sync_books(false, $client));
+        $this->assertSame(3, downloader::sync_books(false, $client));
         $this->assertSame(['changed_since' => '0', 'cursor' => 'c2', 'limit' => '500'], $client->requests[1]['query']);
 
-        $this->assertSame(2, $DB->count_records('moodlereader_books'));
+        $this->assertSame(3, $DB->count_records('moodlereader_books'));
+        $this->assertSame('No Quiz Book', $DB->get_field('moodlereader_books', 'name', ['remoteid' => 1, 'hasquiz' => 0]));
+        $this->assertSame('Book 1', $DB->get_field('moodlereader_books', 'name', ['remoteid' => 1, 'hasquiz' => 1]));
         $linked = $DB->get_record('moodlereader_books', ['id' => $imported->id]);
         $this->assertEquals(2, $linked->remoteid);
         $this->assertEquals(1, $linked->hidden);
 
         // A later sync asks for changes only, and a withdrawn book is flagged, not deleted.
+        // A server without the no-quiz list (404) is not an error.
         $client = (new fake_client())->queue('GET', '/books', 200, ['books' => [$this->book(1, ['withdrawn' => true])],
-            'next_cursor' => null]);
+            'next_cursor' => null])
+            ->queue('GET', '/books-noquiz', 404, ['error' => ['code' => 'not_found', 'message' => 'Not found.']]);
         downloader::sync_books(false, $client);
         $this->assertNotSame('0', $client->requests[0]['query']['changed_since']);
-        $this->assertEquals(1, $DB->get_field('moodlereader_books', 'withdrawn', ['remoteid' => 1]));
-        $this->assertSame(2, $DB->count_records('moodlereader_books'));
+        $this->assertEquals(1, $DB->get_field('moodlereader_books', 'withdrawn', ['remoteid' => 1, 'hasquiz' => 1]));
+        $this->assertSame(3, $DB->count_records('moodlereader_books'));
     }
 
     /**

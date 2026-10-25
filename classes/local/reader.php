@@ -241,8 +241,8 @@ class reader {
                               AND a.deleted = 0 AND a.state = 'finished' AND b2.sametitle <> ''";
 
         $from = '{moodlereader_books} b';
-        // Never a book disabled in Manage books or withdrawn by mreader.org.
-        $where = ['b.hidden = 0', 'b.withdrawn = 0'];
+        // Never a book disabled in Manage books, withdrawn by mreader.org, or without a quiz.
+        $where = ['b.hidden = 0', 'b.withdrawn = 0', 'b.hasquiz = 1'];
 
         if (!empty($this->instance->bookinstances)) {
             $from .= ' JOIN {moodlereader_bookinstances} bi ON bi.bookid = b.id AND bi.readerid = :bireaderid';

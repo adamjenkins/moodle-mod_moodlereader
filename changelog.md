@@ -51,6 +51,14 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - The student summary shows and sets only the current reading level (start and stop
   levels have no effect in this plugin); each report action has its own button.
 - `startquiz.php` and `quiz/mreader.php` need `viewbooks` (the button's audience), not `attempt`.
+- `award.php`: credit is awarded from a search (`attempt_admin::search_award_books()`);
+  `find_books()` and the title box are gone. `award_book()` refuses disabled books.
+- `moodlereader_books.hasquiz` (version 2026102503): book sync also walks `/books-noquiz`
+  (404 = not offered yet), keyed by (remoteid, hasquiz); `has_quiz: false` no longer sets
+  `withdrawn`; the importer maps `reader_books.quizid = 0` to `hasquiz = 0`; the student
+  search requires `hasquiz = 1`.
+- `attempt_admin::students_sql()` also includes everyone with attempts in the activity
+  (only oneself when a group narrows the list).
 - Completion rules use `ignoredate`, count each book once and include credit.
 - `mod_form` validation refuses `wordsorpoints = 1` when no enabled book has points.
 - `moodlereader_books.language` is NOT NULL with no default (XMLDB rejects `''` as a

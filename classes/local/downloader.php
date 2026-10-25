@@ -21,7 +21,8 @@ use mod_moodlereader\local\api\client;
 /**
  * Synchronises the local book catalogue from mreader.org (API v2).
  *
- * Books are matched on mreader.org's stable book id (`remoteid`). A book that has
+ * Books are matched on mreader.org's stable book id (`remoteid`, within the quiz or
+ * no-quiz id space). A book that has
  * no id yet (one imported from mod_reader) is matched once on its legacy image
  * name, then on publisher/series/title, and takes the id from then on.
  *
@@ -34,7 +35,10 @@ class downloader {
     const PAGE_SIZE = 500;
 
     /**
-     * Fetch the books changed since the last sync and upsert them into {moodlereader_books}.
+     * Fetch the catalogue from mreader.org and upsert it into {moodlereader_books}.
+     *
+     * Two walks: the books with quizzes (/books), then the books without one
+     * (/books-noquiz). The second is skipped while mreader.org does not offer it (404).
      *
      * @param bool $full Fetch the whole catalogue rather than the changes.
      * @param client|null $client
@@ -46,30 +50,54 @@ class downloader {
         }
         $client = $client ?? new client();
         $since = $full ? 0 : (int) get_config('mod_moodlereader', 'v2lastbooksync');
+        $servertime = 0;
+        $count = self::walk($client, '/books', $since, true, $servertime);
+        try {
+            $count += self::walk($client, '/books-noquiz', $since, false, $servertime);
+        } catch (api\api_exception $e) {
+            if ((int) $e->httpstatus !== 404) {
+                throw $e;
+            }
+        }
+
+        // The next sync asks for changes since mreader.org's clock at the start of this one.
+        if ($servertime > 0) {
+            set_config('v2lastbooksync', $servertime, 'mod_moodlereader');
+        }
+        return $count;
+    }
+
+    /**
+     * Follow one paged book list to its end.
+     *
+     * @param client $client
+     * @param string $path '/books' or '/books-noquiz'.
+     * @param int $since
+     * @param bool $hasquiz Whether the list's books have quizzes.
+     * @param int $servertime Set from the first page when still 0.
+     * @return int Books inserted or updated.
+     */
+    protected static function walk(client $client, string $path, int $since, bool $hasquiz, int &$servertime): int {
         $cursor = null;
         $count = 0;
-        $servertime = 0;
         $pages = 0;
         do {
             $query = ['changed_since' => $since, 'limit' => self::PAGE_SIZE];
             if ($cursor !== null) {
                 $query['cursor'] = $cursor;
             }
-            $data = $client->get('/books', $query);
+            $data = $client->get($path, $query);
             $servertime = $servertime ?: (int) ($data['server_time'] ?? 0);
             foreach ((array) ($data['books'] ?? []) as $row) {
-                if (is_array($row) && ($book = self::clean_book($row))) {
+                // The list decides whether a book has a quiz, whatever the row says.
+                if (is_array($row) && ($book = self::clean_book(['has_quiz' => $hasquiz] + $row))) {
+                    $book->hasquiz = $hasquiz ? 1 : 0;
                     self::upsert($book);
                     $count++;
                 }
             }
             $cursor = isset($data['next_cursor']) && $data['next_cursor'] !== '' ? (string) $data['next_cursor'] : null;
         } while ($cursor !== null && ++$pages < 1000);
-
-        // The next sync asks for changes since mreader.org's clock at the start of this one.
-        if ($servertime > 0) {
-            set_config('v2lastbooksync', $servertime, 'mod_moodlereader');
-        }
         return $count;
     }
 
@@ -81,18 +109,25 @@ class downloader {
      */
     protected static function upsert(\stdClass $book): int {
         global $DB;
-        $existing = $DB->get_record('moodlereader_books', ['remoteid' => $book->remoteid], '*', IGNORE_MULTIPLE);
+        // Quiz and no-quiz books are numbered separately on mreader.org.
+        $existing = $DB->get_record(
+            'moodlereader_books',
+            ['remoteid' => $book->remoteid, 'hasquiz' => $book->hasquiz],
+            '*',
+            IGNORE_MULTIPLE
+        );
         if (!$existing && $book->image !== '') {
             $existing = $DB->get_record(
                 'moodlereader_books',
-                ['remoteid' => 0, 'image' => $book->image],
+                ['remoteid' => 0, 'hasquiz' => $book->hasquiz, 'image' => $book->image],
                 '*',
                 IGNORE_MULTIPLE
             );
         }
         if (!$existing) {
             $existing = $DB->get_record('moodlereader_books', [
-                'remoteid' => 0, 'publisher' => $book->publisher, 'series' => $book->series, 'name' => $book->name,
+                'remoteid' => 0, 'hasquiz' => $book->hasquiz, 'publisher' => $book->publisher, 'series' => $book->series,
+                'name' => $book->name,
             ], '*', IGNORE_MULTIPLE);
         }
         $book->time = time();
@@ -160,7 +195,8 @@ class downloader {
             'image'      => \core_text::substr(clean_param($get('legacy_image'), PARAM_TEXT), 0, 255),
             'sametitle'  => \core_text::substr(clean_param($get('sametitle'), PARAM_TEXT), 0, 255),
             'language'   => booklanguage::clean($get('language')),
-            'withdrawn'  => !empty($row['withdrawn']) || (isset($row['has_quiz']) && !$row['has_quiz']) ? 1 : 0,
+            'withdrawn'  => !empty($row['withdrawn']) ? 1 : 0,
+            'hasquiz'    => isset($row['has_quiz']) && !$row['has_quiz'] ? 0 : 1,
             'coveretag'  => $get('cover_etag') !== '' ? \core_text::substr($get('cover_etag'), 0, 255) : null,
         ];
     }

@@ -70,6 +70,7 @@ class mod_moodlereader_generator extends testing_module_generator {
             'sametitle'  => '',
             'hidden'     => 0,
             'language'   => '',
+            'hasquiz'    => 1,
             'time'       => time(),
         ]);
         $book->id = $DB->insert_record('moodlereader_books', $book);

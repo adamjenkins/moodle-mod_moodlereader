@@ -89,16 +89,6 @@ if ($action !== '' && $canmanage && $mode !== 'books') {
         if (in_array($action, attempt_admin::LEVEL_FIELDS, true)) {
             $value = optional_param($action === 'goal' ? 'goalvalue' : 'levelvalue', 0, PARAM_INT);
             $done = attempt_admin::set_level_field($reader, $userids, $action, $value);
-        } else if ($action === 'awardbook') {
-            $matches = attempt_admin::find_books(optional_param('awardbooktitle', '', PARAM_TEXT));
-            if (count($matches) !== 1) {
-                redirect($pageurl, get_string(
-                    count($matches) ? 'awardbooktoomany' : 'awardbooknone',
-                    'mod_moodlereader',
-                    count($matches)
-                ), null, \core\output\notification::NOTIFY_WARNING);
-            }
-            $done = attempt_admin::award_book($reader, $userids, (int) reset($matches)->id);
         } else if ($action === 'message') {
             $done = attempt_admin::message($reader, $userids, optional_param('messagetext', '', PARAM_TEXT));
         }

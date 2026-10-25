@@ -160,6 +160,32 @@ final class attempt_admin_test extends \advanced_testcase {
     }
 
     /**
+     * A teacher or administrator who tries the quizzes is in the reports and can change their own attempt.
+     *
+     * @return void
+     */
+    public function test_teacher_and_admin_attempts_are_reported_and_editable(): void {
+        global $DB;
+        [$course, $instance, , $teacher, $book] = $this->setup_activity();
+        $reader = reader::from_instanceid($instance->id);
+        $this->setUser($teacher);
+        $this->assertSame([], attempt_admin::visible_userids($reader, [$teacher->id]));
+
+        // The teacher takes a quiz and fails it, then sets it to passed to show the progress bar.
+        $mine = $this->make_attempt($instance->id, $teacher->id, $book->id, 0);
+        $this->assertSame([$teacher->id => true], attempt_admin::visible_userids($reader, [$teacher->id]));
+        $this->assertSame(1, attempt_admin::update($reader, [$mine], attempt_admin::ACTION_PASS));
+        $this->assertEquals(100, $this->grade($course, $instance, $teacher->id));
+
+        // An administrator, not enrolled at all, likewise.
+        $this->setAdminUser();
+        $admin = get_admin();
+        $adminattempt = $this->make_attempt($instance->id, $admin->id, $book->id, 0);
+        $this->assertSame(1, attempt_admin::update($reader, [$adminattempt], attempt_admin::ACTION_PASS));
+        $this->assertEquals(1, $DB->get_field('moodlereader_attempts', 'passed', ['id' => $adminattempt]));
+    }
+
+    /**
      * Awarding credit counts the book once; levels and goals are set for the students given.
      *
      * @return void
@@ -191,20 +217,32 @@ final class attempt_admin_test extends \advanced_testcase {
     }
 
     /**
-     * Book lookup by title prefers an exact match and skips disabled books.
+     * The award search lists books without a quiz and withdrawn ones, never disabled books.
      *
      * @return void
      */
-    public function test_find_books(): void {
+    public function test_search_award_books(): void {
         $this->resetAfterTest();
         $gen = $this->getDataGenerator()->get_plugin_generator('mod_moodlereader');
-        $gen->create_book(['name' => 'The Kite']);
-        $gen->create_book(['name' => 'The Kite Runner']);
-        $gen->create_book(['name' => 'Kite Hidden', 'hidden' => 1]);
+        $kite = $gen->create_book(['name' => 'The Kite', 'publisher' => 'A', 'language' => 'en']);
+        $gen->create_book(['name' => 'Kite Without Quiz', 'publisher' => 'A', 'hasquiz' => 0]);
+        $gen->create_book(['name' => 'Kite Withdrawn', 'publisher' => 'B', 'withdrawn' => 1]);
+        $gen->create_book(['name' => 'Kite Disabled', 'publisher' => 'A', 'hidden' => 1]);
+        $gen->create_book(['name' => 'Kite en espanol', 'publisher' => 'A', 'language' => 'es']);
 
-        $this->assertCount(1, attempt_admin::find_books('the kite'));
-        $this->assertCount(2, attempt_admin::find_books('Kite'));
-        $this->assertCount(0, attempt_admin::find_books('Kite Hidden'));
-        $this->assertCount(0, attempt_admin::find_books(''));
+        $names = fn(array $books) => array_values(array_map(fn($b) => $b->name, $books));
+        $total = 0;
+        $found = attempt_admin::search_award_books(['name' => 'kite', 'language' => 'en'], 100, $total);
+        $this->assertSame(['Kite Without Quiz', 'The Kite', 'Kite Withdrawn'], $names($found));
+        $this->assertSame(3, $total);
+        $this->assertSame(['Kite Withdrawn'], $names(attempt_admin::search_award_books(['publisher' => 'B'])));
+        $this->assertCount(4, attempt_admin::search_award_books(['name' => 'kite']));
+
+        // A disabled book cannot be awarded even by id.
+        [$course, $instance, $student, $teacher] = $this->setup_activity();
+        $this->setUser($teacher);
+        $disabled = $gen->create_book(['name' => 'Off', 'hidden' => 1]);
+        $this->expectException(\dml_missing_record_exception::class);
+        attempt_admin::award_book(reader::from_instanceid($instance->id), [$student->id], $disabled->id);
     }
 }

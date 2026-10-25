@@ -161,7 +161,8 @@ class attempt_admin {
     /**
      * Give several students credit for a book, as if they had passed its quiz.
      *
-     * A student who already has a counted attempt at the book is skipped.
+     * The book may have no quiz, or a withdrawn one, but must not be disabled. A student
+     * who already has a counted attempt at the book is skipped.
      *
      * @param reader $reader
      * @param int[] $userids
@@ -171,7 +172,8 @@ class attempt_admin {
     public static function award_book(reader $reader, array $userids, int $bookid): int {
         global $CFG, $DB;
         require_once($CFG->dirroot . '/mod/moodlereader/lib.php');
-        $book = $DB->get_record('moodlereader_books', ['id' => $bookid], '*', MUST_EXIST);
+        // A book disabled in Manage books is offered to no one, not even as credit.
+        $book = $DB->get_record('moodlereader_books', ['id' => $bookid, 'hidden' => 0], '*', MUST_EXIST);
         $readerid = $reader->get_instance()->id;
         $now = time();
         $credited = [];
@@ -204,41 +206,45 @@ class attempt_admin {
     }
 
     /**
-     * The catalogue books a teacher may mean by a title: exact title matches if any, else partial ones.
+     * Search the books a teacher may award credit for: every book not disabled in Manage books,
+     * including books without a quiz and books whose quiz mreader.org withdrew.
      *
-     * Disabled and withdrawn books are left out.
+     * Filters (all optional): 'name' and 'series' (partial, case-insensitive), 'publisher'
+     * (exact), 'difficulty' (a value below 0 means any) and 'language' (a book whose language
+     * is unknown always matches).
      *
-     * @param string $title
-     * @return \stdClass[] At most 20 books (id, publisher, name).
+     * @param array $filters
+     * @param int $limit Maximum rows to return.
+     * @param int|null $total Set to the full match count.
+     * @return \stdClass[] Keyed by book id.
      */
-    public static function find_books(string $title): array {
+    public static function search_award_books(array $filters, int $limit = 100, ?int &$total = null): array {
         global $DB;
-        $title = trim($title);
-        if ($title === '') {
-            return [];
+        $where = ['hidden = 0'];
+        $params = [];
+        foreach (['name', 'series'] as $field) {
+            $value = trim((string) ($filters[$field] ?? ''));
+            if ($value !== '') {
+                $where[] = $DB->sql_like($field, ":$field", false, false);
+                $params[$field] = '%' . $DB->sql_like_escape($value) . '%';
+            }
         }
-        $base = 'hidden = 0 AND withdrawn = 0 AND ';
-        $exact = $DB->get_records_select(
-            'moodlereader_books',
-            $base . $DB->sql_equal('name', ':name', false),
-            ['name' => $title],
-            'publisher, name',
-            'id, publisher, name',
-            0,
-            20
-        );
-        if ($exact) {
-            return $exact;
+        if ((string) ($filters['publisher'] ?? '') !== '') {
+            $where[] = 'publisher = :publisher';
+            $params['publisher'] = (string) $filters['publisher'];
         }
-        return $DB->get_records_select(
-            'moodlereader_books',
-            $base . $DB->sql_like('name', ':name', false, false),
-            ['name' => '%' . $DB->sql_like_escape($title) . '%'],
-            'publisher, name',
-            'id, publisher, name',
-            0,
-            20
-        );
+        if (is_numeric($filters['difficulty'] ?? null) && (int) $filters['difficulty'] >= 0) {
+            $where[] = 'difficulty = :difficulty';
+            $params['difficulty'] = (int) $filters['difficulty'];
+        }
+        $language = booklanguage::clean((string) ($filters['language'] ?? ''));
+        if ($language !== '') {
+            $where[] = "(language = :language OR language = '')";
+            $params['language'] = $language;
+        }
+        $wheresql = implode(' AND ', $where);
+        $total = $DB->count_records_select('moodlereader_books', $wheresql, $params);
+        return $DB->get_records_select('moodlereader_books', $wheresql, $params, 'publisher, series, name', '*', 0, $limit);
     }
 
     /**
@@ -263,10 +269,10 @@ class attempt_admin {
     }
 
     /**
-     * The students of the activity the current user may act on, among the given ids.
+     * The people of the activity the current user may act on, among the given ids.
      *
-     * A student must be able to attempt the activity, and in separate-groups mode share
-     * a group with a teacher who cannot access all groups.
+     * See {@see self::students_sql()}: the activity's students, and everyone with attempts here
+     * (teachers and administrators included), limited to the teacher's groups in separate-groups mode.
      *
      * @param reader $reader
      * @param int[] $userids
@@ -285,7 +291,12 @@ class attempt_admin {
     }
 
     /**
-     * SQL selecting the ids of the students the current user may see in this activity.
+     * SQL selecting the ids of the people the current user may see in this activity's reports.
+     *
+     * That is the activity's students, plus everyone who has taken a quiz here: teachers and
+     * administrators try the quizzes too (for example to show students how the progress bar
+     * fills). In separate-groups mode a teacher without access to all groups sees their own
+     * groups' students and their own record.
      *
      * @param reader $reader
      * @param int|null $groupid A group chosen in the report, or null for the activity's current group.
@@ -293,20 +304,29 @@ class attempt_admin {
      */
     public static function students_sql(reader $reader, ?int $groupid = null): array {
         global $USER;
+        static $n = 0;
+        $n++;
         $cm = $reader->get_cm();
         $context = $reader->get_context();
         if ($groupid === null) {
             $groupid = (int) groups_get_activity_group($cm, false);
         }
+        $groups = $groupid;
         $mode = groups_get_activity_groupmode($cm);
-        if ($mode == SEPARATEGROUPS && !has_capability('moodle/site:accessallgroups', $context)) {
+        if ($mode == SEPARATEGROUPS && !has_capability('moodle/site:accessallgroups', $context) && !$groupid) {
             // Without access to all groups, "all participants" means the teacher's own groups.
-            if (!$groupid) {
-                $mine = array_keys(groups_get_all_groups($cm->course, $USER->id, $cm->groupingid));
-                return get_enrolled_sql($context, 'mod/moodlereader:attempt', $mine ?: [-1], true);
-            }
+            $groups = array_keys(groups_get_all_groups($cm->course, $USER->id, $cm->groupingid)) ?: [-1];
         }
-        return get_enrolled_sql($context, 'mod/moodlereader:attempt', $groupid, true);
+        [$esql, $eparams] = get_enrolled_sql($context, 'mod/moodlereader:attempt', $groups, true);
+
+        // Everyone with attempts here when no group narrows the list; otherwise only oneself.
+        $params = $eparams + ["sxreader$n" => $reader->get_instance()->id];
+        $others = "SELECT sxa$n.userid FROM {moodlereader_attempts} sxa$n WHERE sxa$n.readerid = :sxreader$n";
+        if ($groups !== 0) {
+            $others .= " AND sxa$n.userid = :sxself$n";
+            $params["sxself$n"] = (int) $USER->id;
+        }
+        return ["$esql UNION $others", $params];
     }
 
     /**

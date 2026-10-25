@@ -88,9 +88,11 @@ final class importer_test extends \advanced_testcase {
         course_add_cm_to_section($course->id, $cmid, 1, null, 'reader');
 
         $b1 = $DB->insert_record('reader_books', (object) ['publisher' => 'Acme', 'level' => 'Level 2', 'difficulty' => 2,
-            'name' => 'The Red Kite', 'words' => 3000, 'image' => 'red_kite.jpg', 'genre' => 'ad', 'fiction' => 'y']);
+            'name' => 'The Red Kite', 'words' => 3000, 'image' => 'red_kite.jpg', 'genre' => 'ad', 'fiction' => 'y',
+            'quizid' => 11]);
         $b2 = $DB->insert_record('reader_books', (object) ['publisher' => 'Acme', 'level' => 'Level 2', 'difficulty' => 2,
-            'name' => 'Blue Hills', 'words' => 4000, 'image' => 'blue_hills.jpg', 'genre' => 'ad', 'fiction' => 'y']);
+            'name' => 'Blue Hills', 'words' => 4000, 'image' => 'blue_hills.jpg', 'genre' => 'ad', 'fiction' => 'y',
+            'quizid' => 0]);
         foreach ([[$s1, 'aaaa1111'], [$s2, 'bbbb2222']] as [$user, $uid]) {
             $DB->insert_record('reader_users', (object) ['userid' => $user->id, 'uniqueid' => $uid, 'uniquename' => 'xx yyyy']);
         }
@@ -163,6 +165,9 @@ final class importer_test extends \advanced_testcase {
         $this->assertEquals(9000, $DB->get_field('moodlereader_levels', 'goal', ['userid' => $s2->id]));
         $this->assertSame(2, $report['books']['new']);
         $this->assertSame(0, (int) $DB->get_field('moodlereader_books', 'remoteid', ['image' => 'red_kite.jpg']));
+        // A quizid of 0 in mod_reader means the book has no quiz.
+        $this->assertSame(1, (int) $DB->get_field('moodlereader_books', 'hasquiz', ['image' => 'red_kite.jpg']));
+        $this->assertSame(0, (int) $DB->get_field('moodlereader_books', 'hasquiz', ['image' => 'blue_hills.jpg']));
 
         // Nothing changed: a preview says so.
         $preview = $importer->preview($course->id);

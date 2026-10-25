@@ -38,7 +38,16 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   book search and in "Manage books". Books' languages come from mreader.org.
 - Book covers are served only when they are JPEG, PNG, GIF or WebP images.
 - Teachers can take book quizzes to try them: the "Take the quiz" button they were shown
-  used to fail with a permission error. Their attempts are not listed in the reports.
+  used to fail with a permission error.
+- The reports list everyone who has taken a quiz in the activity, teachers and
+  administrators included, so they can change their own results (for example to show
+  students how the progress bar fills).
+- Awarding credit opens a book search like the students' one. It lists every book except
+  disabled ones, including books without a quiz, which are marked "No quiz". The old
+  title box refused any title shared by several books, so on a large catalogue credit
+  often could not be awarded at all.
+- Books without a quiz are kept in the catalogue (from mod_reader, and from mreader.org
+  once it offers them) so credit can be awarded for them; students never see them as quizzes.
 - The "read N words" completion rule now counts what the progress bar and the grade
   count: this term's books, each once, with teacher credit. It used to count every term.
 - "Grade by points" is refused when no enabled book has points (mreader.org sends none),

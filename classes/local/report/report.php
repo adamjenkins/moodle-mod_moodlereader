@@ -204,13 +204,12 @@ class report {
                 $number('goalvalue', $str('goaloverride')) . $button('goal') .
                 html_writer::span($str('reportaction_goal_help'), 'text-muted small')
             );
-            $inner .= $line(
-                html_writer::label($str('awardbooktitle'), 'mr-awardbooktitle', true, ['class' => 'mr-2']) .
-                html_writer::empty_tag('input', [
-                    'type' => 'text', 'name' => 'awardbooktitle', 'id' => 'mr-awardbooktitle',
-                    'class' => 'form-control w-auto mr-2', 'size' => 40,
-                ]) . $button('awardbook')
-            );
+            // Awarding credit opens a book search for the ticked students.
+            $awardurl = new \moodle_url('/mod/moodlereader/award.php', ['id' => $pageurl->get_param('id')]);
+            $inner .= $line(html_writer::tag('button', $str('reportaction_awardbook'), [
+                'type' => 'submit', 'class' => 'btn btn-secondary mr-1 mb-1',
+                'formaction' => $awardurl->out(false), 'formmethod' => 'post',
+            ]));
         }
         $inner .= html_writer::div(
             html_writer::label($str('reportaction_messagetext'), 'mr-messagetext', true, ['class' => 'd-block mb-1']) .
