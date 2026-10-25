@@ -145,4 +145,3 @@ Feature: Moodle Reader activity
     Then I should not see "The Red Kite"
     And I should not see "Night Train"
     And I should not see "Blue Hills"
-
