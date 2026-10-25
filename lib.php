@@ -116,7 +116,6 @@ function moodlereader_delete_instance($id) {
     $DB->delete_records('moodlereader_grades', $params);
     $DB->delete_records('moodlereader_levels', $params);
     $DB->delete_records('moodlereader_bookinstances', $params);
-    $DB->delete_records('moodlereader_hiddenbooks', $params);
     $DB->delete_records('moodlereader_cheatlog', $params);
     $DB->delete_records('moodlereader_messages', $params);
     $DB->delete_records('moodlereader', ['id' => $id]);

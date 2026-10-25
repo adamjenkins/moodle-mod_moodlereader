@@ -193,7 +193,7 @@ function xmldb_moodlereader_upgrade($oldversion) {
 
         // Book language, for the book search.
         $table = new xmldb_table('moodlereader_books');
-        $field = new xmldb_field('language', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, '', 'sametitle');
+        $field = new xmldb_field('language', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, null, 'sametitle');
         if (!$dbman->field_exists($table, $field)) {
             $dbman->add_field($table, $field);
         }
@@ -205,21 +205,17 @@ function xmldb_moodlereader_upgrade($oldversion) {
             $dbman->add_field($table, $field);
         }
 
-        // Books disabled in one activity (disabling no longer hides a book on the whole site).
+        upgrade_mod_savepoint(true, 2026102501, 'moodlereader');
+    }
+
+    if ($oldversion < 2026102502) {
+        // A per-activity book list existed briefly in development; Manage books is site-wide.
         $table = new xmldb_table('moodlereader_hiddenbooks');
-        if (!$dbman->table_exists($table)) {
-            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
-            $table->add_field('readerid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
-            $table->add_field('bookid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
-            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
-            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
-            $table->add_key('readerid', XMLDB_KEY_FOREIGN, ['readerid'], 'moodlereader', ['id']);
-            $table->add_key('bookid', XMLDB_KEY_FOREIGN, ['bookid'], 'moodlereader_books', ['id']);
-            $table->add_index('readerid_bookid', XMLDB_INDEX_UNIQUE, ['readerid', 'bookid']);
-            $dbman->create_table($table);
+        if ($dbman->table_exists($table)) {
+            $dbman->drop_table($table);
         }
 
-        upgrade_mod_savepoint(true, 2026102501, 'moodlereader');
+        upgrade_mod_savepoint(true, 2026102502, 'moodlereader');
     }
 
     return true;

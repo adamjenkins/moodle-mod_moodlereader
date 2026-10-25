@@ -47,10 +47,6 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
             'moodlereader_bookinstance',
             '/activity/moodlereader/bookinstancelinks/bookinstance'
         );
-        $paths[] = new restore_path_element(
-            'moodlereader_hiddenbook',
-            '/activity/moodlereader/hiddenbooks/hiddenbook'
-        );
         if ($userinfo) {
             $paths[] = new restore_path_element(
                 'moodlereader_attempt',
@@ -147,23 +143,6 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
                 'words'      => max(0, min(999999, (int) ($data->words ?? 0))),
                 'points'     => (float) ($data->points ?? 0),
             ]);
-        }
-    }
-
-    /**
-     * Restore a book disabled in the activity, remapping the book id.
-     *
-     * @param array $data
-     * @return void
-     */
-    protected function process_moodlereader_hiddenbook($data) {
-        global $DB;
-        $data = (object) $data;
-        $bookid = (int) $this->get_mappingid('moodlereader_book', $data->bookid);
-        $readerid = $this->get_new_parentid('moodlereader');
-        $key = ['readerid' => $readerid, 'bookid' => $bookid];
-        if ($bookid && !$DB->record_exists('moodlereader_hiddenbooks', $key)) {
-            $DB->insert_record('moodlereader_hiddenbooks', (object) ($key + ['timecreated' => (int) ($data->timecreated ?? 0)]));
         }
     }
 

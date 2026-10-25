@@ -15,8 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Book catalogue management: filter the catalogue and enable/disable books for this activity
- * (or, for site administrators, the whole site), one at a time or in bulk.
+ * Book catalogue management for the whole site: filter the catalogue (several publishers, levels
+ * and languages at once) and enable or disable books one at a time, the selected ones, or every
+ * book matching the filter. A disabled book is offered to no student in any activity.
  *
  * @package    mod_moodlereader
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -25,8 +26,9 @@
 
 require(__DIR__ . '/../../config.php');
 
-use mod_moodlereader\local\reader;
+use mod_moodlereader\local\booklanguage;
 use mod_moodlereader\local\downloader;
+use mod_moodlereader\local\reader;
 
 $id = required_param('id', PARAM_INT);
 $sync = optional_param('sync', 0, PARAM_BOOL);
@@ -35,22 +37,29 @@ $showbook = optional_param('show', 0, PARAM_INT);
 $bulkaction = optional_param('bulkaction', '', PARAM_ALPHA);
 $page = optional_param('page', 0, PARAM_INT);
 
-// Filters.
-$fpublisher = optional_param('fpublisher', '', PARAM_TEXT);
+// Filters. Publishers, levels and languages can each have several values.
+$filtered = optional_param('filtered', 0, PARAM_BOOL);
+$fpublishers = array_values(array_unique(optional_param_array('fpublisher', [], PARAM_TEXT)));
 $fseries = optional_param('fseries', '', PARAM_TEXT);
-$fdifficulty = optional_param('fdifficulty', -1, PARAM_INT);
+$fdifficulties = array_values(array_unique(array_filter(
+    optional_param_array('fdifficulty', [], PARAM_INT),
+    fn($d) => $d >= 0
+)));
+// English is selected until the filter is changed.
+$flanguages = $filtered ? optional_param_array('flanguage', [], PARAM_ALPHA) : [booklanguage::DEFAULT];
+$flanguages = array_values(array_unique(array_filter(array_map([booklanguage::class, 'clean'], $flanguages))));
 $fstatus = optional_param('fstatus', 'all', PARAM_ALPHA);
-$flanguage = \mod_moodlereader\local\booklanguage::clean(optional_param('flanguage', '', PARAM_ALPHA));
 if (!in_array($fstatus, ['all', 'enabled', 'disabled'], true)) {
     $fstatus = 'all';
 }
 // Filter values carried on every link/redirect so the view is preserved.
 $filterparams = [
-    'fpublisher'  => $fpublisher,
+    'filtered'    => 1,
+    'fpublisher'  => $fpublishers,
     'fseries'     => $fseries,
-    'fdifficulty' => $fdifficulty,
+    'fdifficulty' => $fdifficulties,
+    'flanguage'   => $flanguages,
     'fstatus'     => $fstatus,
-    'flanguage'   => $flanguage,
 ];
 
 $reader = reader::from_cmid($id);
@@ -78,25 +87,58 @@ if ($sync) {
     redirect($viewurl, get_string('synced', 'mod_moodlereader', $count), null, \core\output\notification::NOTIFY_SUCCESS);
 }
 
-// Single-book enable/disable for this activity (row action).
+// Build the filtered query (also used by "enable/disable all matching").
+$where = [];
+$params = [];
+if ($fpublishers) {
+    [$insql, $inparams] = $DB->get_in_or_equal($fpublishers, SQL_PARAMS_NAMED, 'fp');
+    $where[] = "publisher $insql";
+    $params += $inparams;
+}
+if (trim($fseries) !== '') {
+    $where[] = $DB->sql_like('series', ':fs', false, false);
+    $params['fs'] = '%' . $DB->sql_like_escape(trim($fseries)) . '%';
+}
+if ($fdifficulties) {
+    [$insql, $inparams] = $DB->get_in_or_equal($fdifficulties, SQL_PARAMS_NAMED, 'fd');
+    $where[] = "difficulty $insql";
+    $params += $inparams;
+}
+if ($flanguages) {
+    // A book whose language mreader.org has not sent matches every language.
+    [$insql, $inparams] = $DB->get_in_or_equal($flanguages, SQL_PARAMS_NAMED, 'fl');
+    $where[] = "(language $insql OR language = '')";
+    $params += $inparams;
+}
+if ($fstatus === 'enabled') {
+    $where[] = 'hidden = 0';
+} else if ($fstatus === 'disabled') {
+    $where[] = 'hidden = 1';
+}
+$wheresql = $where ? implode(' AND ', $where) : '1 = 1';
+
+// Single-book enable/disable (row action).
 if ($hidebook || $showbook) {
     require_sesskey();
-    $reader->set_books_hidden([$hidebook ?: $showbook], (bool) $hidebook);
+    $DB->set_field('moodlereader_books', 'hidden', $hidebook ? 1 : 0, ['id' => $hidebook ?: $showbook]);
     redirect($viewurl);
 }
 
-// Bulk enable/disable of the selected books: for this activity, or (site administrators) the whole site.
+// Bulk enable/disable: the ticked books, or every book matching the filter (all pages).
 if ($bulkaction && data_submitted() && confirm_sesskey()) {
-    $bookids = array_filter(optional_param_array('bookids', [], PARAM_INT));
-    if ($bookids && in_array($bulkaction, ['enable', 'disable'], true)) {
-        $count = $reader->set_books_hidden($bookids, $bulkaction === 'disable');
-    } else if ($bookids && in_array($bulkaction, ['siteenable', 'sitedisable'], true)) {
-        require_capability('mod/moodlereader:manageremotesites', context_system::instance());
-        [$insql, $inparams] = $DB->get_in_or_equal($bookids, SQL_PARAMS_NAMED, 'b');
-        $DB->set_field_select('moodlereader_books', 'hidden', $bulkaction === 'sitedisable' ? 1 : 0, "id $insql", $inparams);
-        $count = count($bookids);
+    $count = 0;
+    if (in_array($bulkaction, ['enable', 'disable'], true)) {
+        $bookids = array_filter(optional_param_array('bookids', [], PARAM_INT));
+        if ($bookids) {
+            [$insql, $inparams] = $DB->get_in_or_equal($bookids, SQL_PARAMS_NAMED, 'b');
+            $count = $DB->count_records_select('moodlereader_books', "id $insql", $inparams);
+            $DB->set_field_select('moodlereader_books', 'hidden', $bulkaction === 'disable' ? 1 : 0, "id $insql", $inparams);
+        }
+    } else if (in_array($bulkaction, ['enableall', 'disableall'], true)) {
+        $count = $DB->count_records_select('moodlereader_books', $wheresql, $params);
+        $DB->set_field_select('moodlereader_books', 'hidden', $bulkaction === 'disableall' ? 1 : 0, $wheresql, $params);
     }
-    if (!empty($count)) {
+    if ($count) {
         redirect(
             $viewurl,
             get_string('booksupdated', 'mod_moodlereader', $count),
@@ -107,49 +149,21 @@ if ($bulkaction && data_submitted() && confirm_sesskey()) {
     redirect($viewurl);
 }
 
-// Build the filtered query.
-$where = [];
-$params = ['hbreaderid' => $reader->get_instance()->id];
-if ($fpublisher !== '') {
-    $where[] = 'b.publisher = :fp';
-    $params['fp'] = $fpublisher;
-}
-if (trim($fseries) !== '') {
-    $where[] = $DB->sql_like('b.series', ':fs', false, false);
-    $params['fs'] = '%' . $DB->sql_like_escape(trim($fseries)) . '%';
-}
-if ($fdifficulty >= 0) {
-    $where[] = 'b.difficulty = :fd';
-    $params['fd'] = $fdifficulty;
-}
-if ($flanguage !== '') {
-    $where[] = 'b.language = :fl';
-    $params['fl'] = $flanguage;
-}
-// Disabled means disabled here: in this activity, or for the whole site.
-if ($fstatus === 'enabled') {
-    $where[] = 'b.hidden = 0 AND hb.id IS NULL';
-} else if ($fstatus === 'disabled') {
-    $where[] = '(b.hidden = 1 OR hb.id IS NOT NULL)';
-}
-$wheresql = $where ? implode(' AND ', $where) : '1 = 1';
-$fromsql = '{moodlereader_books} b
-       LEFT JOIN {moodlereader_hiddenbooks} hb ON hb.bookid = b.id AND hb.readerid = :hbreaderid';
-
 $perpage = 50;
-$totalbooks = $DB->count_records_sql("SELECT COUNT(1) FROM $fromsql WHERE $wheresql", $params);
-$books = $DB->get_records_sql(
-    "SELECT b.*, CASE WHEN hb.id IS NULL THEN 0 ELSE 1 END AS activityhidden
-       FROM $fromsql
-      WHERE $wheresql
-   ORDER BY b.publisher, b.series, b.name",
+$totalbooks = $DB->count_records_select('moodlereader_books', $wheresql, $params);
+$books = $DB->get_records_select(
+    'moodlereader_books',
+    $wheresql,
     $params,
+    'publisher, series, name',
+    '*',
     $page * $perpage,
     $perpage
 );
 
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('managebooks', 'mod_moodlereader'));
+echo html_writer::tag('p', get_string('managebooks_intro', 'mod_moodlereader'));
 
 if ($cansync) {
     $syncurl = new moodle_url($pageurl, $filterparams + ['sync' => 1, 'sesskey' => sesskey()]);
@@ -160,25 +174,16 @@ if ($cansync) {
     );
 }
 
-// Filter form (GET).
-$publishers = ['' => get_string('allpublishers', 'mod_moodlereader')];
-foreach (
-    $DB->get_records_sql(
-        'SELECT DISTINCT publisher FROM {moodlereader_books} ORDER BY publisher'
-    ) as $row
-) {
-    // Option labels are not escaped by html_writer::select().
-    $publishers[$row->publisher] = $row->publisher !== '' ? s($row->publisher) : get_string('nopublisher', 'mod_moodlereader');
+// Filter form (GET). Option labels are not escaped by html_writer::select(), so stored values get s().
+$publishers = [];
+foreach ($DB->get_fieldset_sql('SELECT DISTINCT publisher FROM {moodlereader_books} ORDER BY publisher') as $name) {
+    $publishers[$name] = $name !== '' ? s($name) : get_string('nopublisher', 'mod_moodlereader');
 }
-$difficulties = ['-1' => get_string('anylevel', 'mod_moodlereader')];
-foreach (
-    $DB->get_records_sql(
-        'SELECT DISTINCT difficulty FROM {moodlereader_books} ORDER BY difficulty'
-    ) as $row
-) {
-    $difficulties[(string) $row->difficulty] = (string) $row->difficulty;
+$difficulties = [];
+foreach ($DB->get_fieldset_sql('SELECT DISTINCT difficulty FROM {moodlereader_books} ORDER BY difficulty') as $difficulty) {
+    $difficulties[(string) $difficulty] = (string) (int) $difficulty;
 }
-$languages = ['' => get_string('anylanguage', 'mod_moodlereader')] + array_map('s', \mod_moodlereader\local\booklanguage::options(
+$languages = array_map('s', booklanguage::options(
     $DB->get_fieldset_sql("SELECT DISTINCT language FROM {moodlereader_books} WHERE language <> ''")
 ));
 $statuses = [
@@ -187,36 +192,51 @@ $statuses = [
     'disabled' => get_string('disabledonly', 'mod_moodlereader'),
 ];
 
-$filterrow = function (string $label, string $control): string {
+$filterrow = function (string $label, string $control, string $for): string {
     return html_writer::div(
-        html_writer::tag('label', $label, ['class' => 'mr-1']) . $control,
-        'form-inline mr-3 mb-2 d-inline-flex'
+        html_writer::tag('label', $label, ['class' => 'mr-1 align-self-start', 'for' => $for]) . $control,
+        'mr-3 mb-2 d-inline-flex'
     );
 };
+$multi = function (array $options, string $name, array $selected): string {
+    return html_writer::select($options, $name . '[]', array_map('strval', $selected), false, [
+        'class' => 'form-control', 'multiple' => 'multiple', 'id' => 'mr-' . $name,
+        'size' => max(2, min(8, count($options))),
+    ]);
+};
 $filterinner = html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'id', 'value' => $id]);
+$filterinner .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'filtered', 'value' => 1]);
 $filterinner .= $filterrow(
     get_string('publisher', 'mod_moodlereader'),
-    html_writer::select($publishers, 'fpublisher', $fpublisher, false, ['class' => 'form-control'])
-);
-$filterinner .= $filterrow(
-    get_string('series', 'mod_moodlereader'),
-    html_writer::empty_tag('input', ['type' => 'text', 'name' => 'fseries', 'value' => $fseries, 'class' => 'form-control'])
+    $multi($publishers, 'fpublisher', $fpublishers),
+    'mr-fpublisher'
 );
 $filterinner .= $filterrow(
     get_string('readinglevel', 'mod_moodlereader'),
-    html_writer::select($difficulties, 'fdifficulty', (string) $fdifficulty, false, ['class' => 'form-control'])
+    $multi($difficulties, 'fdifficulty', $fdifficulties),
+    'mr-fdifficulty'
 );
 $filterinner .= $filterrow(
     get_string('booklanguage', 'mod_moodlereader'),
-    html_writer::select($languages, 'flanguage', $flanguage, false, ['class' => 'form-control'])
+    $multi($languages, 'flanguage', $flanguages),
+    'mr-flanguage'
+);
+$filterinner .= $filterrow(
+    get_string('series', 'mod_moodlereader'),
+    html_writer::empty_tag('input', [
+        'type' => 'text', 'name' => 'fseries', 'value' => $fseries, 'class' => 'form-control', 'id' => 'mr-fseries',
+    ]),
+    'mr-fseries'
 );
 $filterinner .= $filterrow(
     get_string('status', 'mod_moodlereader'),
-    html_writer::select($statuses, 'fstatus', $fstatus, false, ['class' => 'form-control'])
+    html_writer::select($statuses, 'fstatus', $fstatus, false, ['class' => 'form-control', 'id' => 'mr-fstatus']),
+    'mr-fstatus'
 );
+$filterinner .= html_writer::div(get_string('multiselecthint', 'mod_moodlereader'), 'form-text text-muted small mb-2');
 $filterinner .= html_writer::tag('button', get_string('filter'), ['type' => 'submit', 'class' => 'btn btn-secondary mb-2']);
 $filterinner .= ' ' . html_writer::link(
-    new moodle_url($pageurl),
+    new moodle_url($pageurl, ['filtered' => 1]),
     get_string('reset'),
     ['class' => 'btn btn-link mb-2']
 );
@@ -230,36 +250,42 @@ if (!$books) {
     exit;
 }
 
-// Bulk form (POST) wrapping the table.
+// Bulk form (POST) wrapping the table; the filter travels with it so "all matching" means what is shown.
 echo html_writer::start_tag('form', ['method' => 'post', 'action' => $pageurl]);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'id', 'value' => $id]);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'page', 'value' => $page]);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
 foreach ($filterparams as $fname => $fvalue) {
-    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $fname, 'value' => $fvalue]);
+    foreach ((array) $fvalue as $one) {
+        echo html_writer::empty_tag('input', [
+            'type' => 'hidden', 'name' => is_array($fvalue) ? $fname . '[]' : $fname, 'value' => $one,
+        ]);
+    }
 }
 
+$button = fn(string $action, string $label, string $class, array $extra = []) => html_writer::tag(
+    'button',
+    $label,
+    ['type' => 'submit', 'name' => 'bulkaction', 'value' => $action, 'class' => "btn btn-sm $class"] + $extra
+);
+$confirm = fn(string $key) => ['onclick' => 'return confirm(' . json_encode(
+    get_string($key, 'mod_moodlereader', $totalbooks)
+) . ');'];
 echo html_writer::div(
-    html_writer::tag(
-        'button',
-        get_string('bulkenable', 'mod_moodlereader'),
-        ['type' => 'submit', 'name' => 'bulkaction', 'value' => 'enable', 'class' => 'btn btn-outline-success btn-sm mr-1']
+    $button('enable', get_string('bulkenable', 'mod_moodlereader'), 'btn-outline-success mr-1') .
+    $button('disable', get_string('bulkdisable', 'mod_moodlereader'), 'btn-outline-secondary mr-3') .
+    $button(
+        'enableall',
+        get_string('bulkenableall', 'mod_moodlereader', $totalbooks),
+        'btn-success mr-1',
+        $confirm('bulkenableall_confirm')
     ) .
-    html_writer::tag(
-        'button',
-        get_string('bulkdisable', 'mod_moodlereader'),
-        ['type' => 'submit', 'name' => 'bulkaction', 'value' => 'disable', 'class' => 'btn btn-outline-secondary btn-sm']
-    ) . ($cansync ? ' ' .
-    html_writer::tag(
-        'button',
-        get_string('bulksiteenable', 'mod_moodlereader'),
-        ['type' => 'submit', 'name' => 'bulkaction', 'value' => 'siteenable', 'class' => 'btn btn-outline-success btn-sm ml-3']
-    ) . ' ' .
-    html_writer::tag(
-        'button',
-        get_string('bulksitedisable', 'mod_moodlereader'),
-        ['type' => 'submit', 'name' => 'bulkaction', 'value' => 'sitedisable', 'class' => 'btn btn-outline-danger btn-sm']
-    ) : ''),
+    $button(
+        'disableall',
+        get_string('bulkdisableall', 'mod_moodlereader', $totalbooks),
+        'btn-secondary',
+        $confirm('bulkdisableall_confirm')
+    ),
     'mb-2'
 );
 
@@ -286,16 +312,13 @@ $table->head = [
 $table->align = ['center', 'left', 'left', 'left', 'center', 'center', 'right', 'center', 'center'];
 
 foreach ($books as $book) {
-    $checkbox = html_writer::empty_tag('input', [
-        'type' => 'checkbox', 'name' => 'bookids[]', 'value' => $book->id,
-        'data-action' => 'toggle', 'data-toggle' => 'target', 'data-togglegroup' => 'mrbooks',
-        'aria-label' => s($book->name),
-    ]);
+    $checkboxid = 'mr-book-' . $book->id;
+    $checkbox = html_writer::label(s($book->name), $checkboxid, false, ['class' => 'accesshide']) .
+        html_writer::empty_tag('input', [
+            'type' => 'checkbox', 'name' => 'bookids[]', 'value' => $book->id, 'id' => $checkboxid,
+            'data-action' => 'toggle', 'data-toggle' => 'target', 'data-togglegroup' => 'mrbooks',
+        ]);
     if ($book->hidden) {
-        // Disabled for the whole site: only a site administrator can enable it again.
-        $status = html_writer::span(get_string('disabledsite', 'mod_moodlereader'), 'badge bg-dark');
-        $toggle = '';
-    } else if ($book->activityhidden) {
         $status = html_writer::span(get_string('disabled', 'mod_moodlereader'), 'badge bg-secondary');
         $toggle = html_writer::link(
             new moodle_url($pageurl, $filterparams + ['show' => $book->id, 'page' => $page, 'sesskey' => sesskey()]),
@@ -316,17 +339,17 @@ foreach ($books as $book) {
         s($book->publisher),
         s($book->series),
         s((int) $book->difficulty),
-        s(\mod_moodlereader\local\booklanguage::label((string) $book->language)),
+        s(booklanguage::label((string) $book->language)),
         s(number_format((int) $book->words)),
         $status,
         $toggle,
     ]);
-    if ($book->hidden || $book->activityhidden) {
+    if ($book->hidden) {
         $row->attributes['class'] = 'dimmed_text';
     }
     $table->data[] = $row;
 }
-echo html_writer::table($table);
+echo html_writer::div(html_writer::table($table), 'table-responsive');
 echo html_writer::end_tag('form');
 
 echo $OUTPUT->paging_bar($totalbooks, $page, $perpage, new moodle_url($pageurl, $filterparams));

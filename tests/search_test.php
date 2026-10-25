@@ -28,11 +28,11 @@ use mod_moodlereader\local\reader;
 #[\PHPUnit\Framework\Attributes\CoversClass(\mod_moodlereader\local\reader::class)]
 final class search_test extends \advanced_testcase {
     /**
-     * Several publishers, levels and languages at once; unknown language always matches; disabled books never do.
+     * Publisher, level and language filters; unknown language always matches; disabled books never do.
      *
      * @return void
      */
-    public function test_multi_value_filters(): void {
+    public function test_filters_and_disabled_books(): void {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course(['summary' => '']);
         $gen = $this->getDataGenerator()->get_plugin_generator('mod_moodlereader');
@@ -53,20 +53,13 @@ final class search_test extends \advanced_testcase {
             return $names;
         };
 
+        // Disabled books never appear, whatever the filter.
         $this->assertSame(['a1en', 'a3xx', 'b2en', 'c3es'], $find([]));
-        $this->assertSame(['a1en', 'a3xx', 'b2en'], $find(['languages' => ['en']]));
-        $this->assertSame(['a1en', 'a3xx', 'b2en'], $find(['publishers' => ['A', 'B']]));
-        $this->assertSame(['a1en', 'a3xx', 'c3es'], $find(['difficulties' => [1, 3]]));
-        $this->assertSame(['a3xx', 'c3es'], $find(['difficulties' => [3], 'languages' => ['en', 'es']]));
-        $this->assertSame(['a1en'], $find(['publishers' => ['A'], 'difficulties' => [1, 2], 'languages' => ['en']]));
+        $this->assertSame(['a1en', 'a3xx', 'b2en'], $find(['language' => 'en']));
+        $this->assertSame(['a1en', 'a3xx'], $find(['publisher' => 'A']));
+        $this->assertSame(['a3xx', 'c3es'], $find(['difficulty' => 3]));
+        $this->assertSame(['a3xx'], $find(['difficulty' => 3, 'language' => 'en']));
+        $this->assertSame(['a1en'], $find(['publisher' => 'A', 'difficulty' => 1, 'language' => 'en']));
         $this->assertSame(['en', 'es'], $reader->available_languages($student->id));
-
-        // Disabling a book in this activity hides it here only.
-        $other = reader::from_instanceid($gen->create_instance(['course' => $course->id, 'goal' => 5000])->id);
-        $this->assertSame(1, $reader->set_books_hidden([$books['b2en']->id], true));
-        $this->assertSame(['a1en', 'a3xx', 'c3es'], $find([]));
-        $this->assertArrayHasKey($books['b2en']->id, $other->search_books($student->id, []));
-        $this->assertSame(1, $reader->set_books_hidden([$books['b2en']->id], false));
-        $this->assertSame(0, $reader->set_books_hidden([$books['b2en']->id, 999999], false));
     }
 }

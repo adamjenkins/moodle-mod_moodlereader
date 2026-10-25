@@ -85,8 +85,7 @@ Feature: Moodle Reader activity
     And I should see "3,000"
     When I follow "Student details"
     And I set the field "The Red Kite" to "1"
-    And I set the field "With the selected rows" to "Mark as cheated"
-    And I press "Apply"
+    And I press "Mark as cheated"
     Then I should see "1 change(s) made."
     And I should see "Cheated" in the "The Red Kite" "table_row"
     When I follow "Student summary"
@@ -120,3 +119,23 @@ Feature: Moodle Reader activity
     And I press "Search"
     Then I should see "El Gato Negro"
     And I should not see "Green Fields"
+
+  Scenario: A teacher disables every book matching a multi-select filter, and students no longer see them
+    Given the following moodlereader books exist:
+      | name         | publisher | series  | difficulty | words |
+      | Night Train  | Orbit     | Level 2 | 2          | 3500  |
+    When I am on the "Reader 1" "moodlereader activity" page logged in as teacher1
+    And I follow "Manage books"
+    And I set the field "Publisher" to "Acme,Orbit"
+    And I press "Filter"
+    Then I should see "Night Train"
+    And I should see "The Red Kite"
+    When I press "Disable all 3 matching books"
+    Then I should see "3 book(s) updated."
+    And I log out
+    When I am on the "Reader 1" "moodlereader activity" page logged in as student1
+    And I press "Search"
+    Then I should not see "The Red Kite"
+    And I should not see "Night Train"
+    And I should not see "Blue Hills"
+

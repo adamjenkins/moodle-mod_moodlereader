@@ -318,7 +318,7 @@ class importer {
             }
             if (!$newid) {
                 $newid = $DB->insert_record('moodlereader_books', (object) ($values + [
-                    'remoteid' => 0, 'hidden' => (int) $old->hidden, 'time' => time(), 'withdrawn' => 0,
+                    'remoteid' => 0, 'hidden' => (int) $old->hidden, 'time' => time(), 'withdrawn' => 0, 'language' => '',
                 ]));
             }
             $this->bookmap[$old->id] = (int) $newid;

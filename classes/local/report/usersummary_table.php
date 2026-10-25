@@ -73,11 +73,10 @@ class usersummary_table extends \table_sql {
         }
         $columns[] = 'fullname';
         $headers[] = get_string('fullname');
+        // The reading level only matters when books are restricted to it.
         if (!empty($instance->levelcheck)) {
-            foreach (['startlevel', 'currentlevel', 'stoplevel'] as $field) {
-                $columns[] = $field;
-                $headers[] = get_string($field, 'mod_moodlereader');
-            }
+            $columns[] = 'currentlevel';
+            $headers[] = get_string('currentlevel', 'mod_moodlereader');
         }
         $unit = $this->points ? 'points' : 'words';
         $more = [
@@ -106,8 +105,7 @@ class usersummary_table extends \table_sql {
         $names = \core_user\fields::for_name()->get_sql('u', false, '', '', false)->selects;
 
         $fields = "u.id, $names,
-                   COALESCE(l.startlevel, 0) AS startlevel, COALESCE(l.currentlevel, 0) AS currentlevel,
-                   COALESCE(l.stoplevel, 0) AS stoplevel, COALESCE(l.goal, 0) AS goal,
+                   COALESCE(l.currentlevel, 0) AS currentlevel, COALESCE(l.goal, 0) AS goal,
                    COALESCE(s.countpassed, 0) AS countpassed, COALESCE(s.countfailed, 0) AS countfailed,
                    COALESCE(s.countcheated, 0) AS countcheated,
                    COALESCE(s.averageduration, 0) AS averageduration, COALESCE(s.averagegrade, 0) AS averagegrade,
@@ -157,16 +155,6 @@ class usersummary_table extends \table_sql {
             'id' => $this->reader->get_cm()->id, 'mode' => 'userdetailed', 'userid' => $row->id,
         ]);
         return html_writer::link($url, fullname($row));
-    }
-
-    /**
-     * The stop level (0 means none).
-     *
-     * @param \stdClass $row
-     * @return string
-     */
-    public function col_stoplevel($row) {
-        return (int) $row->stoplevel ? (string) (int) $row->stoplevel : get_string('unlimited');
     }
 
     /**

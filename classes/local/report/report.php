@@ -161,6 +161,8 @@ class report {
     /**
      * The form applying an action to the selected rows (the rows' checkboxes join it by id).
      *
+     * Each action has its own button, next to the one value it needs, so nothing is ambiguous.
+     *
      * @param string $mode 'usersummary' or 'userdetailed'.
      * @param \moodle_url $pageurl
      * @param \stdClass $instance
@@ -168,60 +170,55 @@ class report {
      */
     public static function action_form(string $mode, \moodle_url $pageurl, \stdClass $instance): string {
         $str = fn($k) => get_string($k, 'mod_moodlereader');
-        if ($mode === 'userdetailed') {
-            $actions = [];
-            foreach (attempt_admin::ATTEMPT_ACTIONS as $a) {
-                $actions[$a] = $str('reportaction_' . $a);
-            }
-            $actions['message'] = $str('reportaction_message');
-        } else {
-            $actions = [];
-            if (!empty($instance->levelcheck)) {
-                foreach (['startlevel', 'currentlevel', 'stoplevel'] as $a) {
-                    $actions[$a] = $str('reportaction_' . $a);
-                }
-            }
-            $actions['goal'] = $str('reportaction_goal');
-            $actions['awardbook'] = $str('reportaction_awardbook');
-            $actions['message'] = $str('reportaction_message');
-        }
+        $button = fn(string $action, string $class = 'btn-secondary') => html_writer::tag(
+            'button',
+            $str('reportaction_' . $action),
+            ['type' => 'submit', 'name' => 'reportaction', 'value' => $action, 'class' => "btn $class mr-1 mb-1"]
+        );
+        $line = fn(string $content) => html_writer::div($content, 'd-flex flex-wrap align-items-center mb-3');
+        $number = fn(string $name, string $label) => html_writer::label($label, 'mr-' . $name, true, ['class' => 'mr-2']) .
+            html_writer::empty_tag('input', [
+                'type' => 'number', 'min' => 0, 'name' => $name, 'id' => 'mr-' . $name, 'class' => 'form-control w-auto mr-2',
+            ]);
 
         $inner = html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
-        $inner .= html_writer::tag('legend', $str('reportactions'), ['class' => 'h5']);
-        $inner .= html_writer::div(
-            html_writer::label($str('reportactionlabel'), 'mr-reportaction', true, ['class' => 'mr-2']) .
-            html_writer::select($actions, 'reportaction', '', ['' => 'choosedots'], [
-                'id' => 'mr-reportaction', 'class' => 'form-select w-auto', 'required' => 'required',
-            ]),
-            'mb-2 d-flex align-items-center'
+        $inner .= html_writer::tag(
+            'legend',
+            $str($mode === 'userdetailed' ? 'reportactions_attempts' : 'reportactions_students'),
+            ['class' => 'h5']
         );
-        if ($mode === 'usersummary') {
-            $inner .= html_writer::div(
-                html_writer::label($str('reportactionvalue'), 'mr-levelvalue', true, ['class' => 'mr-2']) .
-                html_writer::empty_tag('input', [
-                    'type' => 'number', 'min' => 0, 'name' => 'levelvalue', 'id' => 'mr-levelvalue',
-                    'class' => 'form-control w-auto',
-                ]) .
-                html_writer::span($str('reportactionvalue_help'), 'text-muted small ml-2'),
-                'mb-2 d-flex align-items-center'
+        if ($mode === 'userdetailed') {
+            $inner .= $line(
+                $button('pass', 'btn-outline-success') . $button('fail', 'btn-outline-danger') .
+                $button('cheat', 'btn-outline-warning') . $button('uncheat', 'btn-outline-secondary')
             );
-            $inner .= html_writer::div(
+            $inner .= $line(
+                $button('delete', 'btn-outline-danger') . $button('restore', 'btn-outline-secondary') .
+                html_writer::span($str('reportaction_delete_help'), 'text-muted small')
+            );
+        } else {
+            if (!empty($instance->levelcheck)) {
+                $inner .= $line($number('levelvalue', $str('currentlevel')) . $button('currentlevel'));
+            }
+            $inner .= $line(
+                $number('goalvalue', $str('goaloverride')) . $button('goal') .
+                html_writer::span($str('reportaction_goal_help'), 'text-muted small')
+            );
+            $inner .= $line(
                 html_writer::label($str('awardbooktitle'), 'mr-awardbooktitle', true, ['class' => 'mr-2']) .
                 html_writer::empty_tag('input', [
                     'type' => 'text', 'name' => 'awardbooktitle', 'id' => 'mr-awardbooktitle',
-                    'class' => 'form-control w-auto', 'size' => 40,
-                ]),
-                'mb-2 d-flex align-items-center'
+                    'class' => 'form-control w-auto mr-2', 'size' => 40,
+                ]) . $button('awardbook')
             );
         }
         $inner .= html_writer::div(
-            html_writer::label($str('reportaction_message'), 'mr-messagetext', true, ['class' => 'mr-2']) .
+            html_writer::label($str('reportaction_messagetext'), 'mr-messagetext', true, ['class' => 'd-block mb-1']) .
             html_writer::tag('textarea', '', [
-                'name' => 'messagetext', 'id' => 'mr-messagetext', 'rows' => 2, 'cols' => 50, 'class' => 'form-control',
-            ]),
-            'mb-2'
+                'name' => 'messagetext', 'id' => 'mr-messagetext', 'rows' => 2, 'cols' => 50, 'class' => 'form-control mb-1',
+            ]) . $button('message', 'btn-primary'),
+            'mb-1'
         );
-        $inner .= html_writer::tag('button', $str('reportapply'), ['type' => 'submit', 'class' => 'btn btn-primary']);
         return html_writer::tag('form', html_writer::tag('fieldset', $inner, ['class' => 'border p-3 mt-3']), [
             'method' => 'post', 'action' => $pageurl, 'id' => 'mr-reportactions',
         ]);

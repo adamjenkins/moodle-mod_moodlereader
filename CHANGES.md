@@ -31,12 +31,18 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   (same address, quiz finished too quickly, many quizzes in a short time) can be
   switched off or tuned, and a school can allow-list its own shared addresses for the
   whole site or one activity.
-- The book search can select several publishers and reading levels at once and filter
-  by language, with English selected by default. Books' languages come from mreader.org.
-- Disabling a book on the "Manage books" page now disables it in that activity only. It
-  used to hide the book in every course on the site. Site administrators can still
-  disable a book for the whole site.
+- "Manage books" (which applies to the whole site) can filter by several publishers,
+  reading levels and languages at once, and can enable or disable every book matching the
+  filter in one step, not only the ticked books on the current page.
+- Books can be filtered by language, with English selected by default, in the student
+  book search and in "Manage books". Books' languages come from mreader.org.
 - Book covers are served only when they are JPEG, PNG, GIF or WebP images.
+- Teachers and administrators no longer see a student's empty progress, level, records
+  and book search on the activity page; they see their tools and a short note.
+- The "read N words" completion rule now counts what the progress bar and the grade
+  count: this term's books, each once, with teacher credit. It used to count every term.
+- "Grade by points" is refused when no enabled book has points (mreader.org sends none),
+  instead of silently giving every student 0.
 
 ## [0.0.3] - 2026-10-04
 

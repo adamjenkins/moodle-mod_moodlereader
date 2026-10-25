@@ -31,9 +31,11 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   whole-address, /24 or /16 matching), `quickfinish` and `burst`, stored in
   `moodlereader.cheatsettings`; the allow-list (site setting `cheatallowlist` plus the
   activity's own); field `detail` on `moodlereader_cheatlog`.
-- Book `language` (from API v2's `language`; '' when unknown) and multi-select
-  publisher, reading-level and language filters in the book search
+- Book `language` (from API v2's `language`; '' when unknown) and a language filter,
+  English by default, in the student search and in Manage books
   (`classes/local/booklanguage.php`).
+- Manage books: multi-select publisher, level and language filters, and "enable/disable
+  all N matching books", which acts on every page of the filtered result.
 
 ### Changed
 
@@ -46,9 +48,13 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - `report.php` shows the student summary, student details and books tabs (the old
   `attempts`/`users` modes open the new reports).
 - A scan replaces the flags no teacher has acted on, so changed settings apply.
-- `books.php` enable/disable acts on the new `moodlereader_hiddenbooks` table (per
-  activity); the site-wide `moodlereader_books.hidden` flag needs
-  `mod/moodlereader:manageremotesites`.
+- The student summary shows and sets only the current reading level (start and stop
+  levels have no effect in this plugin); each report action has its own button.
+- `view.php`: the student sections need `mod/moodlereader:attempt` without doanything.
+- Completion rules use `ignoredate`, count each book once and include credit.
+- `mod_form` validation refuses `wordsorpoints = 1` when no enabled book has points.
+- `moodlereader_books.language` is NOT NULL with no default (XMLDB rejects `''` as a
+  CHAR default; CI's install failed on it).
 - Covers: only raster images (checked with `getimagesizefromstring`) are cached, stored as
   `cover.<type>`; `pluginfile` force-downloads any other cover file.
 - Restore cleans every restored field, skips attempts whose book or user it did not map

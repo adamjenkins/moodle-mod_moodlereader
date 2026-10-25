@@ -124,4 +124,38 @@ final class grade_integrity_test extends \advanced_testcase {
         $completion = new \mod_moodlereader\completion\custom_completion($getcm(), (int) $user->id);
         $this->assertEquals(COMPLETION_COMPLETE, $completion->get_state('completionpass'));
     }
+
+    /**
+     * The words rule counts this term's books once each, as the grade does, credit included.
+     *
+     * @return void
+     */
+    public function test_completion_words_rule_matches_grade(): void {
+        global $DB;
+        [$reader, $user, $book] = $this->make([
+            'completion' => COMPLETION_TRACKING_AUTOMATIC, 'completiontotalwords' => 6000, 'ignoredate' => time() - DAYSECS,
+        ]);
+        $gen = $this->getDataGenerator()->get_plugin_generator('mod_moodlereader');
+        $old = $gen->create_book(['words' => 3000]);
+        $base = ['readerid' => $reader->get_instance()->id, 'userid' => $user->id, 'attempt' => 1, 'state' => 'finished',
+            'percentgrade' => 90, 'passed' => 1, 'credit' => 0, 'cheated' => 0, 'deleted' => 0, 'bookrating' => 0,
+            'ip' => '', 'timemodified' => time()];
+        // This term: the same 5,000-word book passed twice. Last term: a 3,000-word book.
+        foreach ([time() - 600, time() - 300] as $t) {
+            $row = $base + ['bookid' => $book->id, 'timestart' => $t, 'timefinish' => $t];
+            $DB->insert_record('moodlereader_attempts', (object) $row);
+        }
+        $t = time() - 10 * DAYSECS;
+        $row = $base + ['bookid' => $old->id, 'timestart' => $t, 'timefinish' => $t];
+        $DB->insert_record('moodlereader_attempts', (object) $row);
+
+        $cm = get_fast_modinfo($reader->get_course())->get_cm($reader->get_cm()->id);
+        $completion = new \mod_moodlereader\completion\custom_completion($cm, (int) $user->id);
+        $this->assertSame(COMPLETION_INCOMPLETE, $completion->get_state('completiontotalwords'));
+
+        // Credit for another book this term reaches the threshold.
+        $this->setAdminUser();
+        \mod_moodlereader\local\attempt_admin::award_book($reader, [$user->id], $gen->create_book(['words' => 1000])->id);
+        $this->assertSame(COMPLETION_COMPLETE, $completion->get_state('completiontotalwords'));
+    }
 }

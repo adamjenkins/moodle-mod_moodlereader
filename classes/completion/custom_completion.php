@@ -39,24 +39,31 @@ class custom_completion extends activity_custom_completion {
         $instance = $DB->get_record('moodlereader', ['id' => $this->cm->instance], '*', MUST_EXIST);
         $readerid = $instance->id;
 
+        // Both rules count this term only (from the activity's "ignore before" date), like the grade.
+        $since = (int) $instance->ignoredate;
         if ($rule === 'completionpass') {
             $passed = $DB->record_exists_select(
                 'moodlereader_attempts',
-                'readerid = :readerid AND userid = :userid AND passed = 1 AND deleted = 0 AND cheated = 0',
-                ['readerid' => $readerid, 'userid' => $this->userid]
+                'readerid = :readerid AND userid = :userid AND passed = 1 AND deleted = 0 AND cheated = 0
+                     AND timefinish >= :since',
+                ['readerid' => $readerid, 'userid' => $this->userid, 'since' => $since]
             );
             return $passed ? COMPLETION_COMPLETE : COMPLETION_INCOMPLETE;
         }
 
-        // Rule completiontotalwords: total words in passed books meets the threshold.
+        // Rule completiontotalwords: the words of this term's counted books (each book once,
+        // teacher credit included), the same total the progress bar and the grade use.
         $threshold = (int) $instance->completiontotalwords;
         $total = (int) $DB->get_field_sql(
-            "SELECT COALESCE(SUM(b.words), 0)
-               FROM {moodlereader_attempts} a
-               JOIN {moodlereader_books} b ON b.id = a.bookid
-              WHERE a.readerid = :readerid AND a.userid = :userid
-                    AND a.passed = 1 AND a.deleted = 0 AND a.cheated = 0",
-            ['readerid' => $readerid, 'userid' => $this->userid]
+            "SELECT COALESCE(SUM(perbook.words), 0)
+               FROM (SELECT a.bookid, MAX(b.words) AS words
+                       FROM {moodlereader_attempts} a
+                       JOIN {moodlereader_books} b ON b.id = a.bookid
+                      WHERE a.readerid = :readerid AND a.userid = :userid
+                            AND (a.passed = 1 OR a.credit = 1) AND a.deleted = 0 AND a.cheated = 0
+                            AND a.timefinish >= :since
+                   GROUP BY a.bookid) perbook",
+            ['readerid' => $readerid, 'userid' => $this->userid, 'since' => $since]
         );
         return $total >= $threshold ? COMPLETION_COMPLETE : COMPLETION_INCOMPLETE;
     }

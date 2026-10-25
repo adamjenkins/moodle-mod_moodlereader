@@ -54,7 +54,7 @@ class attempt_admin {
     ];
 
     /** @var string[] The level fields a teacher can set from the student summary. */
-    const LEVEL_FIELDS = ['startlevel', 'currentlevel', 'stoplevel', 'goal'];
+    const LEVEL_FIELDS = ['currentlevel', 'goal'];
 
     /**
      * Apply one action to several attempts of an activity.
@@ -206,24 +206,22 @@ class attempt_admin {
     /**
      * The catalogue books a teacher may mean by a title: exact title matches if any, else partial ones.
      *
-     * Books disabled for the site or in the activity, and withdrawn books, are left out.
+     * Disabled and withdrawn books are left out.
      *
      * @param string $title
-     * @param int $readerid The activity whose disabled books are left out.
      * @return \stdClass[] At most 20 books (id, publisher, name).
      */
-    public static function find_books(string $title, int $readerid = 0): array {
+    public static function find_books(string $title): array {
         global $DB;
         $title = trim($title);
         if ($title === '') {
             return [];
         }
-        $base = 'hidden = 0 AND withdrawn = 0
-                 AND id NOT IN (SELECT bookid FROM {moodlereader_hiddenbooks} WHERE readerid = :hbreaderid) AND ';
+        $base = 'hidden = 0 AND withdrawn = 0 AND ';
         $exact = $DB->get_records_select(
             'moodlereader_books',
             $base . $DB->sql_equal('name', ':name', false),
-            ['name' => $title, 'hbreaderid' => $readerid],
+            ['name' => $title],
             'publisher, name',
             'id, publisher, name',
             0,
@@ -235,7 +233,7 @@ class attempt_admin {
         return $DB->get_records_select(
             'moodlereader_books',
             $base . $DB->sql_like('name', ':name', false, false),
-            ['name' => '%' . $DB->sql_like_escape($title) . '%', 'hbreaderid' => $readerid],
+            ['name' => '%' . $DB->sql_like_escape($title) . '%'],
             'publisher, name',
             'id, publisher, name',
             0,

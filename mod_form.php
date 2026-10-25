@@ -116,6 +116,23 @@ class mod_moodlereader_mod_form extends moodleform_mod {
     }
 
     /**
+     * Validate the settings.
+     *
+     * @param array $data
+     * @param array $files
+     * @return array Errors by element name.
+     */
+    public function validation($data, $files) {
+        global $DB;
+        $errors = parent::validation($data, $files);
+        // The mreader.org catalogue has no points, so grading by points needs books that have them.
+        if (!empty($data['wordsorpoints']) && !$DB->record_exists_select('moodlereader_books', 'points > 0 AND hidden = 0')) {
+            $errors['wordsorpoints'] = get_string('nopointsbooks', 'mod_moodlereader');
+        }
+        return $errors;
+    }
+
+    /**
      * Add custom completion rules.
      *
      * @return array Element names.

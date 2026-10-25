@@ -87,9 +87,10 @@ if ($action !== '' && $canmanage && $mode !== 'books') {
     } else {
         $userids = optional_param_array('userids', [], PARAM_INT);
         if (in_array($action, attempt_admin::LEVEL_FIELDS, true)) {
-            $done = attempt_admin::set_level_field($reader, $userids, $action, optional_param('levelvalue', 0, PARAM_INT));
+            $value = optional_param($action === 'goal' ? 'goalvalue' : 'levelvalue', 0, PARAM_INT);
+            $done = attempt_admin::set_level_field($reader, $userids, $action, $value);
         } else if ($action === 'awardbook') {
-            $matches = attempt_admin::find_books(optional_param('awardbooktitle', '', PARAM_TEXT), $readerid);
+            $matches = attempt_admin::find_books(optional_param('awardbooktitle', '', PARAM_TEXT));
             if (count($matches) !== 1) {
                 redirect($pageurl, get_string(
                     count($matches) ? 'awardbooktoomany' : 'awardbooknone',

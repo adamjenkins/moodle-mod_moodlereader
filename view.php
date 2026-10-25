@@ -105,6 +105,14 @@ if (!\mod_moodlereader\local\connection::allows_launch()) {
     echo $OUTPUT->notification($message, \core\output\notification::NOTIFY_WARNING, false);
 }
 
+// The rest of the page is the student's own reading: progress, level, records and the book search.
+// Only someone who takes quizzes here has any (an administrator's or teacher's would always be empty).
+if (!has_capability('mod/moodlereader:attempt', $reader->get_context(), null, false)) {
+    echo $OUTPUT->notification(get_string('teacherviewnote', 'mod_moodlereader'), \core\output\notification::NOTIFY_INFO);
+    echo $output->footer();
+    exit;
+}
+
 // Teacher messages.
 echo $output->messages($reader, $USER->id);
 
@@ -138,19 +146,20 @@ echo html_writer::div(
 // only once the student runs a search (the form does not list books by default).
 if (!empty($instance->showsearch)) {
     $searched = optional_param('searchsubmit', 0, PARAM_INT);
+    $difficulty = optional_param('searchdifficulty', -1, PARAM_INT);
     $filters = [
-        'name'         => optional_param('searchname', '', PARAM_TEXT),
-        'series'       => optional_param('searchseries', '', PARAM_TEXT),
-        'genre'        => optional_param('searchgenre', '', PARAM_ALPHA),
-        'publishers'   => optional_param_array('searchpublisher', [], PARAM_TEXT),
-        'difficulties' => optional_param_array('searchdifficulty', [], PARAM_INT),
-        // English is selected until the student submits a search of their own.
-        'languages'    => $searched
-            ? optional_param_array('searchlanguage', [], PARAM_ALPHA)
-            : [\mod_moodlereader\local\booklanguage::DEFAULT],
+        'name'       => optional_param('searchname', '', PARAM_TEXT),
+        'publisher'  => optional_param('searchpublisher', '', PARAM_TEXT),
+        'series'     => optional_param('searchseries', '', PARAM_TEXT),
+        'genre'      => optional_param('searchgenre', '', PARAM_ALPHA),
+        'difficulty' => $difficulty,
+        // English is selected until the student chooses another language (or any).
+        'language'   => $searched
+            ? \mod_moodlereader\local\booklanguage::clean(optional_param('searchlanguage', '', PARAM_ALPHA))
+            : \mod_moodlereader\local\booklanguage::DEFAULT,
     ];
-    $hasfilter = trim($filters['name']) !== '' || trim($filters['series']) !== '' || $filters['genre'] !== ''
-        || $filters['publishers'] || $filters['difficulties'];
+    $hasfilter = trim($filters['name']) !== '' || $filters['publisher'] !== '' || trim($filters['series']) !== ''
+        || $filters['genre'] !== '' || $difficulty >= 0;
 
     echo $output->search_form($reader, $USER->id, $filters);
 

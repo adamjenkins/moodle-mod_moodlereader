@@ -53,13 +53,15 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
 - The student activity page shows a reading-progress bar, the student's current
   reading level, a **"books read this term"** cover gallery (covers fetched from
   mreader.org and cached), a reading report of this term's attempts, and a **book
-  search** (title, language, series, genre, and several publishers and reading levels
-  at once; English is selected until the student picks other languages). Search results appear
+  search** (title, language, publisher, series, genre, reading level; English is
+  selected until the student picks another language). Search results appear
   only after a search and each carries a cover thumbnail and a "take the quiz"
   button; the quiz is delivered by mreader.org in a frame.
 - Each passed book's word count contributes once to the gradebook grade.
-- Teachers can **manage the catalogue** (filter by publisher/series/level/language/status
-  and enable or disable books individually or in bulk), **sync** it from mreader.org,
+- Teachers can **manage the site's catalogue** (filter by several publishers, levels and
+  languages at once, plus series and status, and enable or disable single books, the ticked
+  books, or every book matching the filter; a disabled book is offered to no student),
+  **sync** it from mreader.org,
   **message** students, and set **per-student reading goals**.
 - **Reports** (modelled on mod_reader's): the *student summary* (levels, goal, passed,
   failed and cheated counts, average time and score, words this term and in all terms)

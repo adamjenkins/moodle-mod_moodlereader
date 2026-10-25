@@ -53,7 +53,7 @@
         <FIELD NAME="points" TYPE="number" LENGTH="10" DECIMALS="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="image" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="Book-cover image identifier used by the mreader.org quiz URL."/>
         <FIELD NAME="sametitle" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
-        <FIELD NAME="language" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="The book's language code from mreader.org; empty when unknown."/>
+        <FIELD NAME="language" TYPE="char" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="The book's language code from mreader.org; empty when unknown."/>
         <FIELD NAME="hidden" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="time" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="withdrawn" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 when mreader.org no longer offers this book's quiz."/>
@@ -81,22 +81,6 @@
         <KEY NAME="readerid" TYPE="foreign" FIELDS="readerid" REFTABLE="moodlereader" REFFIELDS="id"/>
         <KEY NAME="bookid" TYPE="foreign" FIELDS="bookid" REFTABLE="moodlereader_books" REFFIELDS="id"/>
       </KEYS>
-    </TABLE>
-    <TABLE NAME="moodlereader_hiddenbooks" COMMENT="Books a teacher has disabled in one activity.">
-      <FIELDS>
-        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="readerid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
-        <FIELD NAME="bookid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
-        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
-      </FIELDS>
-      <KEYS>
-        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
-        <KEY NAME="readerid" TYPE="foreign" FIELDS="readerid" REFTABLE="moodlereader" REFFIELDS="id"/>
-        <KEY NAME="bookid" TYPE="foreign" FIELDS="bookid" REFTABLE="moodlereader_books" REFFIELDS="id"/>
-      </KEYS>
-      <INDEXES>
-        <INDEX NAME="readerid_bookid" UNIQUE="true" FIELDS="readerid, bookid"/>
-      </INDEXES>
     </TABLE>
     <TABLE NAME="moodlereader_users" COMMENT="Maps a Moodle user to the anonymous identity used on mreader.org.">
       <FIELDS>

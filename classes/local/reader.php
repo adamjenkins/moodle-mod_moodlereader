@@ -241,10 +241,8 @@ class reader {
                               AND a.deleted = 0 AND a.state = 'finished' AND b2.sametitle <> ''";
 
         $from = '{moodlereader_books} b';
-        // Disabled for the whole site, withdrawn by mreader.org, or disabled in this activity.
-        $where = ['b.hidden = 0', 'b.withdrawn = 0',
-            'b.id NOT IN (SELECT hb.bookid FROM {moodlereader_hiddenbooks} hb WHERE hb.readerid = :hbreaderid)'];
-        $params['hbreaderid'] = $this->instance->id;
+        // Never a book disabled in Manage books or withdrawn by mreader.org.
+        $where = ['b.hidden = 0', 'b.withdrawn = 0'];
 
         if (!empty($this->instance->bookinstances)) {
             $from .= ' JOIN {moodlereader_bookinstances} bi ON bi.bookid = b.id AND bi.readerid = :bireaderid';
@@ -282,12 +280,11 @@ class reader {
     /**
      * Search the books a user may attempt, applying optional filters.
      *
-     * Filters (all optional): 'name' and 'series' (partial, case-insensitive), 'genre'
-     * (a genre code, matched within the book's comma-separated genre list), and the lists
-     * 'publishers', 'difficulties' and 'languages' (a book matches when it has any of the
-     * listed values; an empty list means "any"). A book whose language is unknown matches
-     * every language filter. Every filter is layered on top of the same availability gate
-     * as {@see available_books()}.
+     * Filters (all optional): 'name', 'publisher', 'series' (partial, case-insensitive),
+     * 'genre' (a genre code, matched within the book's comma-separated genre list),
+     * 'difficulty' (exact reading level; a value below 0 means "any") and 'language'
+     * (a language code; a book whose language is unknown always matches). Every filter
+     * is layered on top of the same availability gate as {@see available_books()}.
      *
      * @param int $userid
      * @param array $filters
@@ -300,7 +297,7 @@ class reader {
         [$from, $where, $params] = $this->available_where($userid);
 
         $i = 0;
-        foreach (['name', 'series', 'genre'] as $field) {
+        foreach (['name', 'publisher', 'series', 'genre'] as $field) {
             $value = trim((string) ($filters[$field] ?? ''));
             if ($value === '') {
                 continue;
@@ -309,28 +306,15 @@ class reader {
             $params["s$i"] = '%' . $DB->sql_like_escape($value) . '%';
             $i++;
         }
-        $publishers = array_values(array_unique(array_map('strval', (array) ($filters['publishers'] ?? []))));
-        if ($publishers) {
-            [$insql, $inparams] = $DB->get_in_or_equal($publishers, SQL_PARAMS_NAMED, 'spub');
-            $where[] = "b.publisher $insql";
-            $params += $inparams;
+        $difficulty = $filters['difficulty'] ?? -1;
+        if (is_numeric($difficulty) && (int) $difficulty >= 0) {
+            $where[] = 'b.difficulty = :sdiff';
+            $params['sdiff'] = (int) $difficulty;
         }
-        $difficulties = array_values(array_unique(array_filter(
-            array_map('intval', (array) ($filters['difficulties'] ?? [])),
-            fn($d) => $d >= 0
-        )));
-        if ($difficulties) {
-            [$insql, $inparams] = $DB->get_in_or_equal($difficulties, SQL_PARAMS_NAMED, 'sdiff');
-            $where[] = "b.difficulty $insql";
-            $params += $inparams;
-        }
-        $languages = array_values(array_unique(array_filter(
-            array_map(fn($l) => booklanguage::clean((string) $l), (array) ($filters['languages'] ?? []))
-        )));
-        if ($languages) {
-            [$insql, $inparams] = $DB->get_in_or_equal($languages, SQL_PARAMS_NAMED, 'slang');
-            $where[] = "(b.language $insql OR b.language = '')";
-            $params += $inparams;
+        $language = booklanguage::clean((string) ($filters['language'] ?? ''));
+        if ($language !== '') {
+            $where[] = "(b.language = :slang OR b.language = '')";
+            $params['slang'] = $language;
         }
 
         $wheresql = implode(' AND ', $where);
@@ -384,36 +368,6 @@ class reader {
         $sql = "SELECT DISTINCT b.difficulty
                   FROM $from WHERE " . implode(' AND ', $where) . ' ORDER BY b.difficulty';
         return array_map('intval', array_keys($DB->get_records_sql($sql, $params)));
-    }
-
-    /**
-     * Disable or enable books in this activity only.
-     *
-     * @param int[] $bookids Catalogue book ids; unknown ids are ignored.
-     * @param bool $hidden
-     * @return int Number of books changed.
-     */
-    public function set_books_hidden(array $bookids, bool $hidden): int {
-        global $DB;
-        $bookids = array_values(array_unique(array_filter(array_map('intval', $bookids))));
-        if (!$bookids) {
-            return 0;
-        }
-        [$insql, $params] = $DB->get_in_or_equal($bookids, SQL_PARAMS_NAMED, 'hb');
-        $existing = $DB->get_fieldset_select('moodlereader_books', 'id', "id $insql", $params);
-        $count = 0;
-        foreach ($existing as $bookid) {
-            $key = ['readerid' => $this->instance->id, 'bookid' => (int) $bookid];
-            $is = $DB->record_exists('moodlereader_hiddenbooks', $key);
-            if ($hidden && !$is) {
-                $DB->insert_record('moodlereader_hiddenbooks', (object) ($key + ['timecreated' => time()]));
-                $count++;
-            } else if (!$hidden && $is) {
-                $DB->delete_records('moodlereader_hiddenbooks', $key);
-                $count++;
-            }
-        }
-        return $count;
     }
 
     /**

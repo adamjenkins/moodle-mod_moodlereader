@@ -62,9 +62,6 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
             ['bookid', 'difficulty', 'words', 'points']
         );
 
-        $hiddenbooks = new backup_nested_element('hiddenbooks');
-        $hiddenbook = new backup_nested_element('hiddenbook', ['id'], ['bookid', 'timecreated']);
-
         $attempts = new backup_nested_element('attempts');
         $attempt = new backup_nested_element('attempt', ['id'], [
             'userid', 'bookid', 'attempt', 'state', 'percentgrade', 'passed', 'credit',
@@ -96,8 +93,6 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         $books->add_child($book);
         $reader->add_child($bookinstances);
         $bookinstances->add_child($bookinstance);
-        $reader->add_child($hiddenbooks);
-        $hiddenbooks->add_child($hiddenbook);
         $reader->add_child($attempts);
         $attempts->add_child($attempt);
         $reader->add_child($grades);
@@ -109,15 +104,13 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
 
         $reader->set_source_table('moodlereader', ['id' => backup::VAR_ACTIVITYID]);
         $bookinstance->set_source_table('moodlereader_bookinstances', ['readerid' => backup::VAR_PARENTID]);
-        $hiddenbook->set_source_table('moodlereader_hiddenbooks', ['readerid' => backup::VAR_PARENTID]);
 
         // Books referenced by this activity's bookinstances or (when included) attempts.
         $book->set_source_sql(
             "SELECT b.* FROM {moodlereader_books} b
               WHERE b.id IN (SELECT bookid FROM {moodlereader_bookinstances} WHERE readerid = ?)
-                 OR b.id IN (SELECT bookid FROM {moodlereader_hiddenbooks} WHERE readerid = ?)
                  OR b.id IN (SELECT bookid FROM {moodlereader_attempts} WHERE readerid = ?)",
-            [backup::VAR_ACTIVITYID, backup::VAR_ACTIVITYID, backup::VAR_ACTIVITYID]
+            [backup::VAR_ACTIVITYID, backup::VAR_ACTIVITYID]
         );
 
         if ($userinfo) {
