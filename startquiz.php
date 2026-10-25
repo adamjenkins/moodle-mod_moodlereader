@@ -24,8 +24,9 @@
 
 require(__DIR__ . '/../../config.php');
 
-use mod_moodlereader\local\reader;
 use mod_moodlereader\local\attempt;
+use mod_moodlereader\local\connection;
+use mod_moodlereader\local\reader;
 
 $id = required_param('id', PARAM_INT);       // Course-module id.
 $bookid = required_param('book', PARAM_INT);  // Book id.
@@ -35,6 +36,9 @@ require_login($reader->get_course(), false, $reader->get_cm());
 require_sesskey();
 $reader->require_cap('attempt');
 $reader->require_available();
+if (!connection::allows_launch()) {
+    throw new moodle_exception('notconnected', 'mod_moodlereader', $reader->view_url());
+}
 
 // Server-side availability gate: never trust the submitted book id.
 if (!$reader->book_is_available($bookid, $USER->id)) {

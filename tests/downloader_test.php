@@ -16,10 +16,16 @@
 
 namespace mod_moodlereader;
 
+use mod_moodlereader\local\api\fake_client;
 use mod_moodlereader\local\downloader;
 
+defined('MOODLE_INTERNAL') || die();
+
+global $CFG;
+require_once(__DIR__ . '/fixtures/fake_client.php');
+
 /**
- * Tests for the mreader.org book-list parser.
+ * Tests for the API v2 book catalogue sync.
  *
  * @package    mod_moodlereader
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -28,65 +34,92 @@ use mod_moodlereader\local\downloader;
 #[\PHPUnit\Framework\Attributes\CoversClass(\mod_moodlereader\local\downloader::class)]
 final class downloader_test extends \advanced_testcase {
     /**
-     * Invoke the protected extract_books() on a raw response string.
+     * A v2 book object.
      *
-     * @param string $response
-     * @return \stdClass[]
+     * @param int $id
+     * @param array $overrides
+     * @return array
      */
-    protected function extract(string $response): array {
-        $method = new \ReflectionMethod(downloader::class, 'extract_books');
-        $method->setAccessible(true);
-        return $method->invoke(null, $response);
+    protected function book(int $id, array $overrides = []): array {
+        return $overrides + [
+            'id' => $id, 'legacy_image' => "DFM-Book_$id.jpg", 'title' => "Book $id", 'publisher' => 'Fastback Series',
+            'series' => 'Fastback', 'level' => 'YL-5', 'difficulty' => 5, 'words' => 7500, 'genre' => 'th',
+            'fiction' => 'f', 'points' => 1.5, 'has_quiz' => true, 'cover_etag' => 'e1', 'updated_at' => 1,
+            'withdrawn' => false,
+        ];
     }
 
     /**
-     * The real mreader.org JSON shape maps title->name and level->series.
+     * Mark the site approved.
      *
      * @return void
      */
-    public function test_parses_mreader_json(): void {
-        $json = json_encode([
-            '7' => [
-                'id' => '7', 'publisher' => 'Fastback Series', 'level' => 'YL-5',
-                'title' => "Brannigan's Folly", 'sametitle' => "Brannigan's Folly",
-                'difficulty' => '5', 'words' => '7500', 'genre' => 'th', 'fiction' => 'f',
-                'image' => 'DFM-Brannigans_Folly.jpg',
-            ],
-            '8' => [
-                'id' => '8', 'publisher' => 'Fastback Series', 'level' => 'YL-5',
-                'title' => 'Death at the Border', 'difficulty' => '6', 'words' => '7200',
-                'image' => 'DFM-Death_at_the_Border.jpg',
-            ],
-        ]);
-        $books = $this->extract($json);
-
-        $this->assertCount(2, $books);
-        $this->assertEquals("Brannigan's Folly", $books[0]->name);
-        $this->assertEquals('YL-5', $books[0]->series);
-        $this->assertEquals('Fastback Series', $books[0]->publisher);
-        $this->assertEquals(7500, $books[0]->words);
-        $this->assertEquals(5, $books[0]->difficulty);
-        $this->assertEquals('DFM-Brannigans_Folly.jpg', $books[0]->image);
+    protected function approve(): void {
+        set_config('v2siteid', 'site-1', 'mod_moodlereader');
+        set_config('v2secret', 'Zm9vYmFyLWV4YW1wbGUtc2VjcmV0LTMyLWJ5dGVzISE', 'mod_moodlereader');
+        set_config('v2state', 'approved', 'mod_moodlereader');
     }
 
     /**
-     * A non-JSON or empty body yields no books rather than an error.
+     * Field mapping: level label to series, legacy image kept as text (no PARAM_FILE mangling).
      *
      * @return void
      */
-    public function test_rejects_non_json(): void {
-        $this->assertSame([], $this->extract('<xml>legacy</xml>'));
-        $this->assertSame([], $this->extract(''));
-        $this->assertSame([], $this->extract('null'));
+    public function test_clean_book(): void {
+        $book = downloader::clean_book($this->book(7, ['title' => "Brannigan's Folly", 'legacy_image' => 'A & B (1).jpg']));
+        $this->assertSame(7, $book->remoteid);
+        $this->assertSame("Brannigan's Folly", $book->name);
+        $this->assertSame('YL-5', $book->series);
+        $this->assertSame('A & B (1).jpg', $book->image);
+        $this->assertSame(0, $book->withdrawn);
+        $this->assertNull(downloader::clean_book(['title' => 'No id']));
+        $this->assertNull(downloader::clean_book(['id' => 3]));
+        $this->assertSame(1, downloader::clean_book($this->book(8, ['has_quiz' => false]))->withdrawn);
     }
 
     /**
-     * Entries without a title are skipped.
+     * Pages are followed, books matched by id, imported books linked by legacy image, teacher curation kept.
      *
      * @return void
      */
-    public function test_skips_entries_without_title(): void {
-        $json = json_encode(['1' => ['publisher' => 'X', 'words' => '100']]);
-        $this->assertSame([], $this->extract($json));
+    public function test_sync_pages_and_matches(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->approve();
+        /** @var \mod_moodlereader_generator $gen */
+        $gen = $this->getDataGenerator()->get_plugin_generator('mod_moodlereader');
+        // A book imported from mod_reader: no remote id yet, hidden by a teacher.
+        $imported = $gen->create_book(['remoteid' => 0, 'image' => 'DFM-Book_2.jpg', 'hidden' => 1]);
+
+        $client = (new fake_client())
+            ->queue('GET', '/books', 200, ['books' => [$this->book(1)], 'next_cursor' => 'c2'])
+            ->queue('GET', '/books', 200, ['books' => [$this->book(2), ['id' => 0, 'title' => 'bad']],
+                'next_cursor' => null]);
+        $this->assertSame(2, downloader::sync_books(false, $client));
+        $this->assertSame(['changed_since' => '0', 'cursor' => 'c2', 'limit' => '500'], $client->requests[1]['query']);
+
+        $this->assertSame(2, $DB->count_records('moodlereader_books'));
+        $linked = $DB->get_record('moodlereader_books', ['id' => $imported->id]);
+        $this->assertEquals(2, $linked->remoteid);
+        $this->assertEquals(1, $linked->hidden);
+
+        // A later sync asks for changes only, and a withdrawn book is flagged, not deleted.
+        $client = (new fake_client())->queue('GET', '/books', 200, ['books' => [$this->book(1, ['withdrawn' => true])],
+            'next_cursor' => null]);
+        downloader::sync_books(false, $client);
+        $this->assertNotSame('0', $client->requests[0]['query']['changed_since']);
+        $this->assertEquals(1, $DB->get_field('moodlereader_books', 'withdrawn', ['remoteid' => 1]));
+        $this->assertSame(2, $DB->count_records('moodlereader_books'));
+    }
+
+    /**
+     * No sync without an approved connection.
+     *
+     * @return void
+     */
+    public function test_requires_connection(): void {
+        $this->resetAfterTest();
+        $this->expectException(\moodle_exception::class);
+        downloader::sync_books(false, new fake_client());
     }
 }

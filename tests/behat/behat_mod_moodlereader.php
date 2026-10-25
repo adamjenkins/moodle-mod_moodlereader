@@ -43,14 +43,15 @@ class behat_mod_moodlereader extends behat_base {
     }
 
     /**
-     * Pretend the site is registered with mreader.org (dummy id/key for UI tests).
+     * Pretend mreader.org has approved this site (dummy credential, for UI tests; no request is made).
      *
-     * @Given /^the site is registered with mreader\.org$/
+     * @Given /^the site is connected to mreader\.org$/
      * @return void
      */
-    public function the_site_is_registered_with_mreader_org() {
-        set_config('mreaderurl', 'https://mreader.org', 'mod_moodlereader');
-        set_config('mreadersiteid', '1', 'mod_moodlereader');
-        set_config('mreadersitekey', 'behat-test-key', 'mod_moodlereader');
+    public function the_site_is_connected_to_mreader_org() {
+        set_config('v2siteid', 'behat-site', 'mod_moodlereader');
+        set_config('v2secret', 'YmVoYXQtdGVzdC1zZWNyZXQtMDEyMzQ1Njc4OWFiY2RlZg', 'mod_moodlereader');
+        set_config('v2state', 'approved', 'mod_moodlereader');
+        set_config('v2lastchecked', time(), 'mod_moodlereader');
     }
 }

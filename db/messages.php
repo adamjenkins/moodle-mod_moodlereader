@@ -14,32 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_moodlereader\form;
-
 /**
- * mreader.org account credentials form (used once, to register the site).
+ * Message providers for mod_moodlereader.
  *
  * @package    mod_moodlereader
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class register_form extends \moodleform {
-    /**
-     * Define the form.
-     *
-     * @return void
-     */
-    public function definition() {
-        $mform = $this->_form;
 
-        $mform->addElement('text', 'username', get_string('mreaderusername', 'mod_moodlereader'));
-        $mform->setType('username', PARAM_RAW_TRIMMED);
-        $mform->addRule('username', null, 'required', null, 'client');
+defined('MOODLE_INTERNAL') || die();
 
-        $mform->addElement('passwordunmask', 'password', get_string('mreaderpassword', 'mod_moodlereader'));
-        $mform->setType('password', PARAM_RAW);
-        $mform->addRule('password', null, 'required', null, 'client');
-
-        $this->add_action_buttons(true, get_string('register', 'mod_moodlereader'));
-    }
-}
+$messageproviders = [
+    // A change in this site's mreader.org authorization (approved, rejected, revoked), sent to site admins.
+    'siteconnection' => [
+        'capability' => 'moodle/site:config',
+        'defaults' => [
+            'popup' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
+            'email' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
+        ],
+    ],
+];

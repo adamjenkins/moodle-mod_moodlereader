@@ -75,11 +75,13 @@ class provider implements
             'uniquename' => 'privacy:metadata:moodlereader_users:uniquename',
         ], 'privacy:metadata:moodlereader_users');
 
+        // Only opaque pseudonyms are sent: never a name, username, email address or Moodle user id.
         $collection->add_external_location_link('mreader.org', [
-            'uname' => 'privacy:metadata:mreader.org:uname',
-            'sname' => 'privacy:metadata:mreader.org:sname',
-            'book'  => 'privacy:metadata:mreader.org:book',
-            'grade' => 'privacy:metadata:mreader.org:grade',
+            'uid'          => 'privacy:metadata:mreader.org:uid',
+            'display_name' => 'privacy:metadata:mreader.org:display_name',
+            'book_id'      => 'privacy:metadata:mreader.org:book_id',
+            'attempt_ref'  => 'privacy:metadata:mreader.org:attempt_ref',
+            'percent'      => 'privacy:metadata:mreader.org:percent',
         ], 'privacy:metadata:mreader.org');
 
         $collection->link_subsystem('core_grades', 'privacy:metadata:core_grades');

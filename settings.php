@@ -24,26 +24,52 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+// A folder holding the settings page and the connection and import pages.
+$ADMIN->add('modsettings', new admin_category(
+    'modmoodlereaderfolder',
+    new lang_string('pluginname', 'mod_moodlereader'),
+    $module->is_enabled() === false
+));
+
+$settings = new admin_settingpage($section, get_string('settings'), 'moodle/site:config', $module->is_enabled() === false);
+
 if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_configtext(
         'mod_moodlereader/mreaderurl',
         get_string('mreaderurl', 'mod_moodlereader'),
         get_string('mreaderurl_desc', 'mod_moodlereader'),
-        \mod_moodlereader\local\mreader_site::DEFAULT_BASEURL,
+        \mod_moodlereader\local\api\client::DEFAULT_BASEURL,
         PARAM_URL
     ));
 
-    // Registration status and link. The id/key are written by the registration page.
-    $siteid = get_config('mod_moodlereader', 'mreadersiteid');
-    $registerurl = new moodle_url('/mod/moodlereader/admin/register.php');
-    if ($siteid) {
-        $status = get_string('registeredas', 'mod_moodlereader', s($siteid));
-    } else {
-        $status = get_string('notregistered', 'mod_moodlereader');
-    }
+    // Connection state and link; the connection itself is managed on its own page.
+    $state = \mod_moodlereader\local\connection::state();
     $settings->add(new admin_setting_description(
-        'mod_moodlereader/registrationstatus',
-        get_string('registration', 'mod_moodlereader'),
-        $status . ' ' . html_writer::link($registerurl, get_string('registerlink', 'mod_moodlereader'))
+        'mod_moodlereader/connectionstatus',
+        get_string('connection', 'mod_moodlereader'),
+        get_string('connstate_' . ($state === '' ? 'none' : $state), 'mod_moodlereader') . ' ' .
+            html_writer::link(
+                new moodle_url('/mod/moodlereader/admin/connection.php'),
+                get_string('connmanage', 'mod_moodlereader')
+            )
     ));
 }
+
+$ADMIN->add('modmoodlereaderfolder', $settings);
+$ADMIN->add('modmoodlereaderfolder', new admin_externalpage(
+    'mod_moodlereader_connection',
+    new lang_string('connection', 'mod_moodlereader'),
+    new moodle_url('/mod/moodlereader/admin/connection.php'),
+    'mod/moodlereader:manageremotesites',
+    $module->is_enabled() === false
+));
+$ADMIN->add('modmoodlereaderfolder', new admin_externalpage(
+    'mod_moodlereader_import',
+    new lang_string('import', 'mod_moodlereader'),
+    new moodle_url('/mod/moodlereader/admin/import.php'),
+    'moodle/site:config',
+    $module->is_enabled() === false
+));
+
+// The pages are already in the tree.
+$settings = null;

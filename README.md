@@ -15,8 +15,38 @@ mreader.org iframe model).
 - Moodle 5.2 – 5.3.
   CI-tested (GitHub Actions, moodle-plugin-ci) on MOODLE_502_STABLE and MOODLE_503_STABLE
   with PHP 8.3 and 8.4.
-- An account on mreader.org, used once to register the site (Site administration →
-  Plugins → Activity modules → Moodle Reader → *Register this site*).
+- mreader.org with API v2 (the mreader.org release after v3.6). If the connection page
+  reports `http404` when a request is sent, the mreader.org instance does not offer API v2
+  yet; `503 not_configured` means v2 is deployed but not configured there.
+- An approved connection to mreader.org (see below). Cron must run, for the result,
+  book-sync and connection-check tasks.
+
+## Connecting to mreader.org
+
+Site administration → Plugins → Activity modules → Moodle Reader → **mreader.org
+connection**. A site administrator fills in the institution and a contact, sees exactly
+what will be sent, and presses **Send request**. An mreader.org administrator reviews the
+request and approves or declines it; the page (and an email to the site administrators)
+shows the outcome. Until the site is approved, students see the books but no quiz button.
+mreader.org can revoke a site's access at any time; the page then shows the reason.
+
+- The connection uses the mreader.org **API v2**: every request is signed with a
+  per-site secret (HMAC-SHA256, timestamp and nonce). The secret can be rotated from
+  the connection page.
+- **No student names, usernames, email addresses or Moodle user ids are ever sent.**
+  Each student is known to mreader.org only by a random 8-character code and a random
+  display name.
+- The quiz runs on mreader.org in a frame. The score is then fetched by this site
+  directly from mreader.org with its own credential, never taken from the browser, and a
+  task collects any result whose browser hand-back was lost (a closed tab no longer loses
+  a grade).
+- If mod_reader is installed and registered with mreader.org, the request can ask
+  mreader.org to link that registration's quiz history to the new connection (proved by
+  a signature made with the old key; the key itself is never sent).
+- A server whose clock is more than 300 seconds out is refused; the connection page shows
+  the difference.
+- When testing against a mreader.org instance on a private network address, Moodle's
+  *cURL blocked hosts list* (`curlsecurityblockedhosts`) must allow it.
 
 ## What it does
 
@@ -25,10 +55,8 @@ mreader.org iframe model).
   mreader.org and cached), a reading report of this term's attempts, and a **book
   search** (title, publisher, series, genre, reading level). Search results appear
   only after a search and each carries a cover thumbnail and a "take the quiz"
-  button; the quiz is delivered by mreader.org in an iframe.
-- The signed grade callback from mreader.org is verified (constant-time token check)
-  and recorded; each passed book's word count contributes once to the gradebook
-  grade.
+  button; the quiz is delivered by mreader.org in a frame.
+- Each passed book's word count contributes once to the gradebook grade.
 - Teachers can **manage the catalogue** (filter by publisher/series/level/status and
   enable or disable books individually or in bulk), **sync** it from mreader.org,
   view **reports** (attempts, per-student and per-book summaries), run **cheating
@@ -43,65 +71,51 @@ mreader.org iframe model).
 Not yet ported from the legacy plugin: student import/export, reading rates, and
 view-as-student.
 
-## Migrating from mod_reader
+## Moving from mod_reader
 
-A CLI tool converts an existing `mod_reader` installation's core data — the
-mreader.org registration, book catalogue, the **mreader.org identity map**
-(so students keep their remote identity), activities, attempts, grades and reading
-levels — into `mod_moodlereader`:
+Site administration → Plugins → Activity modules → Moodle Reader → **Import from
+mod_reader** (shown when mod_reader is installed). The workflow is designed to run during a
+semester break, while mod_reader stays in use:
+
+1. **Preview** a course: what a sync would create or change, per activity and per kind of
+   data. A preview writes nothing.
+2. **Sync**: each mod_reader activity gets a **hidden** Moodle Reader copy directly after
+   it, with its settings (including group mode, availability and completion), gradebook
+   category and pass mark, books, students' attempts, reading levels and goals, and
+   optionally the cheating log and teacher messages. Students' mreader.org identities are
+   copied unchanged, so their history carries on.
+3. **Preview and sync again** as often as you like. Each sync is idempotent: it adds what
+   is new in mod_reader, updates what changed, removes what mod_reader no longer has, and
+   leaves everything else alone. The preview shows the gradebook totals of the original
+   and the copy side by side.
+4. **Cut over** (a site administrator confirms it): a final sync runs, then each copy
+   becomes visible exactly as its original is, and is no longer synced.
+
+**mod_reader is never changed.** Its tables, activities and settings are only read. The
+cutover does not hide or delete the old activities: do that yourself when you are ready.
+Nothing is sent to mreader.org during an import.
+
+The same workflow is available from the command line:
 
 ```
-php mod/moodlereader/cli/migrate.php --dry-run   # report only, writes nothing
-php mod/moodlereader/cli/migrate.php --run        # apply the migration
-php mod/moodlereader/cli/migrate.php --help       # (also -h) show usage
+php mod/moodlereader/cli/import.php --list
+php mod/moodlereader/cli/import.php --preview --course=ID
+php mod/moodlereader/cli/import.php --sync --course=ID     # or --course=all
+php mod/moodlereader/cli/import.php --cutover --course=ID --confirm
 ```
 
-`--dry-run` (the default if you pass neither flag) reports what would be migrated
-without writing anything. `--run` performs the migration inside a single database
-transaction, so it either completes fully or rolls back — you are never left with a
-half-migrated site.
-
-**Read-only on the legacy data.** The tool only ever *reads* from the `reader_*`
-tables and *writes* to the `moodlereader_*` tables. It never deletes, drops or
-alters anything in `mod_reader`, so your original data stays intact. After
-migrating and confirming the result, you can uninstall the legacy `mod_reader`
-plugin yourself — that is a separate, manual step. The local-quiz-only artefacts of
-`mod_reader` are intentionally not migrated.
-
-**Safe to re-run.** The migration is idempotent: books are matched on their natural
-key (publisher / series / title), and identities and activities that were already
-migrated are skipped, so running `--run` twice does not create duplicates. A second
-run also acts as a partial sync — it imports **new** activities, books and identity
-mappings added to `mod_reader` since the last run. Note, however, that new attempts,
-grades or levels added to an activity that was *already* migrated are not
-back-filled: re-running skips such activities whole. Migrate once `mod_reader` is no
-longer being actively used, or delete a partially-migrated activity and re-run to
-refresh it.
-
-**No built-in undo.** There is no rollback or undo command. To reverse a completed
-migration you would remove the migrated rows from the `moodlereader`,
-`moodlereader_books`, `moodlereader_users`, `moodlereader_attempts`,
-`moodlereader_grades`, `moodlereader_levels` and `moodlereader_bookinstances`
-tables, along with the course modules and gradebook items the migration created and
-the copied mreader.org settings. In practice, uninstalling the `mod_moodlereader`
-plugin is the cleanest way to start over — your untouched `mod_reader` data remains
-the source of truth until you choose to remove it.
+Not imported, by design: per-student IP locks and attempt-rate limits (not features of
+this plugin) and the local-quiz questions (the local quiz engine was removed).
 
 ## Security
 
 - Every request handler enforces the appropriate capability and, for state changes,
   `sesskey`.
-- The mreader.org grade callback is verified with a constant-time signature check.
+- API v2 requests are signed (HMAC-SHA256 with timestamp and nonce); quiz results are
+  fetched server-to-server and checked against the attempt's student and book.
 - Book covers are served through the Files API (no direct dataroot access).
-- Ships a complete privacy (GDPR) provider and PHPUnit tests covering the token
-  verification and grading.
-
-## The mreader.org contract (important)
-
-The grade callback path `mod/moodlereader/quiz/mreader.php` is fixed by mreader.org,
-which appends `quiz/mreader.php` to the registered site URL. See
-`dev-docs` for the integration notes and the one open item to confirm with the
-mreader.org service owner before production use.
+- Ships a complete privacy (GDPR) provider and PHPUnit tests, including the shared
+  signature test vectors.
 
 ## Licence
 

@@ -54,12 +54,15 @@
         <FIELD NAME="sametitle" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="hidden" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="time" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="withdrawn" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 when mreader.org no longer offers this book's quiz."/>
+        <FIELD NAME="coveretag" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="mreader.org's ETag for the cached cover image."/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
       </KEYS>
       <INDEXES>
         <INDEX NAME="publisher_series" UNIQUE="false" FIELDS="publisher, series"/>
+        <INDEX NAME="remoteid" UNIQUE="false" FIELDS="remoteid"/>
       </INDEXES>
     </TABLE>
     <TABLE NAME="moodlereader_bookinstances" COMMENT="Links a book to a specific moodlereader instance (optional per-instance catalogue).">
@@ -110,6 +113,9 @@
         <FIELD NAME="timefinish" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="ip" TYPE="char" LENGTH="45" NOTNULL="true" SEQUENCE="false" COMMENT="Remote address at attempt time, used by cheating detection."/>
+        <FIELD NAME="attemptref" TYPE="char" LENGTH="40" NOTNULL="false" SEQUENCE="false" COMMENT="Opaque reference that identifies this attempt to mreader.org (API v2); null for attempts that never launched."/>
+        <FIELD NAME="remotestate" TYPE="char" LENGTH="20" NOTNULL="false" SEQUENCE="false" COMMENT="Last attempt state reported by mreader.org."/>
+        <FIELD NAME="timeresultchecked" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When mreader.org was last asked for this attempt's result."/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
@@ -118,6 +124,7 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="readerid_userid" UNIQUE="false" FIELDS="readerid, userid"/>
+        <INDEX NAME="attemptref" UNIQUE="false" FIELDS="attemptref"/>
       </INDEXES>
     </TABLE>
     <TABLE NAME="moodlereader_cheatlog" COMMENT="Suspected-cheating clusters flagged for teacher review.">
@@ -192,6 +199,46 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="readerid_userid" UNIQUE="true" FIELDS="readerid, userid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="moodlereader_imports" COMMENT="One row per mod_reader activity being imported: links it to its new activity and records the sync and cutover state.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="legacyreaderid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The mod_reader instance id (reader.id)."/>
+        <FIELD NAME="legacycmid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="newreaderid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="newcmid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="synced" SEQUENCE="false" COMMENT="synced (hidden copy, can be re-synced) or cutover (live, no longer synced)."/>
+        <FIELD NAME="counts" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="JSON summary of the last sync."/>
+        <FIELD NAME="timesynced" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timecutover" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="legacyreaderid" UNIQUE="true" FIELDS="legacyreaderid"/>
+        <INDEX NAME="courseid" UNIQUE="false" FIELDS="courseid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="moodlereader_importmap" COMMENT="Maps each imported mod_reader row to the row it became, with a hash of its imported content, so that a re-sync only touches what changed.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="importid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="moodlereader_imports.id, or 0 for site-wide rows (books, identities)."/>
+        <FIELD NAME="itemtype" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="legacyid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="legacysub" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Second key part, for one legacy row that becomes several new rows."/>
+        <FIELD NAME="newid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="hash" TYPE="char" LENGTH="40" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="item" UNIQUE="true" FIELDS="importid, itemtype, legacyid, legacysub"/>
       </INDEXES>
     </TABLE>
   </TABLES>

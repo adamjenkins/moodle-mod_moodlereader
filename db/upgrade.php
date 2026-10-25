@@ -107,5 +107,81 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026073003, 'moodlereader');
     }
 
+    if ($oldversion < 2026102500) {
+        // API v2: attempts are identified to mreader.org by an opaque reference.
+        $table = new xmldb_table('moodlereader_attempts');
+        $fields = [
+            new xmldb_field('attemptref', XMLDB_TYPE_CHAR, '40', null, null, null, null, 'ip'),
+            new xmldb_field('remotestate', XMLDB_TYPE_CHAR, '20', null, null, null, null, 'attemptref'),
+            new xmldb_field('timeresultchecked', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'remotestate'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+        $index = new xmldb_index('attemptref', XMLDB_INDEX_NOTUNIQUE, ['attemptref']);
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+
+        // Books: withdrawn flag, cover ETag, and an index on the stable mreader.org id.
+        $table = new xmldb_table('moodlereader_books');
+        $fields = [
+            new xmldb_field('withdrawn', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'time'),
+            new xmldb_field('coveretag', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'withdrawn'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+        $index = new xmldb_index('remoteid', XMLDB_INDEX_NOTUNIQUE, ['remoteid']);
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+
+        // The mod_reader import ledger.
+        $table = new xmldb_table('moodlereader_imports');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('legacyreaderid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('legacycmid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('newreaderid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('newcmid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('status', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'synced');
+            $table->add_field('counts', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('timesynced', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timecutover', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_index('legacyreaderid', XMLDB_INDEX_UNIQUE, ['legacyreaderid']);
+            $table->add_index('courseid', XMLDB_INDEX_NOTUNIQUE, ['courseid']);
+            $dbman->create_table($table);
+        }
+
+        $table = new xmldb_table('moodlereader_importmap');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('importid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('itemtype', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('legacyid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('legacysub', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('newid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('hash', XMLDB_TYPE_CHAR, '40', null, XMLDB_NOTNULL, null, null);
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_index('item', XMLDB_INDEX_UNIQUE, ['importid', 'itemtype', 'legacyid', 'legacysub']);
+            $dbman->create_table($table);
+        }
+
+        // The legacy md5 registration is no longer used: connections are made through API v2.
+        unset_config('mreadersiteid', 'mod_moodlereader');
+        unset_config('mreadersitekey', 'mod_moodlereader');
+
+        upgrade_mod_savepoint(true, 2026102500, 'moodlereader');
+    }
+
     return true;
 }

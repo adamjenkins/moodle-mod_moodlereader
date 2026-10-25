@@ -15,12 +15,11 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * mreader.org quiz endpoint: render the quiz iframe, and receive the grade callback.
+ * Show a book quiz from mreader.org in a frame, and watch for its result.
  *
- * IMPORTANT — the path of this script is an external contract. mreader.org appends
- * "quiz/mreader.php" to the site URL registered during setup, so the grade callback
- * always arrives here. Do not move or rename this file without confirming the
- * callback path with the mreader.org service.
+ * The launch URL is single-use and is requested server-to-server for this attempt.
+ * The page listens for mreader.org's "finished" message and also polls
+ * quiz/status.php, which fetches the result with this site's own credential.
  *
  * @package    mod_moodlereader
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -30,75 +29,57 @@
 require(__DIR__ . '/../../../config.php');
 require_once($CFG->dirroot . '/lib/resourcelib.php');
 
+use mod_moodlereader\local\api\api_exception;
+use mod_moodlereader\local\api\client;
+use mod_moodlereader\local\connection;
 use mod_moodlereader\local\reader;
-use mod_moodlereader\local\attempt;
-use mod_moodlereader\local\mreader_site;
+use mod_moodlereader\local\results;
 
-// The custom_id parameter signals a grade callback from mreader.org; attempt launches the iframe.
-$customid = optional_param('custom_id', 0, PARAM_INT);
-$attemptid = $customid ?: required_param('attempt', PARAM_INT);
+$attemptid = required_param('attempt', PARAM_INT);
 
 $attempt = $DB->get_record('moodlereader_attempts', ['id' => $attemptid], '*', MUST_EXIST);
 $reader = reader::from_instanceid((int) $attempt->readerid);
 
 require_login($reader->get_course(), false, $reader->get_cm());
-$reader->require_cap('viewbooks');
+$reader->require_cap('attempt');
 
-// Only the owner of the attempt may launch or complete it.
 if ((int) $attempt->userid !== (int) $USER->id) {
     throw new moodle_exception('notyourattempt', 'mod_moodlereader', $reader->view_url());
 }
-
-$site = new mreader_site();
-$book = $DB->get_record('moodlereader_books', ['id' => $attempt->bookid], '*', MUST_EXIST);
-
-// Both the launch and the grade callback require a registered site: an empty
-// site key would otherwise make the callback token trivially forgeable.
-if (!$site->is_configured()) {
-    throw new moodle_exception('notconfigured', 'mod_moodlereader', $reader->view_url());
+if ($attempt->state !== 'inprogress') {
+    redirect($reader->view_url());
 }
-
-if ($customid) {
-    // Grade callback from mreader.org.
-    $url = new moodle_url($FULLME);
-    $received = (string) $url->get_param('token');
-    $url->remove_params('token');
-
-    // 1. Constant-time signature check against the recomputed token.
-    if (!$site->verify_token($url, $received)) {
-        throw new moodle_exception('invalidtoken', 'mod_moodlereader', $reader->view_url());
-    }
-    // 2. The callback must name this attempt's book and this user's identity.
-    if ($book->image !== $url->get_param('book')) {
-        throw new moodle_exception('invalidbook', 'mod_moodlereader', $reader->view_url());
-    }
-    $identity = $site->get_identity($USER->id);
-    if ($identity->uniqueid !== $url->get_param('uname')) {
-        throw new moodle_exception('invaliduser', 'mod_moodlereader', $reader->view_url());
-    }
-    // 3. Record the grade and finish the attempt.
-    $grade = clean_param($url->get_param('grade'), PARAM_FLOAT);
-    attempt::finish($reader, $attempt, (float) $grade);
-
-    redirect(
-        $reader->view_url(),
-        get_string('quizfinished', 'mod_moodlereader'),
-        null,
-        \core\output\notification::NOTIFY_SUCCESS
-    );
-}
-
-// Launch the quiz iframe.
 $reader->require_available();
+if (!connection::allows_launch()) {
+    throw new moodle_exception('notconnected', 'mod_moodlereader', $reader->view_url());
+}
 
-$identity = $site->get_identity($USER->id);
-$quizurl = $site->takequiz_url($attempt, $book->image, $identity);
+$book = $DB->get_record('moodlereader_books', ['id' => $attempt->bookid], '*', MUST_EXIST);
+try {
+    $quizurl = results::launch($attempt, $book);
+} catch (api_exception $e) {
+    if ($e->is_state_refusal()) {
+        connection::refresh();
+    }
+    throw new moodle_exception('launchfailed', 'mod_moodlereader', $reader->view_url(), s($e->apicode));
+}
+
 $title = get_string('takequizfor', 'mod_moodlereader', format_string($book->name));
-
 $PAGE->set_url('/mod/moodlereader/quiz/mreader.php', ['attempt' => $attempt->id]);
 $PAGE->set_title($title);
 $PAGE->set_heading($reader->get_course()->fullname);
 $PAGE->set_pagelayout('embedded');
+
+// Messages from the quiz frame are accepted only from the mreader.org origin.
+$base = new moodle_url((new client())->get_baseurl());
+$mreaderorigin = $base->get_scheme() . '://' . $base->get_host() . ($base->get_port() ? ':' . $base->get_port() : '');
+$PAGE->requires->js_call_amd('mod_moodlereader/quizframe', 'init', [[
+    'attemptid' => (int) $attempt->id,
+    'attemptref' => $attempt->attemptref,
+    'origin' => $mreaderorigin,
+    'statusurl' => (new moodle_url('/mod/moodlereader/quiz/status.php'))->out(false),
+    'sesskey' => sesskey(),
+]]);
 
 $mimetype = resourcelib_guess_url_mimetype($quizurl);
 $iframe = resourcelib_embed_general($quizurl, $title, html_writer::link($quizurl, $title), $mimetype);
@@ -106,4 +87,8 @@ $iframe = resourcelib_embed_general($quizurl, $title, html_writer::link($quizurl
 echo $OUTPUT->header();
 echo $OUTPUT->heading($title, 3);
 echo $OUTPUT->box($iframe);
+echo html_writer::div(get_string('quizwatching', 'mod_moodlereader'), 'small text-muted mt-2', [
+    'data-region' => 'mod_moodlereader-quizstatus',
+    'aria-live' => 'polite',
+]);
 echo $OUTPUT->footer();

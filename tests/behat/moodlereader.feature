@@ -32,7 +32,9 @@ Feature: Moodle Reader activity
     When I press "Search"
     Then I should see "The Red Kite"
     And I should see "Blue Hills"
-    And "Take the quiz" "button" should exist
+    And I should see "Book quizzes are not available at the moment."
+    And I should see "Quiz unavailable"
+    And "Take the quiz" "button" should not exist
 
   Scenario: A student does not see the teacher tools
     When I am on the "Reader 1" "moodlereader activity" page logged in as student1
@@ -53,10 +55,22 @@ Feature: Moodle Reader activity
     When I am on the "Reader 1" "moodlereader activity" page logged in as student1
     Then I should see "Welcome to the reading programme"
 
-  Scenario: A student launches a quiz and is taken to the mreader.org quiz page
-    Given the site is registered with mreader.org
+  Scenario: On a connected site a student can start a quiz
+    Given the site is connected to mreader.org
     When I am on the "Reader 1" "moodlereader activity" page logged in as student1
     And I press "Search"
-    And I press "Take the quiz"
-    Then I should see "Take the quiz for"
-    And "iframe" "css_element" should exist
+    Then "Take the quiz" "button" should exist
+    And I should not see "Book quizzes are not available at the moment."
+
+  Scenario: A teacher is told why quizzes are unavailable
+    When I am on the "Reader 1" "moodlereader activity" page logged in as teacher1
+    Then I should see "Students cannot take book quizzes: this site is not connected to mreader.org."
+
+  Scenario: An administrator sees the request form and what it sends
+    When I log in as "admin"
+    And I visit "/mod/moodlereader/admin/connection.php"
+    Then I should see "This site is not connected to mreader.org"
+    And I should see "What mreader.org receives about your students."
+    And I should see "Request access"
+    And the field "Institution" matches value ""
+    And I should see "/mod/moodlereader/quiz/return.php"

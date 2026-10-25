@@ -1,0 +1,67 @@
+{
+    "secret": "Zm9vYmFyLWV4YW1wbGUtc2VjcmV0LTMyLWJ5dGVzISE",
+    "site_id": "6f1c2a9e-3b7d-4c11-9a0e-5d2b8f4e7a10",
+    "requests": [
+        {
+            "method": "GET",
+            "path": "/api/v2/books",
+            "query": {
+                "limit": "500",
+                "changed_since": "0"
+            },
+            "body": "",
+            "ts": 1792900000,
+            "nonce": "AAAAAAAAAAAAAAAAAAAAAA",
+            "canonical": "GET\n/api/v2/books\nchanged_since=0&limit=500\n1792900000\nAAAAAAAAAAAAAAAAAAAAAA\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sig": "MwWBNXOHimU0HTCWianaFJGCHoELghCSCJtfJGCrVf4"
+        },
+        {
+            "method": "GET",
+            "path": "/api/v2/site",
+            "query": [],
+            "body": "",
+            "ts": 1792900001,
+            "nonce": "BBBBBBBBBBBBBBBBBBBBBB",
+            "canonical": "GET\n/api/v2/site\n\n1792900001\nBBBBBBBBBBBBBBBBBBBBBB\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sig": "17c3pPy9fxOYAkY-n0DketF3Z3SccTY5cAxqC4CgRcs"
+        },
+        {
+            "method": "POST",
+            "path": "/api/v2/launches",
+            "query": [],
+            "body": "{\"uid\":\"9JSOSbIu\",\"display_name\":\"ab cdef\",\"book_id\":1234,\"attempt_ref\":\"57-4f3a9c1d2e6b8a70\",\"locale\":\"en\"}",
+            "ts": 1792900002,
+            "nonce": "CCCCCCCCCCCCCCCCCCCCCC",
+            "canonical": "POST\n/api/v2/launches\n\n1792900002\nCCCCCCCCCCCCCCCCCCCCCC\n740c28acbe79b1158eb3f598c73cd5e312a4246c72958b7b2a7f55990dad26d0",
+            "sig": "c5k4Nd9ZyDRMbhMKvz2ijulCjdPf-slyJCzruk0W_jQ"
+        },
+        {
+            "method": "GET",
+            "path": "/api/v2/attempts",
+            "query": {
+                "finished_since": "1792800000",
+                "cursor": "a b/c"
+            },
+            "body": "",
+            "ts": 1792900003,
+            "nonce": "DDDDDDDDDDDDDDDDDDDDDD",
+            "canonical": "GET\n/api/v2/attempts\ncursor=a%20b%2Fc&finished_since=1792800000\n1792900003\nDDDDDDDDDDDDDDDDDDDDDD\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sig": "5DmFXyhBi7vaEEVN_BrTYQZWhTC8RRkIQN83dJAHY3U"
+        }
+    ],
+    "return": {
+        "ref": "57-4f3a9c1d2e6b8a70",
+        "ts": 1792900100,
+        "sig": "kdV3MHUo0A87bdAdyKySde6R4LBApetsiJC5OXeJgOE"
+    },
+    "siteproof": {
+        "c": "challenge-0123456789abcdef",
+        "response": "VrNHLiVS7iXtm0y5N0BIlUuEPf8Krg9C6X_NvCbm0so"
+    },
+    "legacy_claim": {
+        "legacy_key": "4f3a9c1d2e6b8a70aa11bb22cc33dd44",
+        "legacy_sid": 42,
+        "ts": 1792900200,
+        "proof": "SjyRc3qIY4Z4pdL2FvoxdRIbS2VfwBMZYOmd-jX_3OQ"
+    }
+}

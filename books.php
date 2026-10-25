@@ -67,7 +67,11 @@ $cansync = has_capability('mod/moodlereader:manageremotesites', context_system::
 if ($sync) {
     require_sesskey();
     require_capability('mod/moodlereader:manageremotesites', context_system::instance());
-    $count = downloader::sync_books();
+    try {
+        $count = downloader::sync_books();
+    } catch (\moodle_exception $e) {
+        redirect($viewurl, s($e->getMessage()), null, \core\output\notification::NOTIFY_ERROR);
+    }
     redirect($viewurl, get_string('synced', 'mod_moodlereader', $count), null, \core\output\notification::NOTIFY_SUCCESS);
 }
 

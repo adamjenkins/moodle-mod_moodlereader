@@ -16,123 +16,151 @@
 
 namespace mod_moodlereader\local;
 
+use mod_moodlereader\local\api\client;
+
 /**
- * Synchronises the local book catalogue from mreader.org.
+ * Synchronises the local book catalogue from mreader.org (API v2).
  *
- * mreader.org's api.php returns a JSON object of books keyed by remote book id.
- * The field mapping in {@see self::extract_books()} is the single place to adjust
- * if mreader.org changes its response schema.
+ * Books are matched on mreader.org's stable book id (`remoteid`). A book that has
+ * no id yet (one imported from mod_reader) is matched once on its legacy image
+ * name, then on publisher/series/title, and takes the id from then on.
  *
  * @package    mod_moodlereader
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class downloader {
+    /** @var int Books per page requested from mreader.org. */
+    const PAGE_SIZE = 500;
+
     /**
-     * Fetch the book list from mreader.org and upsert it into {moodlereader_books}.
+     * Fetch the books changed since the last sync and upsert them into {moodlereader_books}.
      *
+     * @param bool $full Fetch the whole catalogue rather than the changes.
+     * @param client|null $client
      * @return int Number of books inserted or updated.
      */
-    public static function sync_books(): int {
-        global $CFG, $DB;
-        require_once($CFG->libdir . '/filelib.php');
-
-        $site = new mreader_site();
-        if (!$site->is_configured()) {
-            throw new \moodle_exception('notconfigured', 'mod_moodlereader');
+    public static function sync_books(bool $full = false, ?client $client = null): int {
+        if (!connection::allows_launch()) {
+            throw new \moodle_exception('notconnected', 'mod_moodlereader');
         }
-
-        $url = $site->books_url(mreader_site::BOOKS_WITH_QUIZZES);
-        $curl = new \curl();
-        $response = $curl->get($url->out(false), [], [
-            'CURLOPT_SSL_VERIFYPEER' => 1,
-            'CURLOPT_SSL_VERIFYHOST' => 2,
-            'CURLOPT_RETURNTRANSFER' => 1,
-            'CURLOPT_CONNECTTIMEOUT' => 10,
-            'CURLOPT_TIMEOUT'        => 120,
-        ]);
-        if ($curl->get_errno() || $response === false) {
-            throw new \moodle_exception('registrationfailed', 'mod_moodlereader', '', $curl->error);
-        }
-
-        $books = self::extract_books($response);
-        if (!$books) {
-            throw new \moodle_exception('syncnodata', 'mod_moodlereader');
-        }
-
-        // Preload existing books once (natural key => id) to avoid a query per book.
-        $existing = [];
-        $rs = $DB->get_recordset('moodlereader_books', null, '', 'id, publisher, series, name');
-        foreach ($rs as $b) {
-            $existing[self::key($b->publisher, $b->series, $b->name)] = $b->id;
-        }
-        $rs->close();
-
+        $client = $client ?? new client();
+        $since = $full ? 0 : (int) get_config('mod_moodlereader', 'v2lastbooksync');
+        $cursor = null;
         $count = 0;
-        foreach ($books as $book) {
-            $key = self::key($book->publisher, $book->series, $book->name);
-            $book->time = time();
-            if (isset($existing[$key])) {
-                $book->id = $existing[$key];
-                // Never override a teacher's curation of the 'hidden' flag on re-sync.
-                unset($book->hidden);
-                $DB->update_record('moodlereader_books', $book);
-            } else {
-                $existing[$key] = $DB->insert_record('moodlereader_books', $book);
+        $servertime = 0;
+        $pages = 0;
+        do {
+            $query = ['changed_since' => $since, 'limit' => self::PAGE_SIZE];
+            if ($cursor !== null) {
+                $query['cursor'] = $cursor;
             }
-            $count++;
+            $data = $client->get('/books', $query);
+            $servertime = $servertime ?: (int) ($data['server_time'] ?? 0);
+            foreach ((array) ($data['books'] ?? []) as $row) {
+                if (is_array($row) && ($book = self::clean_book($row))) {
+                    self::upsert($book);
+                    $count++;
+                }
+            }
+            $cursor = isset($data['next_cursor']) && $data['next_cursor'] !== '' ? (string) $data['next_cursor'] : null;
+        } while ($cursor !== null && ++$pages < 1000);
+
+        // The next sync asks for changes since mreader.org's clock at the start of this one.
+        if ($servertime > 0) {
+            set_config('v2lastbooksync', $servertime, 'mod_moodlereader');
         }
         return $count;
     }
 
     /**
-     * The natural key used to match a book across syncs.
+     * Insert or update one catalogue book.
      *
-     * @param string $publisher
-     * @param string $series
-     * @param string $name
-     * @return string
+     * @param \stdClass $book Cleaned book (see {@see self::clean_book()}), plus `coveretag`.
+     * @return int Local book id.
      */
-    protected static function key(string $publisher, string $series, string $name): string {
-        return \core_text::strtolower(trim("$publisher|$series|$name"));
+    protected static function upsert(\stdClass $book): int {
+        global $DB;
+        $existing = $DB->get_record('moodlereader_books', ['remoteid' => $book->remoteid], '*', IGNORE_MULTIPLE);
+        if (!$existing && $book->image !== '') {
+            $existing = $DB->get_record(
+                'moodlereader_books',
+                ['remoteid' => 0, 'image' => $book->image],
+                '*',
+                IGNORE_MULTIPLE
+            );
+        }
+        if (!$existing) {
+            $existing = $DB->get_record('moodlereader_books', [
+                'remoteid' => 0, 'publisher' => $book->publisher, 'series' => $book->series, 'name' => $book->name,
+            ], '*', IGNORE_MULTIPLE);
+        }
+        $book->time = time();
+        if (!$existing) {
+            $book->hidden = 0;
+            return $DB->insert_record('moodlereader_books', $book);
+        }
+        $book->id = $existing->id;
+        // A changed cover is fetched again on its next view.
+        if ((string) $existing->coveretag !== (string) $book->coveretag) {
+            self::delete_cached_covers((int) $book->id);
+        }
+        // Never override a teacher's curation of the 'hidden' flag on re-sync.
+        $DB->update_record('moodlereader_books', $book);
+        return (int) $book->id;
     }
 
     /**
-     * Map the mreader.org JSON response into clean book records.
+     * Delete every cached copy of a book's cover (they are stored per activity context).
      *
-     * mreader.org's api.php returns a JSON object keyed by book id; each entry
-     * uses "title" for the name and "level" for the series. Every stored value is
-     * cleaned before it reaches the database.
-     *
-     * @param string $response Raw HTTP body.
-     * @return \stdClass[]
+     * @param int $bookid
+     * @return void
      */
-    protected static function extract_books(string $response): array {
-        $data = json_decode($response, true);
-        if (!is_array($data)) {
-            return [];
+    protected static function delete_cached_covers(int $bookid): void {
+        global $DB;
+        $fs = get_file_storage();
+        $contextids = $DB->get_fieldset_select(
+            'files',
+            'DISTINCT contextid',
+            "component = 'mod_moodlereader' AND filearea = 'bookcover' AND itemid = ?",
+            [$bookid]
+        );
+        foreach ($contextids as $contextid) {
+            $fs->delete_area_files((int) $contextid, 'mod_moodlereader', 'bookcover', $bookid);
         }
-        $books = [];
-        foreach ($data as $row) {
-            if (!is_array($row) || empty($row['title'])) {
-                continue;
-            }
-            $get = fn($k) => isset($row[$k]) ? trim((string) $row[$k]) : '';
-            $books[] = (object) [
-                'remoteid'   => (int) clean_param($get('id'), PARAM_INT),
-                'publisher'  => clean_param($get('publisher'), PARAM_TEXT),
-                'series'     => clean_param($get('level'), PARAM_TEXT),
-                'difficulty' => (int) clean_param($get('difficulty'), PARAM_INT),
-                'name'       => clean_param($get('title'), PARAM_TEXT),
-                'words'      => (int) clean_param($get('words'), PARAM_INT),
-                'genre'      => clean_param($get('genre'), PARAM_TEXT),
-                'fiction'    => clean_param($get('fiction'), PARAM_TEXT),
-                'points'     => (float) clean_param($get('points'), PARAM_FLOAT),
-                'image'      => clean_param($get('image'), PARAM_FILE),
-                'sametitle'  => clean_param($get('sametitle'), PARAM_TEXT),
-                'hidden'     => 0,
-            ];
+    }
+
+    /**
+     * Map one book object from mreader.org into a clean local record.
+     *
+     * Every stored value is cleaned before it reaches the database.
+     *
+     * @param array $row
+     * @return \stdClass|null Null if the row has no id or title.
+     */
+    public static function clean_book(array $row): ?\stdClass {
+        $get = fn($k) => isset($row[$k]) && is_scalar($row[$k]) ? trim((string) $row[$k]) : '';
+        $remoteid = (int) clean_param($get('id'), PARAM_INT);
+        if ($remoteid <= 0 || $get('title') === '') {
+            return null;
         }
-        return $books;
+        // The local 'series' column holds what mreader.org calls the level label.
+        $series = $get('level') !== '' ? $get('level') : $get('series');
+        return (object) [
+            'remoteid'   => $remoteid,
+            'publisher'  => \core_text::substr(clean_param($get('publisher'), PARAM_TEXT), 0, 100),
+            'series'     => \core_text::substr(clean_param($series, PARAM_TEXT), 0, 100),
+            'difficulty' => (int) clean_param($get('difficulty'), PARAM_INT),
+            'name'       => \core_text::substr(clean_param($get('title'), PARAM_TEXT), 0, 255),
+            'words'      => max(0, min(999999, (int) clean_param($get('words'), PARAM_INT))),
+            'genre'      => \core_text::substr(clean_param($get('genre'), PARAM_TEXT), 0, 255),
+            'fiction'    => \core_text::substr(clean_param($get('fiction'), PARAM_TEXT), 0, 255),
+            'points'     => (float) clean_param($get('points'), PARAM_FLOAT),
+            // The legacy image name is kept as text, never run through PARAM_FILE (contract defect B1).
+            'image'      => \core_text::substr(clean_param($get('legacy_image'), PARAM_TEXT), 0, 255),
+            'sametitle'  => \core_text::substr(clean_param($get('sametitle'), PARAM_TEXT), 0, 255),
+            'withdrawn'  => !empty($row['withdrawn']) || (isset($row['has_quiz']) && !$row['has_quiz']) ? 1 : 0,
+            'coveretag'  => $get('cover_etag') !== '' ? \core_text::substr($get('cover_etag'), 0, 255) : null,
+        ];
     }
 }

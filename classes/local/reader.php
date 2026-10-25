@@ -241,7 +241,7 @@ class reader {
                               AND a.deleted = 0 AND a.state = 'finished' AND b2.sametitle <> ''";
 
         $from = '{moodlereader_books} b';
-        $where = ['b.hidden = 0'];
+        $where = ['b.hidden = 0', 'b.withdrawn = 0'];
 
         if (!empty($this->instance->bookinstances)) {
             $from .= ' JOIN {moodlereader_bookinstances} bi ON bi.bookid = b.id AND bi.readerid = :bireaderid';

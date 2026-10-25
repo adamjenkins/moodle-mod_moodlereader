@@ -89,6 +89,22 @@ if ($links) {
     echo html_writer::div(implode(' ', $links), 'mod-moodlereader-teachertools mb-3');
 }
 
+// Quizzes need an approved mreader.org connection; say so instead of failing at launch.
+if (!\mod_moodlereader\local\connection::allows_launch()) {
+    if ($reader->can('managebooks')) {
+        $message = get_string('notconnectedteacher', 'mod_moodlereader');
+        if (has_capability('mod/moodlereader:manageremotesites', context_system::instance())) {
+            $message .= ' ' . html_writer::link(
+                new moodle_url('/mod/moodlereader/admin/connection.php'),
+                get_string('connection', 'mod_moodlereader')
+            );
+        }
+    } else {
+        $message = get_string('notconnectedstudent', 'mod_moodlereader');
+    }
+    echo $OUTPUT->notification($message, \core\output\notification::NOTIFY_WARNING, false);
+}
+
 // Teacher messages.
 echo $output->messages($reader, $USER->id);
 

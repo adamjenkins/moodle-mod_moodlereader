@@ -25,7 +25,9 @@
 require(__DIR__ . '/../../config.php');
 
 use mod_moodlereader\local\reader;
-use mod_moodlereader\local\mreader_site;
+use mod_moodlereader\local\api\api_exception;
+use mod_moodlereader\local\api\client;
+use mod_moodlereader\local\connection;
 
 $id = required_param('id', PARAM_INT);        // Course-module id.
 $bookid = required_param('book', PARAM_INT);  // Book id.
@@ -43,8 +45,18 @@ $file = $fs->get_file($context->id, 'mod_moodlereader', 'bookcover', $book->id, 
 
 if (!$file) {
     // Not cached yet: fetch it from mreader.org and store it for next time.
-    $bytes = (new mreader_site())->fetch_cover((int) $book->remoteid);
-    if ($bytes !== null) {
+    $bytes = null;
+    if (connection::allows_launch() && (int) $book->remoteid > 0) {
+        try {
+            $response = (new client())->get_raw('/book-cover', ['id' => (int) $book->remoteid]);
+            if ($response['status'] === 200 && strpos($response['headers']['content-type'] ?? '', 'image/') === 0) {
+                $bytes = $response['body'];
+            }
+        } catch (api_exception $e) {
+            $bytes = null;
+        }
+    }
+    if ($bytes !== null && $bytes !== '') {
         $file = $fs->create_file_from_string([
             'contextid' => $context->id,
             'component' => 'mod_moodlereader',

@@ -3,6 +3,42 @@
 The plugin is in pre-release development. The version stays at `0.0.z` until a
 `1.0.0` release is explicitly cut; `x`/`y` are not bumped without sign-off.
 
+## [0.1.0] - 2026-10-25
+
+### Added
+
+- mreader.org API v2 client: HMAC-SHA256 request signing (timestamp + nonce), the
+  authorization request, status, credential rotation and legacy-registration claim
+  (`classes/local/api/`, `classes/local/connection.php`).
+- `admin/connection.php`: request access, see the state, check now, sync books, rotate
+  the credential; site admins are messaged when the state changes
+  (`db/messages.php`, provider `siteconnection`).
+- `quiz/return.php`, `quiz/status.php` and the `mod_moodlereader/quizframe` AMD
+  module: the quiz frame is watched (mreader.org's `postMessage` and polling) and the
+  result is fetched server-to-server.
+- `siteproof.php`: answers mreader.org's optional site-ownership check.
+- Scheduled tasks `reconcile_attempts` (every 15 min), `sync_books` (daily) and
+  `refresh_connection` (daily); ad-hoc task `import_course`.
+- `admin/import.php`, `cli/import.php` and `classes/local/import/importer.php`: the
+  repeatable mod_reader import (preview, sync, re-sync, cutover), with the
+  `moodlereader_imports` and `moodlereader_importmap` tables.
+- Fields `attemptref`, `remotestate`, `timeresultchecked` on attempts and `withdrawn`,
+  `coveretag` on books.
+
+### Changed
+
+- Quiz launches use single-use launch URLs requested server-to-server; the grade
+  callback branch of `quiz/mreader.php` is removed.
+- Book sync uses API v2 with stable ids and `changed_since`; imported books are linked
+  by their legacy image name.
+- Plugin settings are a folder: Settings, mreader.org connection, Import from mod_reader.
+- Privacy metadata describes the v2 data sent to mreader.org.
+
+### Removed
+
+- The legacy registration (`admin/register.php`, `register_form`) and md5 signing.
+- `cli/migrate.php` and `classes/local/migrator.php` (replaced by the importer).
+
 ## [0.0.3] - 2026-10-04
 
 ### Changed

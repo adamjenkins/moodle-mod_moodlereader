@@ -427,6 +427,9 @@ class renderer extends \plugin_renderer_base {
      * @return string HTML.
      */
     protected function take_quiz_button(reader $reader, int $bookid): string {
+        if (!\mod_moodlereader\local\connection::allows_launch()) {
+            return html_writer::span(get_string('quizunavailable', 'mod_moodlereader'), 'text-muted small');
+        }
         $form = html_writer::start_tag('form', [
             'method' => 'post',
             'action' => new moodle_url('/mod/moodlereader/startquiz.php'),
