@@ -1,0 +1,48 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/api/v2/attempt/answer",
+        "query": {},
+        "body": {
+            "ref": "golden-8b86c292",
+            "slot": 2,
+            "seconds_used": 3,
+            "response": {
+                "option": "6mzwwA-lCsWWyUR7Gttr5k"
+            }
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "attempt_ref": "golden-8b86c292",
+            "state": "in_progress",
+            "slot": 3,
+            "slots": 4,
+            "time_limit": 900,
+            "seconds_used": 3,
+            "item": {
+                "type": "o",
+                "text": "",
+                "format": "html",
+                "instruction": "Put the events in order.",
+                "items": [
+                    {
+                        "id": "VZW8kXBBeUvt4Jawc1o9pU",
+                        "text": "He eats breakfast."
+                    },
+                    {
+                        "id": "-hPDQezVbCYMCp9PqTIitp",
+                        "text": "The boy wakes up."
+                    },
+                    {
+                        "id": "8CpyMJGPrnZiTNCcW_nXrs",
+                        "text": "He walks to school."
+                    }
+                ]
+            },
+            "result": null,
+            "server_time": 1792948461
+        }
+    }
+}

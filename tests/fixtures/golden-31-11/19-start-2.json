@@ -1,0 +1,46 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/api/v2/attempt/start",
+        "query": {},
+        "body": {
+            "ref": "golden-00939a92"
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "attempt_ref": "golden-00939a92",
+            "state": "in_progress",
+            "slot": 1,
+            "slots": 4,
+            "time_limit": 900,
+            "seconds_used": 0,
+            "item": {
+                "type": "mc",
+                "text": "What did the boy say\" ______.",
+                "format": "html",
+                "options": [
+                    {
+                        "id": "FwwQTRlAIrMo1BZ7txZ5j9",
+                        "text": "Nothing"
+                    },
+                    {
+                        "id": "I_f3WYUB9QEwKe0A87mSOJ",
+                        "text": "He said \"yes\""
+                    },
+                    {
+                        "id": "Hu19w_haSjSr1nhy_8VgF4",
+                        "text": "He ran away"
+                    },
+                    {
+                        "id": "2Qo5mJu6OTAbzuNoIHPKAk",
+                        "text": "He said \"no\""
+                    }
+                ]
+            },
+            "result": null,
+            "server_time": 1792948463
+        }
+    }
+}

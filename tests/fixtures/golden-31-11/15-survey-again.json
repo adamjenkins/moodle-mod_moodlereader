@@ -1,0 +1,21 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/api/v2/attempt/survey",
+        "query": {},
+        "body": {
+            "ref": "golden-8b86c292",
+            "responses": []
+        }
+    },
+    "response": {
+        "status": 409,
+        "body": {
+            "error": {
+                "code": "survey_done",
+                "message": "The survey for this attempt was already sent."
+            },
+            "server_time": 1792948463
+        }
+    }
+}

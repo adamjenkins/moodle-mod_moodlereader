@@ -46,7 +46,8 @@ class behat_fake_mreader {
                 ['id' => 'optAnna', 'text' => 'Anna'], ['id' => 'optTom', 'text' => 'Tom'],
                 ['id' => 'optSam', 'text' => 'Sam'],
             ]],
-            2 => ['type' => 'o', 'text' => 'What happened first?', 'format' => 'html',
+            // As on the real server (31 §11.12 A2), an ordering item's text is empty: its wording is the instruction.
+            2 => ['type' => 'o', 'text' => '', 'format' => 'html',
                 'instruction' => 'Put the events in order.', 'items' => [
                     ['id' => 'ordB', 'text' => 'The kite flew away.'], ['id' => 'ordA', 'text' => 'Anna found a kite.'],
                     ['id' => 'ordC', 'text' => 'Tom brought it back.'],

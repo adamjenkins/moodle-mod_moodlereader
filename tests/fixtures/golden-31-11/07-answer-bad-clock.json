@@ -1,0 +1,25 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/api/v2/attempt/answer",
+        "query": {},
+        "body": {
+            "ref": "golden-8b86c292",
+            "slot": 1,
+            "seconds_used": 99999,
+            "response": {
+                "option": "x"
+            }
+        }
+    },
+    "response": {
+        "status": 422,
+        "body": {
+            "error": {
+                "code": "bad_clock",
+                "message": "seconds_used must not decrease, nor exceed the time since the attempt started."
+            },
+            "server_time": 1792948458
+        }
+    }
+}

@@ -1,0 +1,24 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/api/v2/attempt",
+        "query": {
+            "ref": "golden-8b86c292"
+        },
+        "body": null
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "attempt_ref": "golden-8b86c292",
+            "uid": "GoldUid1",
+            "book_id": 99985592,
+            "state": "finished",
+            "percent": 100,
+            "passed": true,
+            "started_at": 1792948458,
+            "finished_at": 1792948463,
+            "server_time": 1792948463
+        }
+    }
+}

@@ -87,6 +87,7 @@ try {
                 optional_param_array('order', [], PARAM_ALPHANUMEXT)
             );
             $timeout = optional_param('timeout', 0, PARAM_BOOL);
+            // Only a malformed form is refused; nothing chosen is a (wrong) answer.
             if ($response === null && !$timeout) {
                 redirect(
                     $pageurl,
@@ -107,6 +108,9 @@ try {
     }
 
     $state = quizsession::show($attempt);
+    if ($state['state'] === 'relaunch') {
+        redirect(new moodle_url('/mod/moodlereader/quiz/mreader.php', ['attempt' => $attempt->id]));
+    }
 } catch (api_exception $e) {
     moodlereader_quiz_failed($reader, $e);
 }

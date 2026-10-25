@@ -1,0 +1,24 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/api/v2/launches",
+        "query": {},
+        "body": {
+            "attempt_ref": "golden-00939a92",
+            "uid": "GoldUid2",
+            "display_name": "ab cdef",
+            "book_id": 99985592,
+            "locale": "en",
+            "delivery": "moodle"
+        }
+    },
+    "response": {
+        "status": 201,
+        "body": {
+            "attempt_ref": "golden-00939a92",
+            "time_limit": 900,
+            "slots": 4,
+            "server_time": 1792948463
+        }
+    }
+}

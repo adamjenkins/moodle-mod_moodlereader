@@ -1,0 +1,41 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/api/v2/attempt/answer",
+        "query": {},
+        "body": {
+            "ref": "golden-00939a92",
+            "slot": 1,
+            "seconds_used": 1,
+            "response": {}
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "attempt_ref": "golden-00939a92",
+            "state": "in_progress",
+            "slot": 2,
+            "slots": 4,
+            "time_limit": 900,
+            "seconds_used": 1,
+            "item": {
+                "type": "tf",
+                "text": "The boy was <b>happy</b> at the end.",
+                "format": "html",
+                "options": [
+                    {
+                        "id": "hrU1kO3U_seyokLrJ4rXI6",
+                        "value": "true"
+                    },
+                    {
+                        "id": "o_14RIpWRRnpRDAqDwPOB2",
+                        "value": "false"
+                    }
+                ]
+            },
+            "result": null,
+            "server_time": 1792948464
+        }
+    }
+}

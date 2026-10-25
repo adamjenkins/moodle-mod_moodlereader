@@ -1,0 +1,26 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/api/v2/launches",
+        "query": {},
+        "body": {
+            "attempt_ref": "golden-other",
+            "uid": "GoldUid2",
+            "display_name": "ab cdef",
+            "book_id": 99985592,
+            "locale": "en",
+            "delivery": "moodle"
+        }
+    },
+    "response": {
+        "status": 409,
+        "body": {
+            "error": {
+                "code": "attempt_open",
+                "message": "This student already has a quiz in progress. Resume it, or wait for it to end."
+            },
+            "attempt_ref": "golden-00939a92",
+            "server_time": 1792948463
+        }
+    }
+}

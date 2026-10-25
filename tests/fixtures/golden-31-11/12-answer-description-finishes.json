@@ -1,0 +1,52 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/api/v2/attempt/answer",
+        "query": {},
+        "body": {
+            "ref": "golden-8b86c292",
+            "slot": 4,
+            "seconds_used": 5,
+            "response": {}
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "attempt_ref": "golden-8b86c292",
+            "state": "finished",
+            "slot": 4,
+            "slots": 4,
+            "time_limit": 900,
+            "seconds_used": 5,
+            "item": null,
+            "result": {
+                "percent": 100,
+                "passed": true,
+                "answered": 4
+            },
+            "survey": [
+                {
+                    "id": 816,
+                    "question": "Fixture survey: how did you like this book?",
+                    "format": "html",
+                    "answers": [
+                        {
+                            "id": 1,
+                            "text": "Very much"
+                        },
+                        {
+                            "id": 2,
+                            "text": "It was OK"
+                        },
+                        {
+                            "id": 3,
+                            "text": "Not much"
+                        }
+                    ]
+                }
+            ],
+            "server_time": 1792948463
+        }
+    }
+}

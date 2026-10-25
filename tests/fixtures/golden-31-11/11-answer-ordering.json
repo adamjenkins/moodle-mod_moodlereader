@@ -1,0 +1,37 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/api/v2/attempt/answer",
+        "query": {},
+        "body": {
+            "ref": "golden-8b86c292",
+            "slot": 3,
+            "seconds_used": 4,
+            "response": {
+                "order": [
+                    "-hPDQezVbCYMCp9PqTIitp",
+                    "VZW8kXBBeUvt4Jawc1o9pU",
+                    "8CpyMJGPrnZiTNCcW_nXrs"
+                ]
+            }
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "attempt_ref": "golden-8b86c292",
+            "state": "in_progress",
+            "slot": 4,
+            "slots": 4,
+            "time_limit": 900,
+            "seconds_used": 4,
+            "item": {
+                "type": "d",
+                "text": "Read this passage about the <i>long</i> walk home.",
+                "format": "html"
+            },
+            "result": null,
+            "server_time": 1792948462
+        }
+    }
+}

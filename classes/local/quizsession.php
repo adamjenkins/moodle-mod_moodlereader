@@ -150,12 +150,45 @@ class quizsession {
         if (self::time_left($attempt) <= 0) {
             return self::finish($attempt, $client);
         }
-        $path = (int) $attempt->currentslot === 0 ? '/attempt/start' : '/attempt/current';
-        $state = self::call($client, $path, ['ref' => $attempt->attemptref]);
+        $start = (int) $attempt->currentslot === 0;
+        try {
+            try {
+                $state = self::call($client, $start ? '/attempt/start' : '/attempt/current', ['ref' => $attempt->attemptref]);
+            } catch (api_exception $e) {
+                // Not started yet (31 §11.12 A3), or the start failed on the server: start (again), once.
+                if (!in_array($e->apicode, ['not_started', 'start_failed'], true)) {
+                    throw $e;
+                }
+                $state = self::call($client, '/attempt/start', ['ref' => $attempt->attemptref]);
+            }
+        } catch (api_exception $e) {
+            // A reservation not started within an hour has expired: launch afresh with a new ref.
+            if ($e->httpstatus === 410 && $e->apicode === 'expired' && empty($e->response['state'])) {
+                self::forget_launch($attempt);
+                return ['state' => 'relaunch', 'slot' => 0, 'slots' => 0, 'item' => null, 'survey' => null];
+            }
+            throw $e;
+        }
         if ($state['state'] === 'in_progress') {
             self::open_segment($attempt, (int) $state['slot']);
         }
         return $state;
+    }
+
+    /**
+     * Drop an expired launch, so the next visit launches the attempt again with a fresh ref.
+     *
+     * @param \stdClass $attempt
+     * @return void
+     */
+    protected static function forget_launch(\stdClass $attempt): void {
+        global $DB;
+        $reset = ['attemptref' => null, 'remotestate' => null, 'delivery' => self::DELIVERY_IFRAME, 'timelimit' => 0,
+            'slots' => 0, 'currentslot' => 0, 'timeserved' => 0, 'timeheartbeat' => 0];
+        $DB->update_record('moodlereader_attempts', (object) (['id' => $attempt->id] + $reset));
+        foreach ($reset as $field => $value) {
+            $attempt->$field = $value;
+        }
     }
 
     /**
@@ -216,7 +249,8 @@ class quizsession {
         try {
             $client->post('/attempt/survey', ['ref' => $attempt->attemptref, 'responses' => $list]);
         } catch (api_exception $e) {
-            if ($e->apicode !== 'survey_done') {
+            // Already sent, or (should never happen here) not finished yet: either way there is nothing to send.
+            if (!in_array($e->apicode, ['survey_done', 'not_finished'], true)) {
                 throw $e;
             }
         }
@@ -378,7 +412,9 @@ class quizsession {
                 'value' => in_array($choice['value'] ?? '', ['true', 'false'], true) ? $choice['value'] : '',
             ];
         }
-        if ($type === 'd' ? $choices : (count($choices) < 2 || count($choices) > 20)) {
+        // Real counts (31 §11.12 A2): mc 0..5 options (some items have none), tf 2, ordering 1..100 items, d none.
+        $counts = ['mc' => [0, 20], 'tf' => [2, 2], 'o' => [1, 100], 'd' => [0, 0]][$type];
+        if (count($choices) < $counts[0] || count($choices) > $counts[1]) {
             throw new api_exception('badresponse', 'mreader.org sent a question with the wrong number of options.');
         }
         return [
@@ -419,6 +455,7 @@ class quizsession {
      *
      * Moodle does not keep the item, so only the shape is checked here: ids that look like ids, and an
      * order without repeats. mreader.org refuses an id that is not on the question (400 validation).
+     * Nothing chosen (mc, tf) is sent as {}, which mreader.org marks wrong.
      *
      * @param string $type The item type the page was drawn for.
      * @param string $option The chosen option id (mc, tf).
@@ -432,7 +469,7 @@ class quizsession {
                 return [];
             case 'o':
                 $order = array_values($order);
-                $wellformed = count($order) >= 2 && count($order) === count(array_unique($order))
+                $wellformed = count($order) >= 1 && count($order) === count(array_unique($order))
                     && count(array_filter($order, $isid)) === count($order);
                 if (!$wellformed) {
                     return null;
@@ -440,6 +477,10 @@ class quizsession {
                 return ['order' => $order];
             case 'mc':
             case 'tf':
+                // Nothing chosen is an answer too, marked wrong (31 §11.12 A1): some items have no options.
+                if ($option === '') {
+                    return [];
+                }
                 return $isid($option) ? ['option' => $option] : null;
             default:
                 return null;

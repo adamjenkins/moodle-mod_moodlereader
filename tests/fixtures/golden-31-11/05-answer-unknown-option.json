@@ -1,0 +1,25 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/api/v2/attempt/answer",
+        "query": {},
+        "body": {
+            "ref": "golden-8b86c292",
+            "slot": 1,
+            "seconds_used": 1,
+            "response": {
+                "option": "no-such-id"
+            }
+        }
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "error": {
+                "code": "validation",
+                "message": "The response does not fit this item."
+            },
+            "server_time": 1792948458
+        }
+    }
+}
