@@ -91,11 +91,12 @@ class progressbar {
                 'mod_moodlereader',
                 self::number($extra, $points)
             )), ['class' => 'h5 mt-3']);
+            // The extra-reading bar is always blue: the goal is already reached.
             $out .= self::bar($extra, $nextgoal, $points, get_string(
                 'progressextracaption_' . $unit,
                 'mod_moodlereader',
                 self::number($extra, $points)
-            ));
+            ), 'blue');
         }
         return html_writer::div($out, 'mod-moodlereader-progress mb-3');
     }
@@ -107,12 +108,13 @@ class progressbar {
      * @param float $goal
      * @param bool $points
      * @param string $caption Text on the coloured part.
+     * @param string|null $band A fixed colour band, or null for the band of the percentage.
      * @return string HTML.
      */
-    protected static function bar(float $total, float $goal, bool $points, string $caption): string {
+    protected static function bar(float $total, float $goal, bool $points, string $caption, ?string $band = null): string {
         $percent = self::percent($total, $goal);
         $width = round(min(100, $percent), 1);
-        $fill = html_writer::div(s($caption), 'progress-bar mr-progress-' . self::band($percent), [
+        $fill = html_writer::div(s($caption), 'progress-bar mr-progress-' . ($band ?? self::band($percent)), [
             'role' => 'progressbar', 'style' => "width: {$width}%;",
             'aria-valuenow' => (int) min(100, $percent), 'aria-valuemin' => 0, 'aria-valuemax' => 100,
             'aria-label' => $caption,

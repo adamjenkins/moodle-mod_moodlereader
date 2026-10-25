@@ -48,7 +48,7 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   often could not be awarded at all.
 - The progress bar is mod_reader's expanding bar again: it turns from red through orange,
   yellow and green to blue as the goal is reached, with quarter marks, and once the goal is
-  passed a second bar counts the extra reading. A new activity setting can turn the
+  passed a second, blue bar counts the extra reading. A new activity setting can turn the
   second bar off.
 - The student summary has a miniature progress bar for each student.
 - Reading levels work as in mod_reader: students move up a level after passing a set

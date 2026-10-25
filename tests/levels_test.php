@@ -153,6 +153,9 @@ final class levels_test extends \advanced_testcase {
         $twobars = progressbar::render(4500, 3000, false, true);
         $this->assertSame(2, substr_count($twobars, 'role="progressbar"'));
         $this->assertStringContainsString('Extra reading: 1,500 more words', $twobars);
+        // The extra-reading bar is blue even though it is only half full; the first is blue at the goal.
+        $this->assertSame(2, substr_count($twobars, 'mr-progress-blue'));
+        $this->assertStringNotContainsString('mr-progress-yellow', $twobars);
         $this->assertSame(1, substr_count(progressbar::render(4500, 3000, false, false), 'role="progressbar"'));
         $this->assertStringContainsString('51%', progressbar::mini(1530, 3000, false));
     }
