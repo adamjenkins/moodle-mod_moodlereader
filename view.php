@@ -105,14 +105,6 @@ if (!\mod_moodlereader\local\connection::allows_launch()) {
     echo $OUTPUT->notification($message, \core\output\notification::NOTIFY_WARNING, false);
 }
 
-// The rest of the page is the student's own reading: progress, level, records and the book search.
-// Only someone who takes quizzes here has any (an administrator's or teacher's would always be empty).
-if (!has_capability('mod/moodlereader:attempt', $reader->get_context(), null, false)) {
-    echo $OUTPUT->notification(get_string('teacherviewnote', 'mod_moodlereader'), \core\output\notification::NOTIFY_INFO);
-    echo $output->footer();
-    exit;
-}
-
 // Teacher messages.
 echo $output->messages($reader, $USER->id);
 

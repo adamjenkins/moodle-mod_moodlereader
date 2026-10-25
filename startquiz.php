@@ -34,7 +34,8 @@ $bookid = required_param('book', PARAM_INT);  // Book id.
 $reader = reader::from_cmid($id);
 require_login($reader->get_course(), false, $reader->get_cm());
 require_sesskey();
-$reader->require_cap('attempt');
+// Everyone who sees the books may take a quiz, teachers included; reports list students only.
+$reader->require_cap('viewbooks');
 $reader->require_available();
 if (!connection::allows_launch()) {
     throw new moodle_exception('notconnected', 'mod_moodlereader', $reader->view_url());

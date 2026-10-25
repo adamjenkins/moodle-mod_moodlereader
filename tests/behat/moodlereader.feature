@@ -62,6 +62,13 @@ Feature: Moodle Reader activity
     Then "Take the quiz" "button" should exist
     And I should not see "Book quizzes are not available at the moment."
 
+  Scenario: On a connected site a teacher can search and try a quiz too
+    Given the site is connected to mreader.org
+    When I am on the "Reader 1" "moodlereader activity" page logged in as teacher1
+    Then I should see "Reading progress: 0 of 5,000 words"
+    And I press "Search"
+    Then "Take the quiz" "button" should exist
+
   Scenario: A teacher is told why quizzes are unavailable
     When I am on the "Reader 1" "moodlereader activity" page logged in as teacher1
     Then I should see "Students cannot take book quizzes: this site is not connected to mreader.org."

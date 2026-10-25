@@ -388,7 +388,6 @@ $string['takequizfor'] = 'Take the quiz for "{$a}"';
 $string['taskreconcile'] = 'Collect mreader.org quiz results';
 $string['taskrefreshconnection'] = 'Check the mreader.org connection';
 $string['tasksyncbooks'] = 'Sync books from mreader.org';
-$string['teacherviewnote'] = 'Students see their reading progress, level, records and the book search here. Use the buttons above to follow their reading, manage the books and check for cheating.';
 $string['termshown'] = 'Attempts';
 $string['thisterm'] = 'This term';
 $string['totalpointsallterms'] = 'Points (all terms)';

@@ -41,7 +41,8 @@ $attempt = $DB->get_record('moodlereader_attempts', ['id' => $attemptid], '*', M
 $reader = reader::from_instanceid((int) $attempt->readerid);
 
 require_login($reader->get_course(), false, $reader->get_cm());
-$reader->require_cap('attempt');
+// Everyone who sees the books may take a quiz, teachers included; reports list students only.
+$reader->require_cap('viewbooks');
 
 if ((int) $attempt->userid !== (int) $USER->id) {
     throw new moodle_exception('notyourattempt', 'mod_moodlereader', $reader->view_url());

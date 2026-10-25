@@ -37,8 +37,8 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - Books can be filtered by language, with English selected by default, in the student
   book search and in "Manage books". Books' languages come from mreader.org.
 - Book covers are served only when they are JPEG, PNG, GIF or WebP images.
-- Teachers and administrators no longer see a student's empty progress, level, records
-  and book search on the activity page; they see their tools and a short note.
+- Teachers can take book quizzes to try them: the "Take the quiz" button they were shown
+  used to fail with a permission error. Their attempts are not listed in the reports.
 - The "read N words" completion rule now counts what the progress bar and the grade
   count: this term's books, each once, with teacher credit. It used to count every term.
 - "Grade by points" is refused when no enabled book has points (mreader.org sends none),

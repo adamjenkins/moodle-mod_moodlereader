@@ -50,7 +50,7 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - A scan replaces the flags no teacher has acted on, so changed settings apply.
 - The student summary shows and sets only the current reading level (start and stop
   levels have no effect in this plugin); each report action has its own button.
-- `view.php`: the student sections need `mod/moodlereader:attempt` without doanything.
+- `startquiz.php` and `quiz/mreader.php` need `viewbooks` (the button's audience), not `attempt`.
 - Completion rules use `ignoredate`, count each book once and include credit.
 - `mod_form` validation refuses `wordsorpoints = 1` when no enabled book has points.
 - `moodlereader_books.language` is NOT NULL with no default (XMLDB rejects `''` as a
