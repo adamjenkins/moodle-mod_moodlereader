@@ -49,7 +49,7 @@ class connection {
     /** @var string[] Config keys holding the connection; cleared together by {@see self::forget()}. */
     const KEYS = ['v2siteid', 'v2secret', 'v2state', 'v2reason', 'v2requestref', 'v2requestedat',
         'v2approvedat', 'v2revokedat', 'v2lastchecked', 'v2clockskew', 'v2legacylinks', 'v2institution',
-        'v2contactname', 'v2contactemail', 'v2reconcilesince', 'v2lastbooksync'];
+        'v2contactname', 'v2contactemail', 'v2reconcilesince', 'v2lastbooksync', 'v2lastnoquizsync'];
 
     /**
      * The cached state.

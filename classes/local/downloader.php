@@ -38,7 +38,8 @@ class downloader {
      * Fetch the catalogue from mreader.org and upsert it into {moodlereader_books}.
      *
      * Two walks: the books with quizzes (/books), then the books without one
-     * (/books-noquiz). The second is skipped while mreader.org does not offer it (404).
+     * (/books-noquiz), each asking only for what changed since its own last complete
+     * walk. The second is skipped while mreader.org does not offer it (404).
      *
      * @param bool $full Fetch the whole catalogue rather than the changes.
      * @param client|null $client
@@ -49,20 +50,29 @@ class downloader {
             throw new \moodle_exception('notconnected', 'mod_moodlereader');
         }
         $client = $client ?? new client();
-        $since = $full ? 0 : (int) get_config('mod_moodlereader', 'v2lastbooksync');
-        $servertime = 0;
-        $count = self::walk($client, '/books', $since, true, $servertime);
-        try {
-            $count += self::walk($client, '/books-noquiz', $since, false, $servertime);
-        } catch (api\api_exception $e) {
-            if ((int) $e->httpstatus !== 404) {
+        $count = 0;
+        // Each list remembers its own date (31 §10 amendment 5): the next walk asks for the books changed
+        // since mreader.org's clock at the first page of the last COMPLETE walk; a walk that fails part-way
+        // keeps the old date, so nothing is skipped.
+        $lists = [
+            '/books' => ['v2lastbooksync', true],
+            '/books-noquiz' => ['v2lastnoquizsync', false],
+        ];
+        foreach ($lists as $path => [$setting, $hasquiz]) {
+            $since = $full ? 0 : (int) get_config('mod_moodlereader', $setting);
+            $servertime = 0;
+            try {
+                $count += self::walk($client, $path, $since, $hasquiz, $servertime);
+            } catch (api\api_exception $e) {
+                // A server without the no-quiz list yet answers 404: there is nothing to sync from it.
+                if ($path === '/books-noquiz' && (int) $e->httpstatus === 404) {
+                    continue;
+                }
                 throw $e;
             }
-        }
-
-        // The next sync asks for changes since mreader.org's clock at the start of this one.
-        if ($servertime > 0) {
-            set_config('v2lastbooksync', $servertime, 'mod_moodlereader');
+            if ($servertime > 0) {
+                set_config($setting, $servertime, 'mod_moodlereader');
+            }
         }
         return $count;
     }

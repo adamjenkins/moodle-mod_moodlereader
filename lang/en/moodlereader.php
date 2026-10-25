@@ -255,6 +255,7 @@ $string['levelcolumn_counts'] = 'Level {$a->level}: {$a->used} of {$a->quota} bo
 $string['levelcolumn_own'] = 'Level {$a} (yours)';
 $string['levelcolumn_unlimited'] = 'Level {$a}: any number of books.';
 $string['levelcountrange'] = 'Enter a number from 0 to 99.';
+$string['levelfixed'] = 'Your teacher has fixed your reading level for now: read as many books at level {$a} as you like.';
 $string['levelheader'] = 'Reading levels';
 $string['levelleft'] = '{$a->left} of {$a->quota} left';
 $string['levelnopromotion'] = 'You may read any number of books at level {$a}.';

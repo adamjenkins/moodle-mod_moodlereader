@@ -117,14 +117,43 @@ final class downloader_test extends \advanced_testcase {
         $this->assertEquals(1, $linked->hidden);
 
         // A later sync asks for changes only, and a withdrawn book is flagged, not deleted.
-        // A server without the no-quiz list (404) is not an error.
+        // Each list sends its own date, the server_time of the first page of its last complete walk.
+        $booksince = get_config('mod_moodlereader', 'v2lastbooksync');
+        $noquizsince = get_config('mod_moodlereader', 'v2lastnoquizsync');
+        $this->assertNotEmpty($booksince);
+        $this->assertNotEmpty($noquizsince);
+        // A server without the no-quiz list (404) is not an error, and keeps that list's date.
         $client = (new fake_client())->queue('GET', '/books', 200, ['books' => [$this->book(1, ['withdrawn' => true])],
             'next_cursor' => null])
             ->queue('GET', '/books-noquiz', 404, ['error' => ['code' => 'not_found', 'message' => 'Not found.']]);
         downloader::sync_books(false, $client);
-        $this->assertNotSame('0', $client->requests[0]['query']['changed_since']);
+        $this->assertSame((string) $booksince, $client->requests[0]['query']['changed_since']);
+        $this->assertSame((string) $noquizsince, $client->requests[1]['query']['changed_since']);
+        $this->assertSame($noquizsince, get_config('mod_moodlereader', 'v2lastnoquizsync'));
         $this->assertEquals(1, $DB->get_field('moodlereader_books', 'withdrawn', ['remoteid' => 1, 'hasquiz' => 1]));
         $this->assertSame(3, $DB->count_records('moodlereader_books'));
+    }
+
+    /**
+     * A walk that fails part-way keeps its old date, so the next sync asks again from there.
+     *
+     * @return void
+     */
+    public function test_failed_walk_keeps_its_date(): void {
+        $this->resetAfterTest();
+        $this->approve();
+        set_config('v2lastbooksync', 1000, 'mod_moodlereader');
+        $client = (new fake_client())
+            ->queue('GET', '/books', 200, ['books' => [$this->book(1)], 'next_cursor' => 'c2'])
+            ->queue('GET', '/books', 500, ['error' => ['code' => 'internal', 'message' => 'Oops.']]);
+        try {
+            downloader::sync_books(false, $client);
+            $this->fail('A failed page must not pass silently.');
+        } catch (\mod_moodlereader\local\api\api_exception $e) {
+            $this->assertSame(500, $e->httpstatus);
+        }
+        $this->assertSame('1000', $client->requests[1]['query']['changed_since']);
+        $this->assertSame('1000', get_config('mod_moodlereader', 'v2lastbooksync'));
     }
 
     /**

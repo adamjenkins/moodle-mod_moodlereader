@@ -79,7 +79,8 @@ class levels {
      *
      * @param reader $reader
      * @param int $userid
-     * @return \stdClass level, stoplevel, promotion (bool), columns (each: level, quota,
+     * @return \stdClass level, stoplevel, attop, promotion (bool), allowpromotion (the teacher's switch),
+     *     columns (each: level, quota,
      *     used, remaining, relation -1/0/1), remainingtopromotion (null when there is no
      *     promotion to work towards).
      */
@@ -116,6 +117,7 @@ class levels {
             'stoplevel' => $stoplevel,
             'attop' => $attop,
             'promotion' => $promotion,
+            'allowpromotion' => !empty($record->allowpromotion),
             'columns' => $columns,
             'remainingtopromotion' => $promotion ? max(0, $thislevel - ($passes[$level] ?? 0)) : null,
         ];

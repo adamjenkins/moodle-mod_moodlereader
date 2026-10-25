@@ -205,6 +205,8 @@ class renderer extends \plugin_renderer_base {
                 'next' => $status->level + 1]);
         } else if ($status->attop) {
             $summary = $str('leveltop', $status->level);
+        } else if (!$status->allowpromotion) {
+            $summary = $str('levelfixed', $status->level);
         } else {
             $summary = $str('levelnopromotion', $status->level);
         }

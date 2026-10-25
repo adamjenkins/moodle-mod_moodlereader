@@ -134,6 +134,9 @@ final class levels_test extends \advanced_testcase {
         $DB->set_field('moodlereader_levels', 'allowpromotion', 0, ['userid' => $student->id]);
         $this->assertFalse(levels::maybe_promote($reader, $student->id));
         $this->assertSame([1, 2, 3], levels::allowed($reader, $student->id));
+        $status = levels::status($reader, $student->id);
+        $this->assertFalse($status->allowpromotion);
+        $this->assertNull($status->remainingtopromotion);
     }
 
     /**
