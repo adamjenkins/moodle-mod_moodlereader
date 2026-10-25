@@ -74,3 +74,49 @@ Feature: Moodle Reader activity
     And I should see "Request access"
     And the field "Institution" matches value ""
     And I should see "/mod/moodlereader/quiz/return.php"
+
+  Scenario: A teacher changes a result in the student details report
+    Given the following moodlereader attempts exist:
+      | user     | activity | book         | percent | passed |
+      | student1 | reader1  | The Red Kite | 90      | 1      |
+    When I am on the "Reader 1" "moodlereader activity" page logged in as teacher1
+    And I follow "Reading report"
+    Then I should see "Student summary"
+    And I should see "3,000"
+    When I follow "Student details"
+    And I set the field "The Red Kite" to "1"
+    And I set the field "With the selected rows" to "Mark as cheated"
+    And I press "Apply"
+    Then I should see "1 change(s) made."
+    And I should see "Cheated" in the "The Red Kite" "table_row"
+    When I follow "Student summary"
+    Then I should not see "3,000"
+
+  Scenario: A teacher sees what cheating detection looks for and allow-lists the school address
+    When I am on the "Reader 1" "moodlereader activity" page logged in as teacher1
+    And I follow "Cheating detection"
+    Then I should see "Same book from the same address"
+    And I should see "Quiz finished too quickly"
+    And I should see "Many quizzes in a short time: off"
+    When I press "Detection settings"
+    And I set the field "This activity's allow-listed addresses" to "bogus"
+    And I press "Save changes"
+    Then I should see "These entries are not addresses, ranges, CIDR blocks or prefixes: bogus"
+    When I set the field "This activity's allow-listed addresses" to "203.0.113.0/24"
+    And I press "Save changes"
+    Then I should see "Detection settings saved."
+    And I should see "1 allow-listed address entries"
+
+  Scenario: The book search shows English books until another language is chosen
+    Given the following moodlereader books exist:
+      | name          | publisher | series  | difficulty | words | language |
+      | El Gato Negro | Acme      | Level 1 | 1          | 2000  | es       |
+      | Green Fields  | Acme      | Level 1 | 1          | 2500  | en       |
+    When I am on the "Reader 1" "moodlereader activity" page logged in as student1
+    And I press "Search"
+    Then I should see "Green Fields"
+    And I should not see "El Gato Negro"
+    When I set the field "Language" to "Spanish"
+    And I press "Search"
+    Then I should see "El Gato Negro"
+    And I should not see "Green Fields"

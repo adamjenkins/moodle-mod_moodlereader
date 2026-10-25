@@ -39,9 +39,16 @@ $reader->require_cap('viewbooks');
 $book = $DB->get_record('moodlereader_books', ['id' => $bookid], '*', MUST_EXIST);
 $context = $reader->get_context();
 
-$filename = $book->image !== '' ? clean_param($book->image, PARAM_FILE) : "book{$book->id}.jpg";
+// Only raster images are served inline: never SVG or anything else that can carry script.
+$types = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_GIF => 'gif', IMAGETYPE_WEBP => 'webp'];
 $fs = get_file_storage();
-$file = $fs->get_file($context->id, 'mod_moodlereader', 'bookcover', $book->id, '/', $filename);
+$file = null;
+foreach ($fs->get_area_files($context->id, 'mod_moodlereader', 'bookcover', $book->id, 'id', false) as $cached) {
+    if (in_array($cached->get_mimetype(), ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+        $file = $cached;
+        break;
+    }
+}
 
 if (!$file) {
     // Not cached yet: fetch it from mreader.org and store it for next time.
@@ -56,20 +63,24 @@ if (!$file) {
             $bytes = null;
         }
     }
-    if ($bytes !== null && $bytes !== '') {
+    // The bytes must be an image of an allowed type; the name is taken from that type.
+    $info = $bytes !== null && $bytes !== '' ? @getimagesizefromstring($bytes) : false;
+    if ($info && isset($types[$info[2]])) {
+        $fs->delete_area_files($context->id, 'mod_moodlereader', 'bookcover', $book->id);
         $file = $fs->create_file_from_string([
             'contextid' => $context->id,
             'component' => 'mod_moodlereader',
             'filearea'  => 'bookcover',
             'itemid'    => $book->id,
             'filepath'  => '/',
-            'filename'  => $filename,
+            'filename'  => 'cover.' . $types[$info[2]],
         ], $bytes);
     }
 }
 
 if ($file) {
     // Covers are curated public images; cache for a day and serve inline.
+    header('X-Content-Type-Options: nosniff');
     send_stored_file($file, DAYSECS, 0, false, ['immutable' => true]);
 }
 

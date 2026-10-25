@@ -47,6 +47,10 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
             'moodlereader_bookinstance',
             '/activity/moodlereader/bookinstancelinks/bookinstance'
         );
+        $paths[] = new restore_path_element(
+            'moodlereader_hiddenbook',
+            '/activity/moodlereader/hiddenbooks/hiddenbook'
+        );
         if ($userinfo) {
             $paths[] = new restore_path_element(
                 'moodlereader_attempt',
@@ -80,6 +84,10 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         $data->course = $this->get_courseid();
         $data->availablefrom = $this->apply_date_offset($data->availablefrom);
         $data->availableuntil = $this->apply_date_offset($data->availableuntil);
+        // A backup file is untrusted: keep only valid detection settings.
+        $settings = json_decode((string) ($data->cheatsettings ?? ''), true);
+        $data->cheatsettings = is_array($settings)
+            ? json_encode(\mod_moodlereader\local\cheatdetector::clean_settings($settings)) : null;
         $newid = $DB->insert_record('moodlereader', $data);
         $this->apply_activity_instance($newid);
     }
@@ -95,9 +103,27 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         $data = (object) $data;
         $oldid = $data->id;
         unset($data->id);
+        // A backup file is untrusted: clean every catalogue field as a sync does.
+        $text = fn($field, $length) => \core_text::substr(clean_param((string) ($data->$field ?? ''), PARAM_TEXT), 0, $length);
+        $data = (object) [
+            'remoteid'   => max(0, (int) ($data->remoteid ?? 0)),
+            'publisher'  => $text('publisher', 100),
+            'series'     => $text('series', 100),
+            'difficulty' => (int) ($data->difficulty ?? 0),
+            'name'       => $text('name', 255),
+            'words'      => max(0, min(999999, (int) ($data->words ?? 0))),
+            'genre'      => $text('genre', 255),
+            'fiction'    => $text('fiction', 255),
+            'points'     => (float) ($data->points ?? 0),
+            'image'      => $text('image', 255),
+            'sametitle'  => $text('sametitle', 255),
+            'language'   => \mod_moodlereader\local\booklanguage::clean((string) ($data->language ?? '')),
+            'hidden'     => empty($data->hidden) ? 0 : 1,
+            'time'       => (int) ($data->time ?? 0),
+        ];
         $existing = $DB->get_record('moodlereader_books', [
             'publisher' => $data->publisher, 'series' => $data->series, 'name' => $data->name,
-        ]);
+        ], 'id', IGNORE_MULTIPLE);
         $newid = $existing ? $existing->id : $DB->insert_record('moodlereader_books', $data);
         $this->set_mapping('moodlereader_book', $oldid, $newid);
     }
@@ -112,9 +138,32 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         global $DB;
         $data = (object) $data;
         $data->readerid = $this->get_new_parentid('moodlereader');
-        $data->bookid = $this->get_mappingid('moodlereader_book', $data->bookid) ?: $data->bookid;
-        if ($DB->record_exists('moodlereader_books', ['id' => $data->bookid])) {
-            $DB->insert_record('moodlereader_bookinstances', $data);
+        $data->bookid = (int) $this->get_mappingid('moodlereader_book', $data->bookid);
+        if ($data->bookid && $DB->record_exists('moodlereader_books', ['id' => $data->bookid])) {
+            $DB->insert_record('moodlereader_bookinstances', (object) [
+                'readerid'   => $data->readerid,
+                'bookid'     => $data->bookid,
+                'difficulty' => (int) ($data->difficulty ?? 0),
+                'words'      => max(0, min(999999, (int) ($data->words ?? 0))),
+                'points'     => (float) ($data->points ?? 0),
+            ]);
+        }
+    }
+
+    /**
+     * Restore a book disabled in the activity, remapping the book id.
+     *
+     * @param array $data
+     * @return void
+     */
+    protected function process_moodlereader_hiddenbook($data) {
+        global $DB;
+        $data = (object) $data;
+        $bookid = (int) $this->get_mappingid('moodlereader_book', $data->bookid);
+        $readerid = $this->get_new_parentid('moodlereader');
+        $key = ['readerid' => $readerid, 'bookid' => $bookid];
+        if ($bookid && !$DB->record_exists('moodlereader_hiddenbooks', $key)) {
+            $DB->insert_record('moodlereader_hiddenbooks', (object) ($key + ['timecreated' => (int) ($data->timecreated ?? 0)]));
         }
     }
 
@@ -127,18 +176,37 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
     protected function process_moodlereader_attempt($data) {
         global $DB;
         $data = (object) $data;
-        $data->readerid = $this->get_new_parentid('moodlereader');
-        $data->userid = $this->get_mappingid('user', $data->userid);
-        $data->bookid = $this->get_mappingid('moodlereader_book', $data->bookid) ?: $data->bookid;
-        // Skip attempts whose book could not be resolved on the target site.
-        if (!$DB->record_exists('moodlereader_books', ['id' => $data->bookid])) {
-            $this->log("skipped attempt for unresolved book", backup::LOG_WARNING);
+        $userid = (int) $this->get_mappingid('user', $data->userid);
+        // Only a book this restore mapped: an unmapped id may be another book on this site.
+        $bookid = (int) $this->get_mappingid('moodlereader_book', $data->bookid);
+        if (!$userid || !$bookid || !$DB->record_exists('moodlereader_books', ['id' => $bookid])) {
+            $this->log("skipped attempt for unresolved book or user", backup::LOG_WARNING);
             return;
         }
-        $data->timestart = $this->apply_date_offset($data->timestart);
-        $data->timefinish = $this->apply_date_offset($data->timefinish);
-        $data->timemodified = $this->apply_date_offset($data->timemodified);
-        $DB->insert_record('moodlereader_attempts', $data);
+        $flag = fn($field) => empty($data->$field) ? 0 : 1;
+        $ip = (string) ($data->ip ?? '');
+        $attempt = (object) [
+            'readerid'     => $this->get_new_parentid('moodlereader'),
+            'userid'       => $userid,
+            'bookid'       => $bookid,
+            'attempt'      => max(1, (int) ($data->attempt ?? 1)),
+            'state'        => ($data->state ?? '') === 'finished' ? 'finished' : 'inprogress',
+            'percentgrade' => max(0.0, min(100.0, (float) ($data->percentgrade ?? 0))),
+            'passed'       => $flag('passed'),
+            'credit'       => $flag('credit'),
+            'cheated'      => $flag('cheated'),
+            'deleted'      => $flag('deleted'),
+            'bookrating'   => max(0, min(99, (int) ($data->bookrating ?? 0))),
+            'timestart'    => $this->apply_date_offset((int) ($data->timestart ?? 0)),
+            'timefinish'   => $this->apply_date_offset((int) ($data->timefinish ?? 0)),
+            'timemodified' => $this->apply_date_offset((int) ($data->timemodified ?? 0)),
+            'ip'           => filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '',
+            // A restored attempt is not linked to mreader.org: its ref belongs to the original site.
+            'attemptref'   => null,
+            'remotestate'  => null,
+            'timeresultchecked' => 0,
+        ];
+        $DB->insert_record('moodlereader_attempts', $attempt);
     }
 
     /**
@@ -150,9 +218,17 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
     protected function process_moodlereader_grade($data) {
         global $DB;
         $data = (object) $data;
-        $data->readerid = $this->get_new_parentid('moodlereader');
-        $data->userid = $this->get_mappingid('user', $data->userid);
-        $DB->insert_record('moodlereader_grades', $data);
+        $userid = (int) $this->get_mappingid('user', $data->userid);
+        if (!$userid) {
+            return;
+        }
+        $DB->insert_record('moodlereader_grades', (object) [
+            'readerid'      => $this->get_new_parentid('moodlereader'),
+            'userid'        => $userid,
+            'rawgrade'      => max(0.0, (float) ($data->rawgrade ?? 0)),
+            'datesubmitted' => (int) ($data->datesubmitted ?? 0),
+            'dategraded'    => (int) ($data->dategraded ?? 0),
+        ]);
     }
 
     /**
@@ -164,9 +240,21 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
     protected function process_moodlereader_level($data) {
         global $DB;
         $data = (object) $data;
-        $data->readerid = $this->get_new_parentid('moodlereader');
-        $data->userid = $this->get_mappingid('user', $data->userid);
-        $DB->insert_record('moodlereader_levels', $data);
+        $userid = (int) $this->get_mappingid('user', $data->userid);
+        if (!$userid) {
+            return;
+        }
+        $level = fn($field) => max(0, min(99, (int) ($data->$field ?? 0)));
+        $DB->insert_record('moodlereader_levels', (object) [
+            'readerid'       => $this->get_new_parentid('moodlereader'),
+            'userid'         => $userid,
+            'goal'           => max(0, min(9999999, (int) ($data->goal ?? 0))),
+            'startlevel'     => $level('startlevel'),
+            'currentlevel'   => $level('currentlevel'),
+            'stoplevel'      => $level('stoplevel'),
+            'allowpromotion' => empty($data->allowpromotion) ? 0 : 1,
+            'time'           => (int) ($data->time ?? 0),
+        ]);
     }
 
     /**
@@ -179,10 +267,24 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         global $DB;
         $data = (object) $data;
         $data->readerid = $this->get_new_parentid('moodlereader');
+        $userid = 0;
         if (!empty($data->userid)) {
-            $data->userid = $this->get_mappingid('user', $data->userid);
+            $userid = (int) $this->get_mappingid('user', $data->userid);
+            if (!$userid) {
+                // Never widen a message for one student into a message for everyone.
+                return;
+            }
         }
-        $DB->insert_record('moodlereader_messages', $data);
+        $format = (int) ($data->messageformat ?? FORMAT_HTML);
+        $DB->insert_record('moodlereader_messages', (object) [
+            'readerid'      => $data->readerid,
+            'userid'        => $userid,
+            'messagetext'   => (string) ($data->messagetext ?? ''),
+            'messageformat' => in_array($format, [FORMAT_MOODLE, FORMAT_HTML, FORMAT_PLAIN, FORMAT_MARKDOWN], true)
+                ? $format : FORMAT_HTML,
+            'timecreated'   => (int) ($data->timecreated ?? 0),
+            'timemodified'  => (int) ($data->timemodified ?? 0),
+        ]);
     }
 
     /**

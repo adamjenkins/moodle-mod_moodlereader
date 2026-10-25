@@ -42,7 +42,13 @@ $PAGE->set_context($context);
 $PAGE->set_title(get_string('setgoals', 'mod_moodlereader'));
 $PAGE->set_heading(format_string($reader->get_course()->fullname));
 
-$students = get_enrolled_users($context, 'mod/moodlereader:attempt', 0, 'u.*', 'u.lastname, u.firstname', 0, 0, true);
+// Only students this teacher can see (their own groups in separate-groups mode).
+[$esql, $eparams] = \mod_moodlereader\local\attempt_admin::students_sql($reader, 0);
+$names = \core_user\fields::for_name()->get_sql('u', false, '', '', false)->selects;
+$students = $DB->get_records_sql(
+    "SELECT u.id, $names FROM {user} u WHERE u.id IN ($esql) ORDER BY u.lastname, u.firstname",
+    $eparams
+);
 
 if (($data = data_submitted()) && confirm_sesskey()) {
     $goals = optional_param_array('goal', [], PARAM_INT);

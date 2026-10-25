@@ -159,6 +159,7 @@ class downloader {
             // The legacy image name is kept as text, never run through PARAM_FILE (contract defect B1).
             'image'      => \core_text::substr(clean_param($get('legacy_image'), PARAM_TEXT), 0, 255),
             'sametitle'  => \core_text::substr(clean_param($get('sametitle'), PARAM_TEXT), 0, 255),
+            'language'   => booklanguage::clean($get('language')),
             'withdrawn'  => !empty($row['withdrawn']) || (isset($row['has_quiz']) && !$row['has_quiz']) ? 1 : 0,
             'coveretag'  => $get('cover_etag') !== '' ? \core_text::substr($get('cover_etag'), 0, 255) : null,
         ];

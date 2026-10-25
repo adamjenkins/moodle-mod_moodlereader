@@ -42,6 +42,17 @@ if ($ADMIN->fulltree) {
         PARAM_URL
     ));
 
+    // Addresses the whole school shares, never compared by cheating detection.
+    $settings->add(new \mod_moodlereader\local\admin_setting_allowlist(
+        'mod_moodlereader/cheatallowlist',
+        get_string('siteallowlist', 'mod_moodlereader'),
+        get_string('siteallowlist_desc', 'mod_moodlereader'),
+        '',
+        PARAM_RAW_TRIMMED,
+        40,
+        5
+    ));
+
     // Connection state and link; the connection itself is managed on its own page.
     $state = \mod_moodlereader\local\connection::state();
     $settings->add(new admin_setting_description(

@@ -54,4 +54,27 @@ class behat_mod_moodlereader extends behat_base {
         set_config('v2state', 'approved', 'mod_moodlereader');
         set_config('v2lastchecked', time(), 'mod_moodlereader');
     }
+
+    /**
+     * Create finished attempts: columns user (username), activity (idnumber), book (title), percent, passed.
+     *
+     * @Given /^the following moodlereader attempts exist:$/
+     * @param TableNode $data
+     * @return void
+     */
+    public function the_following_moodlereader_attempts_exist(TableNode $data) {
+        global $DB;
+        foreach ($data->getHash() as $row) {
+            $userid = $DB->get_field('user', 'id', ['username' => $row['user']], MUST_EXIST);
+            $cmid = $DB->get_field('course_modules', 'instance', ['idnumber' => $row['activity']], MUST_EXIST);
+            $bookid = $DB->get_field('moodlereader_books', 'id', ['name' => $row['book']], MUST_EXIST);
+            $now = time();
+            $DB->insert_record('moodlereader_attempts', (object) [
+                'readerid' => $cmid, 'userid' => $userid, 'bookid' => $bookid, 'attempt' => 1,
+                'state' => 'finished', 'percentgrade' => (float) $row['percent'], 'passed' => (int) $row['passed'],
+                'credit' => 0, 'cheated' => 0, 'deleted' => 0, 'bookrating' => 0,
+                'timestart' => $now - 900, 'timefinish' => $now, 'timemodified' => $now, 'ip' => '203.0.113.9',
+            ]);
+        }
+    }
 }

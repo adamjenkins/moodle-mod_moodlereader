@@ -183,5 +183,44 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026102500, 'moodlereader');
     }
 
+    if ($oldversion < 2026102501) {
+        // Per-activity cheating-detection settings.
+        $table = new xmldb_table('moodlereader');
+        $field = new xmldb_field('cheatsettings', XMLDB_TYPE_TEXT, null, null, null, null, null, 'completiontotalwords');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Book language, for the book search.
+        $table = new xmldb_table('moodlereader_books');
+        $field = new xmldb_field('language', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, '', 'sametitle');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // What each cheating flag measured.
+        $table = new xmldb_table('moodlereader_cheatlog');
+        $field = new xmldb_field('detail', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'reason');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Books disabled in one activity (disabling no longer hides a book on the whole site).
+        $table = new xmldb_table('moodlereader_hiddenbooks');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('readerid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('bookid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key('readerid', XMLDB_KEY_FOREIGN, ['readerid'], 'moodlereader', ['id']);
+            $table->add_key('bookid', XMLDB_KEY_FOREIGN, ['bookid'], 'moodlereader_books', ['id']);
+            $table->add_index('readerid_bookid', XMLDB_INDEX_UNIQUE, ['readerid', 'bookid']);
+            $dbman->create_table($table);
+        }
+
+        upgrade_mod_savepoint(true, 2026102501, 'moodlereader');
+    }
+
     return true;
 }

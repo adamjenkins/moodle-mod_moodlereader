@@ -137,17 +137,20 @@ echo html_writer::div(
 // gate, so students only ever see books they may actually attempt. Results are shown
 // only once the student runs a search (the form does not list books by default).
 if (!empty($instance->showsearch)) {
-    $difficulty = optional_param('searchdifficulty', -1, PARAM_INT);
-    $filters = [
-        'name'       => optional_param('searchname', '', PARAM_TEXT),
-        'publisher'  => optional_param('searchpublisher', '', PARAM_TEXT),
-        'series'     => optional_param('searchseries', '', PARAM_TEXT),
-        'genre'      => optional_param('searchgenre', '', PARAM_ALPHA),
-        'difficulty' => $difficulty,
-    ];
     $searched = optional_param('searchsubmit', 0, PARAM_INT);
-    $hasfilter = trim($filters['name']) !== '' || $filters['publisher'] !== '' || trim($filters['series']) !== ''
-        || $filters['genre'] !== '' || $difficulty >= 0;
+    $filters = [
+        'name'         => optional_param('searchname', '', PARAM_TEXT),
+        'series'       => optional_param('searchseries', '', PARAM_TEXT),
+        'genre'        => optional_param('searchgenre', '', PARAM_ALPHA),
+        'publishers'   => optional_param_array('searchpublisher', [], PARAM_TEXT),
+        'difficulties' => optional_param_array('searchdifficulty', [], PARAM_INT),
+        // English is selected until the student submits a search of their own.
+        'languages'    => $searched
+            ? optional_param_array('searchlanguage', [], PARAM_ALPHA)
+            : [\mod_moodlereader\local\booklanguage::DEFAULT],
+    ];
+    $hasfilter = trim($filters['name']) !== '' || trim($filters['series']) !== '' || $filters['genre'] !== ''
+        || $filters['publishers'] || $filters['difficulties'];
 
     echo $output->search_form($reader, $USER->id, $filters);
 

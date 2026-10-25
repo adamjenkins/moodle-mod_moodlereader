@@ -69,6 +69,7 @@ class mod_moodlereader_generator extends testing_module_generator {
             'image'      => "book$n.jpg",
             'sametitle'  => '',
             'hidden'     => 0,
+            'language'   => '',
             'time'       => time(),
         ]);
         $book->id = $DB->insert_record('moodlereader_books', $book);

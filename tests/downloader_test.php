@@ -61,7 +61,7 @@ final class downloader_test extends \advanced_testcase {
     }
 
     /**
-     * Field mapping: level label to series, legacy image kept as text (no PARAM_FILE mangling).
+     * Field mapping: level label to series, legacy image kept as text (no PARAM_FILE mangling), language.
      *
      * @return void
      */
@@ -75,6 +75,10 @@ final class downloader_test extends \advanced_testcase {
         $this->assertNull(downloader::clean_book(['title' => 'No id']));
         $this->assertNull(downloader::clean_book(['id' => 3]));
         $this->assertSame(1, downloader::clean_book($this->book(8, ['has_quiz' => false]))->withdrawn);
+        // Language: sent by newer servers, unknown ('') when missing or malformed.
+        $this->assertSame('', $book->language);
+        $this->assertSame('es', downloader::clean_book($this->book(9, ['language' => 'ES']))->language);
+        $this->assertSame('', downloader::clean_book($this->book(9, ['language' => '../x']))->language);
     }
 
     /**

@@ -269,17 +269,19 @@ class importer {
         );
         $maps = $this->load_maps(0, 'book');
         foreach ($books as $old) {
+            // Imported text is cleaned exactly as a book synced from mreader.org is.
+            $text = fn($value, $length) => \core_text::substr(clean_param((string) $value, PARAM_TEXT), 0, $length);
             $values = [
-                'publisher'  => \core_text::substr((string) $old->publisher, 0, 100),
-                'series'     => \core_text::substr((string) $old->level, 0, 100),
+                'publisher'  => $text($old->publisher, 100),
+                'series'     => $text($old->level, 100),
                 'difficulty' => (int) $old->difficulty,
-                'name'       => \core_text::substr((string) $old->name, 0, 255),
-                'words'      => (int) $old->words,
-                'genre'      => (string) $old->genre,
-                'fiction'    => (string) $old->fiction,
+                'name'       => $text($old->name, 255),
+                'words'      => max(0, min(999999, (int) $old->words)),
+                'genre'      => $text($old->genre, 255),
+                'fiction'    => $text($old->fiction, 255),
                 'points'     => (float) $old->points,
-                'image'      => (string) $old->image,
-                'sametitle'  => (string) $old->sametitle,
+                'image'      => $text($old->image, 255),
+                'sametitle'  => $text($old->sametitle, 255),
             ];
             $hash = self::hash($values);
             $map = $maps[$old->id . ':0'] ?? null;

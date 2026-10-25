@@ -20,6 +20,7 @@ use html_table;
 use html_writer;
 use moodle_url;
 use stdClass;
+use mod_moodlereader\local\booklanguage;
 use mod_moodlereader\local\reader;
 
 /**
@@ -288,68 +289,84 @@ class renderer extends \plugin_renderer_base {
      *
      * @param reader $reader
      * @param int $userid
-     * @param array $filters Current filter values (name, publisher, series, genre, difficulty).
+     * @param array $filters Current filter values (name, series, genre, and the lists publishers, difficulties, languages).
      * @return string HTML.
      */
     public function search_form(reader $reader, int $userid, array $filters): string {
         $cmid = $reader->get_cm()->id;
 
-        // Publisher select, populated from the books currently available to this user.
-        $publishers = ['' => get_string('allpublishers', 'mod_moodlereader')];
+        // Publisher list, from the books currently available to this user.
+        $publishers = [];
         foreach ($reader->available_publishers($userid) as $name => $count) {
             $label = ($name === '' ? get_string('nopublisher', 'mod_moodlereader') : $name) . " ($count)";
-            $publishers[$name] = $label;
+            // Option labels are not escaped by html_writer::select().
+            $publishers[$name] = s($label);
         }
 
         // Genre select.
         $genres = ['' => get_string('anygenre', 'mod_moodlereader')] + self::GENRES;
 
-        // Reading-level select, from the levels present in the available books
-        // ('-1' is the "any level" sentinel so difficulty 0 stays selectable).
-        $levels = ['-1' => get_string('anylevel', 'mod_moodlereader')];
+        // Reading levels present in the available books.
+        $levels = [];
         foreach ($reader->available_difficulties($userid) as $difficulty) {
             $levels[(string) $difficulty] = (string) $difficulty;
         }
 
-        $row = function (string $labelkey, string $control): string {
-            return html_writer::div(
-                html_writer::tag('label', get_string($labelkey, 'mod_moodlereader'), ['class' => 'col-sm-3 col-form-label']) .
-                html_writer::div($control, 'col-sm-9'),
-                'form-group row mb-2'
-            );
+        $languages = array_map('s', booklanguage::options($reader->available_languages($userid)));
+
+        $row = function (string $labelkey, string $control, string $for, string $hint = ''): string {
+            $label = html_writer::tag('label', get_string($labelkey, 'mod_moodlereader'), [
+                'class' => 'col-sm-3 col-form-label', 'for' => $for,
+            ]);
+            if ($hint !== '') {
+                $control .= html_writer::div($hint, 'form-text text-muted small');
+            }
+            return html_writer::div($label . html_writer::div($control, 'col-sm-9'), 'form-group row mb-2');
         };
+        $multi = function (array $options, string $name, array $selected, string $id): string {
+            return html_writer::select($options, $name . '[]', array_map('strval', $selected), false, [
+                'class' => 'form-control', 'multiple' => 'multiple', 'id' => $id,
+                'size' => max(2, min(6, count($options))),
+            ]);
+        };
+        $multihint = get_string('multiselecthint', 'mod_moodlereader');
 
         $inner = html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'id', 'value' => $cmid]);
         // Marks the request as a submitted search so results show only on demand.
         $inner .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'searchsubmit', 'value' => 1]);
         $inner .= $row('booktitle', html_writer::empty_tag('input', [
-            'type' => 'text', 'name' => 'searchname', 'value' => $filters['name'] ?? '',
+            'type' => 'text', 'name' => 'searchname', 'value' => $filters['name'] ?? '', 'id' => 'mr-searchname',
             'class' => 'form-control', 'placeholder' => get_string('booktitleplaceholder', 'mod_moodlereader'),
-        ]));
-        $inner .= $row('publisher', html_writer::select(
+        ]), 'mr-searchname');
+        $inner .= $row('booklanguage', $multi(
+            $languages,
+            'searchlanguage',
+            $filters['languages'] ?? [],
+            'mr-searchlanguage'
+        ), 'mr-searchlanguage', $multihint);
+        $inner .= $row('publisher', $multi(
             $publishers,
             'searchpublisher',
-            $filters['publisher'] ?? '',
-            false,
-            ['class' => 'form-control']
-        ));
+            $filters['publishers'] ?? [],
+            'mr-searchpublisher'
+        ), 'mr-searchpublisher', $multihint);
         $inner .= $row('series', html_writer::empty_tag('input', [
             'type' => 'text', 'name' => 'searchseries', 'value' => $filters['series'] ?? '', 'class' => 'form-control',
-        ]));
+            'id' => 'mr-searchseries',
+        ]), 'mr-searchseries');
         $inner .= $row('genre', html_writer::select(
             $genres,
             'searchgenre',
             $filters['genre'] ?? '',
             false,
-            ['class' => 'form-control']
-        ));
-        $inner .= $row('readinglevel', html_writer::select(
+            ['class' => 'form-control', 'id' => 'mr-searchgenre']
+        ), 'mr-searchgenre');
+        $inner .= $row('readinglevel', $multi(
             $levels,
             'searchdifficulty',
-            (string) ($filters['difficulty'] ?? '-1'),
-            false,
-            ['class' => 'form-control']
-        ));
+            $filters['difficulties'] ?? [],
+            'mr-searchdifficulty'
+        ), 'mr-searchdifficulty', $multihint);
         $inner .= html_writer::div(
             html_writer::tag('button', get_string('search'), ['type' => 'submit', 'class' => 'btn btn-primary']) . ' ' .
             html_writer::link($reader->view_url(), get_string('reset'), ['class' => 'btn btn-link']),

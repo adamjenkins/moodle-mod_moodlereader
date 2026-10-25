@@ -53,14 +53,26 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
 - The student activity page shows a reading-progress bar, the student's current
   reading level, a **"books read this term"** cover gallery (covers fetched from
   mreader.org and cached), a reading report of this term's attempts, and a **book
-  search** (title, publisher, series, genre, reading level). Search results appear
+  search** (title, language, series, genre, and several publishers and reading levels
+  at once; English is selected until the student picks other languages). Search results appear
   only after a search and each carries a cover thumbnail and a "take the quiz"
   button; the quiz is delivered by mreader.org in a frame.
 - Each passed book's word count contributes once to the gradebook grade.
-- Teachers can **manage the catalogue** (filter by publisher/series/level/status and
-  enable or disable books individually or in bulk), **sync** it from mreader.org,
-  view **reports** (attempts, per-student and per-book summaries), run **cheating
-  detection**, **message** students, and set **per-student reading goals**.
+- Teachers can **manage the catalogue** (filter by publisher/series/level/language/status
+  and enable or disable books individually or in bulk), **sync** it from mreader.org,
+  **message** students, and set **per-student reading goals**.
+- **Reports** (modelled on mod_reader's): the *student summary* (levels, goal, passed,
+  failed and cheated counts, average time and score, words this term and in all terms)
+  and *student details* (every attempt with its result and running total), both
+  downloadable. From the summary a teacher can set start/current/stop levels and goals,
+  award credit for a book and message students; from the details, set attempts to
+  passed or failed, mark or unmark them as cheated, delete or restore them. Every change
+  regrades the student and is logged.
+- **Cheating detection** with a settings page per activity: three markers (same book
+  from the same address or network, a quiz finished too quickly, many quizzes in a short
+  time), each can be switched off and tuned. Addresses on an allow-list (the site's
+  school addresses plus the activity's own) are never compared, for schools whose
+  students share one public address. Flags are advisory until a teacher marks an attempt.
 - **Appearance** settings let a teacher choose which sections of the activity page
   students see.
 - Per-user reading levels, a reading goal (default for everyone, overridable per

@@ -24,6 +24,16 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   `moodlereader_imports` and `moodlereader_importmap` tables.
 - Fields `attemptref`, `remotestate`, `timeresultchecked` on attempts and `withdrawn`,
   `coveretag` on books.
+- Reports `usersummary` and `userdetailed` (`classes/local/report/`, on `table_sql`,
+  downloadable) with teacher actions in `classes/local/attempt_admin.php`, and the
+  `attempt_updated` event.
+- `cheatsettings.php` and `cheatsettings_form`: per-activity markers `sameip` (with
+  whole-address, /24 or /16 matching), `quickfinish` and `burst`, stored in
+  `moodlereader.cheatsettings`; the allow-list (site setting `cheatallowlist` plus the
+  activity's own); field `detail` on `moodlereader_cheatlog`.
+- Book `language` (from API v2's `language`; '' when unknown) and multi-select
+  publisher, reading-level and language filters in the book search
+  (`classes/local/booklanguage.php`).
 
 ### Changed
 
@@ -33,6 +43,16 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   by their legacy image name.
 - Plugin settings are a folder: Settings, mreader.org connection, Import from mod_reader.
 - Privacy metadata describes the v2 data sent to mreader.org.
+- `report.php` shows the student summary, student details and books tabs (the old
+  `attempts`/`users` modes open the new reports).
+- A scan replaces the flags no teacher has acted on, so changed settings apply.
+- `books.php` enable/disable acts on the new `moodlereader_hiddenbooks` table (per
+  activity); the site-wide `moodlereader_books.hidden` flag needs
+  `mod/moodlereader:manageremotesites`.
+- Covers: only raster images (checked with `getimagesizefromstring`) are cached, stored as
+  `cover.<type>`; `pluginfile` force-downloads any other cover file.
+- Restore cleans every restored field, skips attempts whose book or user it did not map
+  (it no longer falls back to the backup's own ids), and does not restore attempt refs.
 
 ### Removed
 

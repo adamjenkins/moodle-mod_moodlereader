@@ -23,6 +23,20 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - The book catalogue is matched on mreader.org's stable book ids; books withdrawn by
   mreader.org are hidden from students.
 - Requires cron for the new tasks (results, book sync, connection check).
+- New student summary and student details reports, as in mod_reader: teachers can set
+  attempts to passed or failed, mark them as cheated, delete or restore them, set
+  reading levels and goals, award credit for a book and message students. Both reports
+  can be downloaded.
+- Cheating detection now has a settings page showing what it looks for. Each marker
+  (same address, quiz finished too quickly, many quizzes in a short time) can be
+  switched off or tuned, and a school can allow-list its own shared addresses for the
+  whole site or one activity.
+- The book search can select several publishers and reading levels at once and filter
+  by language, with English selected by default. Books' languages come from mreader.org.
+- Disabling a book on the "Manage books" page now disables it in that activity only. It
+  used to hide the book in every course on the site. Site administrators can still
+  disable a book for the whole site.
+- Book covers are served only when they are JPEG, PNG, GIF or WebP images.
 
 ## [0.0.3] - 2026-10-04
 

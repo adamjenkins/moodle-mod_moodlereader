@@ -49,16 +49,31 @@ if ($delete) {
     redirect($pageurl, get_string('messagedeleted', 'mod_moodlereader'));
 }
 
-// Build the recipient menu: everyone, plus each enrolled student.
-$recipients = [0 => get_string('everyone', 'mod_moodlereader')];
-$enrolled = get_enrolled_users($reader->get_context(), 'mod/moodlereader:attempt', 0, 'u.*', 'u.lastname', 0, 250);
+// Build the recipient menu: each student this teacher can see (their own groups in separate-groups
+// mode), plus "everyone" for a teacher who can see every student.
+$recipients = [];
+$cm = $reader->get_cm();
+if (groups_get_activity_groupmode($cm) != SEPARATEGROUPS || has_capability('moodle/site:accessallgroups', $reader->get_context())) {
+    $recipients[0] = get_string('everyone', 'mod_moodlereader');
+}
+[$esql, $eparams] = \mod_moodlereader\local\attempt_admin::students_sql($reader, 0);
+$names = \core_user\fields::for_name()->get_sql('u', false, '', '', false)->selects;
+$enrolled = $DB->get_records_sql(
+    "SELECT u.id, $names FROM {user} u WHERE u.id IN ($esql) ORDER BY u.lastname, u.firstname",
+    $eparams,
+    0,
+    250
+);
 foreach ($enrolled as $student) {
     $recipients[$student->id] = fullname($student);
 }
 
 $mform = new message_form($pageurl->out(false), ['cmid' => $id, 'recipients' => $recipients]);
 if ($data = $mform->get_data()) {
-    $target = array_key_exists($data->target, $recipients) ? (int) $data->target : 0;
+    if (!array_key_exists($data->target, $recipients)) {
+        throw new \moodle_exception('invaliduser');
+    }
+    $target = (int) $data->target;
     message::create($readerid, $target, $data->messagetext['text'], (int) $data->messagetext['format']);
     redirect($pageurl, get_string('messagesent', 'mod_moodlereader'));
 }

@@ -116,6 +116,7 @@ function moodlereader_delete_instance($id) {
     $DB->delete_records('moodlereader_grades', $params);
     $DB->delete_records('moodlereader_levels', $params);
     $DB->delete_records('moodlereader_bookinstances', $params);
+    $DB->delete_records('moodlereader_hiddenbooks', $params);
     $DB->delete_records('moodlereader_cheatlog', $params);
     $DB->delete_records('moodlereader_messages', $params);
     $DB->delete_records('moodlereader', ['id' => $id]);
@@ -363,7 +364,12 @@ function moodlereader_pluginfile($course, $cm, $context, $filearea, $args, $forc
     if (!$file || $file->is_directory()) {
         return false;
     }
-    // Book covers and intro media are curated content, so may be served inline.
+    // Intro media is teacher content. A cover is served inline only when it is a raster image,
+    // never SVG or anything else that can carry script.
+    $raster = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if ($filearea === 'bookcover' && !in_array($file->get_mimetype(), $raster, true)) {
+        $forcedownload = true;
+    }
     send_stored_file($file, DAYSECS, 0, $forcedownload, $options);
 }
 
