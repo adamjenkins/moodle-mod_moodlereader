@@ -68,6 +68,15 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - `student.php`, `renderer::reading_page()` (shared with `view.php`) and
   `classes/local/eligibility.php` (the search gate's rules as reasons);
   `reader::search_catalogue()`/`catalogue_menus()`; `records.php?userid=` for teachers.
+- Moodle-drawn quizzes (API v2 31 §11, agreed with mreader.org as plan/32): `classes/local/quizsession.php`
+  (launch with `"delivery": "moodle"` and fallback to the frame on a `launch_url`; start, current,
+  answer, finish, survey; the Moodle-run clock: time counts from the page being served to the answer
+  or the last heartbeat, never while waiting for mreader.org), `quiz/render.php`, `quiz/heartbeat.php`,
+  templates `quiz_page` and `quiz_survey`, AMD `quizrender` (countdown, heartbeat, ordering by
+  buttons, submit at zero). Fields `moodlereader.quizdelivery` and, on attempts, `delivery`,
+  `timelimit`, `slots`, `currentslot`, `secondsused`, `timeserved`, `timeheartbeat` (version
+  2026102505). No question text is stored; pages are sent `no-store`. Behat runs against a fake
+  mreader.org (`tests/behat/fake_mreader.php`, Behat site only).
 - Completion rules use `ignoredate`, count each book once and include credit.
 - `mod_form` validation refuses `wordsorpoints = 1` when no enabled book has points.
 - `moodlereader_books.language` is NOT NULL with no default (XMLDB rejects `''` as a

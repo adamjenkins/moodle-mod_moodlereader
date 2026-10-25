@@ -83,7 +83,7 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         $data->ignoredate = $this->apply_date_offset((int) ($data->ignoredate ?? 0));
         // A backup file is untrusted: on/off settings are 0 or 1, and only valid detection settings are kept.
         foreach (
-            ['levelcheck', 'bookinstances', 'showprogressbar', 'extraprogressbar', 'showlevel', 'showbooksread',
+            ['levelcheck', 'bookinstances', 'showprogressbar', 'extraprogressbar', 'quizdelivery', 'showlevel', 'showbooksread',
                 'showreport', 'showsearch', 'completionpass'] as $flag
         ) {
             $data->$flag = empty($data->$flag) ? 0 : 1;
@@ -188,6 +188,8 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
             'timefinish'   => $this->apply_date_offset((int) ($data->timefinish ?? 0)),
             'timemodified' => $this->apply_date_offset((int) ($data->timemodified ?? 0)),
             'ip'           => filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '',
+            'delivery'     => ($data->delivery ?? '') === 'moodle' ? 'moodle' : 'iframe',
+            'secondsused'  => max(0, (int) ($data->secondsused ?? 0)),
             // A restored attempt is not linked to mreader.org: its ref belongs to the original site.
             'attemptref'   => null,
             'remotestate'  => null,

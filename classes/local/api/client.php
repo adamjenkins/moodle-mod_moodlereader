@@ -193,6 +193,11 @@ class client {
      */
     protected function transport(string $method, string $url, array $headers, string $body): array {
         global $CFG;
+        // On the Behat test site only, a fake mreader.org can answer instead (tests/behat/fake_mreader.php).
+        if (defined('BEHAT_SITE_RUNNING') && BEHAT_SITE_RUNNING && get_config('mod_moodlereader', 'behatfakemreader')) {
+            require_once($CFG->dirroot . '/mod/moodlereader/tests/behat/fake_mreader.php');
+            return \behat_fake_mreader::handle($method, $url, $body);
+        }
         require_once($CFG->libdir . '/filelib.php');
 
         $curl = new \curl();

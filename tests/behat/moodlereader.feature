@@ -213,3 +213,42 @@ Feature: Moodle Reader activity
     When I am on the "Reader 3" "moodlereader activity" page
     And I follow "Reading report"
     Then I should see "This term (since 1 January 2026)"
+
+  Scenario: A student takes a quiz drawn by Moodle, answers the survey, and the result is recorded
+    Given mreader.org draws quizzes for Moodle
+    When I am on the "Reader 1" "moodlereader activity" page logged in as student1
+    And I press "Search"
+    And I click on "Take the quiz" "button" in the "The Red Kite" "table_row"
+    Then I should see "Question 1 of 3"
+    And I should see "Who found the red kite?"
+    And I should see "Time left"
+    When I set the field "Anna" to "1"
+    And I press "Next"
+    Then I should see "Question 2 of 3"
+    And I should see "Put the events in order."
+    When I press "Next"
+    Then I should see "Question 3 of 3"
+    When I set the field "True" to "1"
+    And I press "Finish"
+    Then I should see "You have finished the quiz on \"The Red Kite\""
+    And I should see "How did you like this book?"
+    When I set the field "Very much" to "1"
+    And I press "Send"
+    Then I should see "Your result for \"The Red Kite\" has been recorded: 67%, passed."
+    And I should see "Reading progress: 3,000 of 5,000 words"
+
+  @javascript
+  Scenario: A student puts the ordering question right with the move buttons
+    Given mreader.org draws quizzes for Moodle
+    When I am on the "Reader 1" "moodlereader activity" page logged in as student1
+    And I press "Search"
+    And I click on "Take the quiz" "button" in the "Blue Hills" "table_row"
+    And I set the field "Anna" to "1"
+    And I press "Next"
+    Then I should see "Question 2 of 3"
+    When I click on "Move up" "button" in the "Anna found a kite." "list_item"
+    And I press "Next"
+    And I set the field "True" to "1"
+    And I press "Finish"
+    And I press "No thanks"
+    Then I should see "Your result for \"Blue Hills\" has been recorded: 100%, passed."

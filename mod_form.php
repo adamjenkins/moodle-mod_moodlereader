@@ -68,6 +68,14 @@ class mod_moodlereader_mod_form extends moodleform_mod {
         $mform->addElement('date_selector', 'ignoredate', get_string('ignoredate', 'mod_moodlereader'), ['optional' => true]);
         $mform->addHelpButton('ignoredate', 'ignoredate', 'mod_moodlereader');
 
+        // How quizzes are shown: drawn by Moodle (the questions and marking stay on mreader.org), or in a frame.
+        $mform->addElement('select', 'quizdelivery', get_string('quizdelivery', 'mod_moodlereader'), [
+            1 => get_string('quizdelivery_moodle', 'mod_moodlereader'),
+            0 => get_string('quizdelivery_iframe', 'mod_moodlereader'),
+        ]);
+        $mform->setDefault('quizdelivery', 1);
+        $mform->addHelpButton('quizdelivery', 'quizdelivery', 'mod_moodlereader');
+
         $mform->addElement('text', 'minpassgrade', get_string('minpassgrade', 'mod_moodlereader'), ['size' => 4]);
         $mform->setType('minpassgrade', PARAM_INT);
         $mform->setDefault('minpassgrade', 60);

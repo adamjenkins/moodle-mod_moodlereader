@@ -258,5 +258,31 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026102504, 'moodlereader');
     }
 
+    if ($oldversion < 2026102505) {
+        // Quizzes drawn by Moodle (API v2 31 §11), with a Moodle-run clock that pauses while waiting.
+        $table = new xmldb_table('moodlereader');
+        $field = new xmldb_field('quizdelivery', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1', 'extraprogressbar');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        $table = new xmldb_table('moodlereader_attempts');
+        $fields = [
+            new xmldb_field('delivery', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, 'iframe', 'timeresultchecked'),
+            new xmldb_field('timelimit', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'delivery'),
+            new xmldb_field('slots', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '0', 'timelimit'),
+            new xmldb_field('currentslot', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '0', 'slots'),
+            new xmldb_field('secondsused', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'currentslot'),
+            new xmldb_field('timeserved', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'secondsused'),
+            new xmldb_field('timeheartbeat', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'timeserved'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+
+        upgrade_mod_savepoint(true, 2026102505, 'moodlereader');
+    }
+
     return true;
 }

@@ -1,0 +1,112 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_moodlereader/quiz_page
+
+    One question of a book quiz drawn by Moodle (API v2 31 §11). The text is already cleaned
+    with format_text(); option ids are opaque.
+
+    Classes required for JS:
+    * none; data-region attributes are used by mod_moodlereader/quizrender.
+
+    Context variables required for this template:
+    * bookname - the book's title (escaped by the template)
+    * slot, slots - the question number and the number of questions
+    * timeleft - seconds left, formatted by the page as mm:ss
+    * actionurl, attemptid, sesskey, type - form fields
+    * texthtml - the question, cleaned HTML
+    * instructionhtml - ordering instruction, cleaned HTML (ordering only)
+    * ismc, istf, isordering, isdescription - the item type
+    * choices - [{id, texthtml, label, position}] options (mc, tf) or items (ordering)
+    * islast - the last question (the button says Finish)
+
+    Example context (json):
+    {
+        "bookname": "The Red Kite", "slot": 2, "slots": 10, "timeleft": "12:30",
+        "actionurl": "https://example.com/mod/moodlereader/quiz/render.php", "attemptid": 5,
+        "sesskey": "abc", "type": "mc", "texthtml": "Who found the kite?",
+        "instructionhtml": "", "ismc": true, "istf": false, "isordering": false, "isdescription": false,
+        "choices": [{"id": "Abc_1", "texthtml": "Tom", "label": "", "position": 1},
+            {"id": "Xyz_2", "texthtml": "Anna", "label": "", "position": 2}],
+        "islast": false
+    }
+}}
+<div class="mod-moodlereader-quiz" data-region="mr-quiz">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <div class="h5 mb-0">{{#str}} quizquestionof, mod_moodlereader, {"slot": {{slot}}, "slots": {{slots}} } {{/str}}</div>
+        <div class="mr-quiz-timer badge bg-secondary p-2" role="timer" aria-live="off" data-region="mr-timer">
+            {{#str}} timeleft, quiz {{/str}} <span data-region="mr-timeleft">{{timeleft}}</span>
+        </div>
+    </div>
+    <form method="post" action="{{actionurl}}" data-region="mr-quizform">
+        <input type="hidden" name="attempt" value="{{attemptid}}">
+        <input type="hidden" name="sesskey" value="{{sesskey}}">
+        <input type="hidden" name="slot" value="{{slot}}">
+        <input type="hidden" name="type" value="{{type}}">
+        <input type="hidden" name="timeout" value="0" data-region="mr-timeout">
+        <fieldset class="mr-quiz-question mb-3">
+            <legend class="visually-hidden accesshide">{{#str}} quizquestionof, mod_moodlereader, {"slot": {{slot}}, "slots": {{slots}} } {{/str}}</legend>
+            <div class="mr-quiz-text mb-3">{{{texthtml}}}</div>
+            {{#ismc}}
+                {{#choices}}
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="option" id="mr-opt-{{id}}" value="{{id}}" required>
+                    <label class="form-check-label" for="mr-opt-{{id}}">{{{texthtml}}}</label>
+                </div>
+                {{/choices}}
+            {{/ismc}}
+            {{#istf}}
+                {{#choices}}
+                <div class="form-check form-check-inline mb-2">
+                    <input class="form-check-input" type="radio" name="option" id="mr-opt-{{id}}" value="{{id}}" required>
+                    <label class="form-check-label" for="mr-opt-{{id}}">{{label}}</label>
+                </div>
+                {{/choices}}
+            {{/istf}}
+            {{#isordering}}
+                <div class="mr-quiz-instruction mb-2">{{{instructionhtml}}}</div>
+                <p class="small text-muted">{{#str}} orderinghelp, mod_moodlereader {{/str}}</p>
+                <ol class="list-group list-group-numbered mr-quiz-order" data-region="mr-order">
+                    {{#choices}}
+                    <li class="list-group-item d-flex align-items-center" data-id="{{id}}">
+                        <input type="hidden" name="order[]" value="{{id}}">
+                        <span class="flex-grow-1 ms-2 ml-2">{{{texthtml}}}</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ms-1 ml-1" data-action="mr-up">
+                            <span aria-hidden="true">&uarr;</span>
+                            <span class="visually-hidden accesshide">{{#str}} moveup, mod_moodlereader {{/str}}</span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ms-1 ml-1" data-action="mr-down">
+                            <span aria-hidden="true">&darr;</span>
+                            <span class="visually-hidden accesshide">{{#str}} movedown, mod_moodlereader {{/str}}</span>
+                        </button>
+                    </li>
+                    {{/choices}}
+                </ol>
+                <div class="visually-hidden accesshide" aria-live="polite" data-region="mr-orderstatus"></div>
+            {{/isordering}}
+        </fieldset>
+        <div class="d-flex align-items-center">
+            <button type="submit" class="btn btn-primary" data-region="mr-next">
+                {{#islast}}{{#str}} quizfinish, mod_moodlereader {{/str}}{{/islast}}
+                {{^islast}}{{#str}} quiznext, mod_moodlereader {{/str}}{{/islast}}
+            </button>
+            <span class="ms-3 ml-3 text-muted d-none" data-region="mr-loading" aria-live="polite">
+                {{#str}} quizloading, mod_moodlereader {{/str}}
+            </span>
+        </div>
+    </form>
+</div>

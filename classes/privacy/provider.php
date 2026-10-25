@@ -51,6 +51,8 @@ class provider implements
             'timestart'    => 'privacy:metadata:moodlereader_attempts:timestart',
             'timefinish'   => 'privacy:metadata:moodlereader_attempts:timefinish',
             'ip'           => 'privacy:metadata:moodlereader_attempts:ip',
+            'secondsused'  => 'privacy:metadata:moodlereader_attempts:secondsused',
+            'bookrating'   => 'privacy:metadata:moodlereader_attempts:bookrating',
         ], 'privacy:metadata:moodlereader_attempts');
 
         $collection->add_database_table('moodlereader_cheatlog', [
@@ -196,6 +198,8 @@ class provider implements
                         'passed'       => $a->passed,
                         'cheated'      => $a->cheated,
                         'ip'           => $a->ip,
+                        'secondsused'  => $a->secondsused,
+                        'bookrating'   => $a->bookrating,
                         'timestart'    => $a->timestart ? \core_privacy\local\request\transform::datetime($a->timestart) : null,
                         'timefinish'   => $a->timefinish ? \core_privacy\local\request\transform::datetime($a->timefinish) : null,
                     ];

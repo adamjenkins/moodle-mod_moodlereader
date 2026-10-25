@@ -40,7 +40,7 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         $reader = new backup_nested_element('moodlereader', ['id'], [
             'name', 'intro', 'introformat', 'availablefrom', 'availableuntil', 'maxgrade',
             'goal', 'wordsorpoints', 'minpassgrade', 'ignoredate', 'levelcheck', 'thislevel',
-            'prevlevel', 'nextlevel', 'bookinstances', 'showprogressbar', 'extraprogressbar', 'showlevel',
+            'prevlevel', 'nextlevel', 'bookinstances', 'showprogressbar', 'extraprogressbar', 'quizdelivery', 'showlevel',
             'showbooksread', 'showreport', 'showsearch', 'completionpass',
             'completiontotalwords', 'cheatsettings', 'timecreated', 'timemodified',
         ]);
@@ -66,6 +66,7 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         $attempt = new backup_nested_element('attempt', ['id'], [
             'userid', 'bookid', 'attempt', 'state', 'percentgrade', 'passed', 'credit',
             'cheated', 'deleted', 'bookrating', 'timestart', 'timefinish', 'timemodified', 'ip',
+            'delivery', 'secondsused',
         ]);
 
         $grades = new backup_nested_element('grades');

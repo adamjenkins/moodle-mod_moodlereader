@@ -70,6 +70,10 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
   award credit for a book and message students; from the details, set attempts to
   passed or failed, mark or unmark them as cheated, delete or restore them. Every change
   regrades the student and is logged.
+- **Quizzes in Moodle's own pages** (with mreader.org's next release): mreader.org chooses the
+  questions and marks the answers; Moodle shows one question at a time in its own look, never
+  stores the questions, runs a countdown that pauses while the next question loads, and offers
+  mreader.org's book survey at the end. Otherwise quizzes show in mreader.org's frame.
 - **Cheating detection** with a settings page per activity: three markers (same book
   from the same address or network, a quiz finished too quickly, many quizzes in a short
   time), each can be switched off and tuned. Addresses on an allow-list (the site's

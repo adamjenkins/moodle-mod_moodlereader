@@ -65,6 +65,12 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - New activity setting "Term start date": "This term" in the grade, progress bar, levels
   and reports counts from it (the reports show the date). It existed but could not be
   set, so "this term" silently meant every quiz ever taken.
+- Book quizzes can be taken in Moodle's own pages, in its look and language (new activity
+  setting "Show quizzes", on by default). mreader.org still chooses the questions and marks
+  the answers, and Moodle never stores the questions. The countdown runs only while a
+  question is on screen, and stops while the next one loads or the page is closed. At the end
+  students can answer mreader.org's short book survey. This needs mreader.org's next release;
+  until then quizzes are shown in mreader.org's frame as before.
 - Books without a quiz are kept in the catalogue (from mod_reader, and from mreader.org
   once it offers them) so credit can be awarded for them; students never see them as quizzes.
 - The "read N words" completion rule now counts what the progress bar and the grade

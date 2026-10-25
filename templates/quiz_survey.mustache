@@ -1,0 +1,52 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_moodlereader/quiz_survey
+
+    The post-quiz book survey from mreader.org (API v2 31 §11.11). Every question is optional.
+
+    Context variables required for this template:
+    * actionurl, attemptid, sesskey - form fields
+    * questions - [{id, questionhtml, answers: [{id, questionid, texthtml, inputid}]}]; both are cleaned HTML
+
+    Example context (json):
+    {
+        "actionurl": "https://example.com/mod/moodlereader/quiz/render.php", "attemptid": 5, "sesskey": "abc",
+        "questions": [{"id": 1, "questionhtml": "How did you like this book?",
+            "answers": [{"id": 1, "questionid": 1, "texthtml": "Very much", "inputid": "mr-s-1-1"},
+                {"id": 2, "questionid": 1, "texthtml": "Not much", "inputid": "mr-s-1-2"}]}]
+    }
+}}
+<form method="post" action="{{actionurl}}" class="mod-moodlereader-survey">
+    <input type="hidden" name="attempt" value="{{attemptid}}">
+    <input type="hidden" name="sesskey" value="{{sesskey}}">
+    <input type="hidden" name="survey" value="1">
+    <p>{{#str}} surveyintro, mod_moodlereader {{/str}}</p>
+    {{#questions}}
+    <fieldset class="mb-3">
+        <legend class="h6">{{{questionhtml}}}</legend>
+        {{#answers}}
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="answers[{{questionid}}]" id="{{inputid}}" value="{{id}}">
+            <label class="form-check-label" for="{{inputid}}">{{{texthtml}}}</label>
+        </div>
+        {{/answers}}
+    </fieldset>
+    {{/questions}}
+    <button type="submit" class="btn btn-primary" name="send" value="1">{{#str}} surveysend, mod_moodlereader {{/str}}</button>
+    <button type="submit" class="btn btn-secondary" name="decline" value="1">{{#str}} surveyskip, mod_moodlereader {{/str}}</button>
+</form>

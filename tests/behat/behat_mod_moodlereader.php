@@ -77,4 +77,19 @@ class behat_mod_moodlereader extends behat_base {
             ]);
         }
     }
+
+    /**
+     * Answer API v2 from a fake mreader.org that draws one three-question quiz for Moodle (31 §11).
+     *
+     * @Given /^mreader\.org draws quizzes for Moodle$/
+     * @return void
+     */
+    public function mreader_org_draws_quizzes_for_moodle() {
+        global $DB;
+        $this->the_site_is_connected_to_mreader_org();
+        set_config('behatfakemreader', 1, 'mod_moodlereader');
+        set_config('behatfakestate', '', 'mod_moodlereader');
+        // The fake's books need mreader.org ids.
+        $DB->execute('UPDATE {moodlereader_books} SET remoteid = id WHERE remoteid = 0');
+    }
 }

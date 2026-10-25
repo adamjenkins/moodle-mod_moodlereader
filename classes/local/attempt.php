@@ -78,6 +78,13 @@ class attempt {
             'attemptref'   => null,
             'remotestate'  => null,
             'timeresultchecked' => 0,
+            'delivery'     => 'iframe',
+            'timelimit'    => 0,
+            'slots'        => 0,
+            'currentslot'  => 0,
+            'secondsused'  => 0,
+            'timeserved'   => 0,
+            'timeheartbeat' => 0,
         ];
         $attempt->id = $DB->insert_record('moodlereader_attempts', $attempt);
 

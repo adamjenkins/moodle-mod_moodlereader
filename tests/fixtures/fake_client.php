@@ -69,6 +69,23 @@ class fake_client extends client {
     }
 
     /**
+     * Queue a JSON response built from the request's decoded body (e.g. to echo a ref the plugin made).
+     *
+     * @param string $method
+     * @param string $path Below /api/v2.
+     * @param int $status
+     * @param callable $build function(array $requestbody): array
+     * @return self
+     */
+    public function queue_callback(string $method, string $path, int $status, callable $build): self {
+        $key = $method . ' ' . $path;
+        $queue = $this->responses[$key] ?? [];
+        $queue[] = ['status' => $status, 'headers' => [], 'build' => $build];
+        $this->responses[$key] = $queue;
+        return $this;
+    }
+
+    /**
      * Answer from the queue instead of the network.
      *
      * @param string $method
@@ -95,6 +112,11 @@ class fake_client extends client {
         }
         $response = array_shift($queue);
         $this->responses[$key] = $queue;
+        if (isset($response['build'])) {
+            $built = ($response['build'])(json_decode($body, true) ?: []);
+            $response = ['status' => $response['status'], 'headers' => [],
+                'body' => json_encode($built + ['server_time' => time()])];
+        }
         return $response;
     }
 }
