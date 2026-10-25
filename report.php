@@ -86,9 +86,11 @@ if ($action !== '' && $canmanage && $mode !== 'books') {
         }
     } else {
         $userids = optional_param_array('userids', [], PARAM_INT);
-        if (in_array($action, attempt_admin::LEVEL_FIELDS, true)) {
-            $value = optional_param($action === 'goal' ? 'goalvalue' : 'levelvalue', 0, PARAM_INT);
-            $done = attempt_admin::set_level_field($reader, $userids, $action, $value);
+        if (in_array($action, ['promotionon', 'promotionoff'], true)) {
+            $done = attempt_admin::set_level_field($reader, $userids, 'allowpromotion', $action === 'promotionon' ? 1 : 0);
+        } else if (in_array($action, attempt_admin::LEVEL_FIELDS, true) && $action !== 'allowpromotion') {
+            $param = ['goal' => 'goalvalue', 'stoplevel' => 'stopvalue'][$action] ?? 'levelvalue';
+            $done = attempt_admin::set_level_field($reader, $userids, $action, optional_param($param, 0, PARAM_INT));
         } else if ($action === 'message') {
             $done = attempt_admin::message($reader, $userids, optional_param('messagetext', '', PARAM_TEXT));
         }

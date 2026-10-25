@@ -54,7 +54,7 @@ class attempt_admin {
     ];
 
     /** @var string[] The level fields a teacher can set from the student summary. */
-    const LEVEL_FIELDS = ['currentlevel', 'goal'];
+    const LEVEL_FIELDS = ['currentlevel', 'stoplevel', 'allowpromotion', 'goal'];
 
     /**
      * Apply one action to several attempts of an activity.
@@ -125,7 +125,8 @@ class attempt_admin {
      * @param reader $reader
      * @param int[] $userids
      * @param string $field One of LEVEL_FIELDS.
-     * @param int $value A level 0-99, or a goal (0 = the activity's default).
+     * @param int $value A level 0-99 (a stop level of 0 means none), 0/1 for allowpromotion,
+     *     or a goal (0 = the activity's default).
      * @return int Number of students changed.
      */
     public static function set_level_field(reader $reader, array $userids, string $field, int $value): int {
@@ -134,7 +135,15 @@ class attempt_admin {
         if (!in_array($field, self::LEVEL_FIELDS, true)) {
             throw new \coding_exception("Unknown level field '$field'");
         }
-        $value = $field === 'goal' ? max(0, min(9999999, $value)) : max(0, min(99, $value));
+        if ($field === 'goal') {
+            $value = max(0, min(9999999, $value));
+        } else if ($field === 'allowpromotion') {
+            $value = $value ? 1 : 0;
+        } else {
+            $value = max(0, min(99, $value));
+        }
+        // A level set by hand is a fresh start: books are counted towards promotion from now.
+        $restart = $field === 'currentlevel' ? ['time' => time()] : [];
         $readerid = $reader->get_instance()->id;
         $count = 0;
         foreach (array_keys(self::visible_userids($reader, $userids)) as $userid) {
@@ -148,7 +157,7 @@ class attempt_admin {
                 $DB->insert_record('moodlereader_levels', $level);
                 $count++;
             } else if ((int) $level->$field !== $value) {
-                $DB->set_field('moodlereader_levels', $field, $value, ['id' => $level->id]);
+                $DB->update_record('moodlereader_levels', (object) (['id' => $level->id, $field => $value] + $restart));
                 $count++;
             }
         }

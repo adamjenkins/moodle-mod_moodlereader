@@ -46,6 +46,17 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   disabled ones, including books without a quiz, which are marked "No quiz". The old
   title box refused any title shared by several books, so on a large catalogue credit
   often could not be awarded at all.
+- The progress bar is mod_reader's expanding bar again: it turns from red through orange,
+  yellow and green to blue as the goal is reached, with quarter marks, and once the goal is
+  passed a second bar counts the extra reading. A new activity setting can turn the
+  second bar off.
+- The student summary has a miniature progress bar for each student.
+- Reading levels work as in mod_reader: students move up a level after passing a set
+  number of books at their own level, and may read a set number one level below and one
+  above (the settings are numbers again, not on/off switches). Teachers can set stop
+  levels and turn moving up on or off per student. With levels restricted, students see a
+  grid, as on mreader.org, of how many books they may still read at each level and how
+  many more they need to move up.
 - Books without a quiz are kept in the catalogue (from mod_reader, and from mreader.org
   once it offers them) so credit can be awarded for them; students never see them as quizzes.
 - The "read N words" completion rule now counts what the progress bar and the grade

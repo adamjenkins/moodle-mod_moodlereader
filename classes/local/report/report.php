@@ -198,7 +198,11 @@ class report {
             );
         } else {
             if (!empty($instance->levelcheck)) {
-                $inner .= $line($number('levelvalue', $str('currentlevel')) . $button('currentlevel'));
+                $inner .= $line($number('levelvalue', $str('currentlevel')) . $button('currentlevel') .
+                    html_writer::span($str('reportaction_currentlevel_help'), 'text-muted small'));
+                $inner .= $line($number('stopvalue', $str('stoplevel')) . $button('stoplevel') .
+                    html_writer::span($str('reportaction_stoplevel_help'), 'text-muted small'));
+                $inner .= $line($button('promotionon', 'btn-outline-success') . $button('promotionoff', 'btn-outline-secondary'));
             }
             $inner .= $line(
                 $number('goalvalue', $str('goaloverride')) . $button('goal') .

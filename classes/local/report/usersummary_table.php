@@ -73,14 +73,17 @@ class usersummary_table extends \table_sql {
         }
         $columns[] = 'fullname';
         $headers[] = get_string('fullname');
-        // The reading level only matters when books are restricted to it.
+        // Reading levels only matter when books are restricted to them.
         if (!empty($instance->levelcheck)) {
-            $columns[] = 'currentlevel';
-            $headers[] = get_string('currentlevel', 'mod_moodlereader');
+            foreach (['currentlevel', 'stoplevel', 'allowpromotion'] as $field) {
+                $columns[] = $field;
+                $headers[] = get_string($field, 'mod_moodlereader');
+            }
         }
         $unit = $this->points ? 'points' : 'words';
         $more = [
             'goal' => get_string('goal_' . $unit, 'mod_moodlereader'),
+            'progress' => get_string('progress', 'mod_moodlereader'),
             'countpassed' => get_string('countpassed', 'mod_moodlereader'),
             'countfailed' => get_string('countfailed', 'mod_moodlereader'),
             'countcheated' => get_string('countcheated', 'mod_moodlereader'),
@@ -93,6 +96,7 @@ class usersummary_table extends \table_sql {
         $this->define_headers(array_merge($headers, array_values($more)));
         $this->define_baseurl($baseurl);
         $this->no_sorting('select');
+        $this->no_sorting('progress');
         $this->sortable(true, 'lastname', SORT_ASC);
         $this->collapsible(false);
         $this->set_attribute('class', 'generaltable mod-moodlereader-report');
@@ -105,7 +109,8 @@ class usersummary_table extends \table_sql {
         $names = \core_user\fields::for_name()->get_sql('u', false, '', '', false)->selects;
 
         $fields = "u.id, $names,
-                   COALESCE(l.currentlevel, 0) AS currentlevel, COALESCE(l.goal, 0) AS goal,
+                   COALESCE(l.currentlevel, 0) AS currentlevel, COALESCE(l.stoplevel, 0) AS stoplevel,
+                   COALESCE(l.allowpromotion, 1) AS allowpromotion, COALESCE(l.goal, 0) AS goal,
                    COALESCE(s.countpassed, 0) AS countpassed, COALESCE(s.countfailed, 0) AS countfailed,
                    COALESCE(s.countcheated, 0) AS countcheated,
                    COALESCE(s.averageduration, 0) AS averageduration, COALESCE(s.averagegrade, 0) AS averagegrade,
@@ -158,6 +163,26 @@ class usersummary_table extends \table_sql {
     }
 
     /**
+     * The stop level (0 means none).
+     *
+     * @param \stdClass $row
+     * @return string
+     */
+    public function col_stoplevel($row) {
+        return (int) $row->stoplevel ? (string) (int) $row->stoplevel : get_string('none');
+    }
+
+    /**
+     * Whether the student moves up a level automatically.
+     *
+     * @param \stdClass $row
+     * @return string
+     */
+    public function col_allowpromotion($row) {
+        return get_string($row->allowpromotion ? 'yes' : 'no');
+    }
+
+    /**
      * The goal, or the activity's default when the student has none.
      *
      * @param \stdClass $row
@@ -174,6 +199,23 @@ class usersummary_table extends \table_sql {
         return html_writer::span(number_format($this->defaultgoal), 'text-muted', [
             'title' => get_string('defaultgoal', 'mod_moodlereader'),
         ]);
+    }
+
+    /**
+     * A miniature progress bar: this term's total against the student's goal.
+     *
+     * @param \stdClass $row
+     * @return string
+     */
+    public function col_progress($row) {
+        $goal = (int) $row->goal > 0 ? (float) $row->goal : (float) $this->defaultgoal;
+        if ($goal <= 0) {
+            return '-';
+        }
+        if ($this->is_downloading()) {
+            return (int) round(\mod_moodlereader\local\progressbar::percent((float) $row->totalthisterm, $goal)) . '%';
+        }
+        return \mod_moodlereader\local\progressbar::mini((float) $row->totalthisterm, $goal, $this->points);
     }
 
     /**

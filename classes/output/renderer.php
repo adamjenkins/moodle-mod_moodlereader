@@ -109,22 +109,15 @@ class renderer extends \plugin_renderer_base {
         $instance = $reader->get_instance();
         $goal = $reader->get_goal($userid);
         $total = $this->words_read($reader, $userid);
-
-        $percent = $goal > 0 ? min(100, (int) round(100 * $total / $goal)) : 0;
-        $label = get_string('progresslabel', 'mod_moodlereader', [
-            'total' => number_format($total),
-            'goal'  => number_format($goal),
-        ]);
-
-        $out = html_writer::tag('h3', s($label));
-        if (!empty($instance->showprogressbar) && $goal > 0) {
-            $bar = html_writer::div(s($percent . '%'), 'progress-bar', [
-                'role' => 'progressbar', 'style' => "width: {$percent}%",
-                'aria-valuenow' => $percent, 'aria-valuemin' => 0, 'aria-valuemax' => 100,
-            ]);
-            $out .= html_writer::div($bar, 'progress', ['style' => 'height: 1.5rem;']);
+        if ($goal <= 0) {
+            return '';
         }
-        return html_writer::div($out, 'mod-moodlereader-progress mb-3');
+        return \mod_moodlereader\local\progressbar::render(
+            $total,
+            $goal,
+            !empty($instance->wordsorpoints),
+            !empty($instance->extraprogressbar)
+        );
     }
 
     /**
@@ -139,14 +132,51 @@ class renderer extends \plugin_renderer_base {
             $note = get_string('alllevelsavailable', 'mod_moodlereader');
             return html_writer::div(s($note), 'mod-moodlereader-level text-muted mb-3');
         }
-        $current = (int) $reader->get_level($userid)->currentlevel;
-        $difficulties = $reader->allowed_difficulties($userid);
-        $out = html_writer::tag('strong', get_string('yourcurrentlevel', 'mod_moodlereader', $current));
-        if ($difficulties) {
-            sort($difficulties);
-            $out .= ' ' . s(get_string('levelsyoumayattempt', 'mod_moodlereader', implode(', ', $difficulties)));
+        $status = \mod_moodlereader\local\levels::status($reader, $userid);
+        $str = fn(string $key, $a = null) => get_string($key, 'mod_moodlereader', $a);
+
+        $out = $this->output->heading(s($str('yourcurrentlevel', $status->level)), 3, 'h4');
+        if ($status->remainingtopromotion !== null) {
+            $summary = $str('levelpromotion', ['n' => $status->remainingtopromotion, 'level' => $status->level,
+                'next' => $status->level + 1]);
+        } else if ($status->attop) {
+            $summary = $str('leveltop', $status->level);
+        } else {
+            $summary = $str('levelnopromotion', $status->level);
         }
-        return html_writer::div($out, 'mod-moodlereader-level alert alert-info mb-3');
+        $out .= html_writer::tag('p', s($summary));
+
+        // One column per level the student may read at, one square per book that level allows,
+        // filled for each book passed there since the last promotion (as on mreader.org).
+        $columns = '';
+        foreach ($status->columns as $col) {
+            $label = $str(
+                'levelcolumn_' . ['-1' => 'below', '0' => 'own', '1' => 'above'][(string) $col->relation],
+                $col->level
+            );
+            if ($col->quota === \mod_moodlereader\local\levels::UNLIMITED) {
+                $squares = html_writer::div(s($str('levelunlimited')), 'mr-level-any');
+                $sr = $str('levelcolumn_unlimited', $col->level);
+            } else {
+                $squares = '';
+                for ($i = 1; $i <= $col->quota; $i++) {
+                    $squares .= html_writer::span('', 'mr-level-square' . ($i <= $col->used ? ' mr-level-done' : ''));
+                }
+                $sr = $str('levelcolumn_counts', ['level' => $col->level, 'used' => min($col->used, $col->quota),
+                    'quota' => $col->quota, 'left' => $col->remaining]);
+            }
+            $caption = $col->quota === \mod_moodlereader\local\levels::UNLIMITED ? ''
+                : $str('levelleft', ['left' => $col->remaining, 'quota' => $col->quota]);
+            $columns .= html_writer::div(
+                html_writer::div($squares, 'mr-level-squares', ['aria-hidden' => 'true']) .
+                html_writer::div(s($label), 'mr-level-label') .
+                html_writer::div(s($caption), 'mr-level-caption small', ['aria-hidden' => 'true']) .
+                html_writer::span(s($sr), 'accesshide'),
+                'mr-level-col' . ($col->relation === 0 ? ' mr-level-own' : '')
+            );
+        }
+        $out .= html_writer::div($columns, 'mr-level-grid');
+        return html_writer::div($out, 'mod-moodlereader-level mb-3');
     }
 
     /**

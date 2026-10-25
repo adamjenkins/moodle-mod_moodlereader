@@ -127,6 +127,9 @@ class attempt {
         // Push the aggregate grade to the gradebook.
         moodlereader_update_grades($reader->get_instance(), $attempt->userid);
 
+        // Enough books passed at the student's level moves them up a level.
+        levels::maybe_promote($reader, (int) $attempt->userid);
+
         // Update activity completion, if in use.
         $completion = new \completion_info($reader->get_course());
         if ($completion->is_enabled($reader->get_cm())) {

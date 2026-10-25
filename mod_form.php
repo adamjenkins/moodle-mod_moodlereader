@@ -75,6 +75,12 @@ class mod_moodlereader_mod_form extends moodleform_mod {
         foreach (['showprogressbar', 'showlevel', 'showbooksread', 'showreport', 'showsearch'] as $toggle) {
             $mform->addElement('advcheckbox', $toggle, get_string($toggle, 'mod_moodlereader'));
             $mform->setDefault($toggle, 1);
+            if ($toggle === 'showprogressbar') {
+                $mform->addElement('advcheckbox', 'extraprogressbar', get_string('extraprogressbar', 'mod_moodlereader'));
+                $mform->setDefault('extraprogressbar', 1);
+                $mform->addHelpButton('extraprogressbar', 'extraprogressbar', 'mod_moodlereader');
+                $mform->disabledIf('extraprogressbar', 'showprogressbar');
+            }
         }
 
         // Reading-level control.
@@ -83,15 +89,14 @@ class mod_moodlereader_mod_form extends moodleform_mod {
         $mform->addElement('advcheckbox', 'levelcheck', get_string('levelcheck', 'mod_moodlereader'));
         $mform->addHelpButton('levelcheck', 'levelcheck', 'mod_moodlereader');
 
-        $mform->addElement('advcheckbox', 'prevlevel', get_string('allowprevlevel', 'mod_moodlereader'));
-        $mform->setDefault('prevlevel', 0);
-        $mform->disabledIf('prevlevel', 'levelcheck');
-        $mform->addElement('advcheckbox', 'thislevel', get_string('allowthislevel', 'mod_moodlereader'));
-        $mform->setDefault('thislevel', 1);
-        $mform->disabledIf('thislevel', 'levelcheck');
-        $mform->addElement('advcheckbox', 'nextlevel', get_string('allownextlevel', 'mod_moodlereader'));
-        $mform->setDefault('nextlevel', 1);
-        $mform->disabledIf('nextlevel', 'levelcheck');
+        // How many books a student reads at, below and above their level (mod_reader's defaults: 6, 3, 1).
+        foreach (['thislevel' => 6, 'prevlevel' => 3, 'nextlevel' => 1] as $field => $default) {
+            $mform->addElement('text', $field, get_string($field, 'mod_moodlereader'), ['size' => 3]);
+            $mform->setType($field, PARAM_INT);
+            $mform->setDefault($field, $default);
+            $mform->addHelpButton($field, $field, 'mod_moodlereader');
+            $mform->disabledIf($field, 'levelcheck');
+        }
 
         // Availability window.
         $mform->addElement('header', 'availabilityheader', get_string('availability'));
@@ -125,6 +130,11 @@ class mod_moodlereader_mod_form extends moodleform_mod {
     public function validation($data, $files) {
         global $DB;
         $errors = parent::validation($data, $files);
+        foreach (['thislevel', 'prevlevel', 'nextlevel'] as $field) {
+            if (isset($data[$field]) && ((int) $data[$field] < 0 || (int) $data[$field] > 99)) {
+                $errors[$field] = get_string('levelcountrange', 'mod_moodlereader');
+            }
+        }
         // The mreader.org catalogue has no points, so grading by points needs books that have them.
         if (!empty($data['wordsorpoints']) && !$DB->record_exists_select('moodlereader_books', 'points > 0 AND hidden = 0')) {
             $errors['wordsorpoints'] = get_string('nopointsbooks', 'mod_moodlereader');

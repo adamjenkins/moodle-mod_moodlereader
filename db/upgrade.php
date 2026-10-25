@@ -229,5 +229,34 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026102503, 'moodlereader');
     }
 
+    if ($oldversion < 2026102504) {
+        // A second progress bar for the reading beyond the goal (mod_reader's "expanding" bar).
+        $table = new xmldb_table('moodlereader');
+        $field = new xmldb_field('extraprogressbar', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1', 'showprogressbar');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // The level settings are counts again, as in mod_reader: books to pass at the student's level
+        // to move up, and books allowed one level below and above. 0.1.0 stored them as on/off
+        // switches; convert those (imported activities already hold counts).
+        $imported = $DB->get_fieldset_select('moodlereader_imports', 'newreaderid', 'newreaderid > 0');
+        foreach ($DB->get_records('moodlereader', null, '', 'id, thislevel, prevlevel, nextlevel') as $r) {
+            if (in_array($r->id, $imported) || max($r->thislevel, $r->prevlevel, $r->nextlevel) > 1) {
+                continue;
+            }
+            $DB->update_record('moodlereader', (object) [
+                'id' => $r->id,
+                'thislevel' => $r->thislevel ? 6 : 0,
+                'prevlevel' => $r->prevlevel ? 3 : 0,
+                'nextlevel' => $r->nextlevel ? 1 : 0,
+            ]);
+        }
+        $field = new xmldb_field('prevlevel', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '3', 'thislevel');
+        $dbman->change_field_default($table, $field);
+
+        upgrade_mod_savepoint(true, 2026102504, 'moodlereader');
+    }
+
     return true;
 }

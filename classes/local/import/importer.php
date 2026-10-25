@@ -511,7 +511,9 @@ class importer {
             'prevlevel'      => (int) ($legacy->prevlevel ?? 0),
             'nextlevel'      => (int) ($legacy->nextlevel ?? 1),
             'bookinstances'  => (int) ($legacy->bookinstances ?? 0),
-            'showprogressbar' => (int) ($legacy->showprogressbar ?? 1),
+            // The mod_reader bar was none (0), fixed (1) or expanding (2, the second bar past the goal).
+            'showprogressbar' => (int) ($legacy->showprogressbar ?? 1) > 0 ? 1 : 0,
+            'extraprogressbar' => (int) ($legacy->showprogressbar ?? 1) === 2 ? 1 : 0,
             'completionpass' => (int) ($legacy->completionpass ?? 0),
             'completiontotalwords' => (int) ($legacy->completiontotalwords ?? 0),
             'timemodified'   => (int) ($legacy->timemodified ?? 0),

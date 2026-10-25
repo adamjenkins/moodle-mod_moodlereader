@@ -192,19 +192,7 @@ class reader {
      * @return int[] Empty when level checking is off (i.e. all difficulties allowed).
      */
     public function allowed_difficulties(int $userid): array {
-        if (empty($this->instance->levelcheck)) {
-            return [];
-        }
-        $current = (int) $this->get_level($userid)->currentlevel;
-        $levels = [$this->instance->thislevel ? $current : null];
-        if ($this->instance->prevlevel && $current >= 1) {
-            $levels[] = $current - 1;
-        }
-        if ($this->instance->nextlevel) {
-            $levels[] = $current + 1;
-        }
-        $levels = array_values(array_unique(array_filter($levels, fn($l) => $l !== null)));
-        return $levels ?: [$current];
+        return levels::allowed($this, $userid);
     }
 
     /**
@@ -253,12 +241,17 @@ class reader {
         $where[] = "b.id NOT IN ($doneids)";
         $where[] = "(b.sametitle = '' OR b.sametitle NOT IN ($donetitles))";
 
-        // Level filtering.
-        $difficulties = $this->allowed_difficulties($userid);
-        if ($difficulties) {
-            [$insql, $inparams] = $DB->get_in_or_equal($difficulties, SQL_PARAMS_NAMED, 'diff');
-            $where[] = "b.difficulty $insql";
-            $params += $inparams;
+        // Level filtering: only the levels the student may still read at (none left means no books).
+        if (!empty($this->instance->levelcheck)) {
+            $difficulties = $this->allowed_difficulties($userid);
+            if (!$difficulties) {
+                $where[] = '1 = 0';
+            } else {
+                $diffcol = empty($this->instance->bookinstances) ? 'b.difficulty' : 'COALESCE(bi.difficulty, b.difficulty)';
+                [$insql, $inparams] = $DB->get_in_or_equal($difficulties, SQL_PARAMS_NAMED, 'diff');
+                $where[] = "$diffcol $insql";
+                $params += $inparams;
+            }
         }
 
         return [$from, $where, $params];

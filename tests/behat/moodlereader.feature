@@ -166,3 +166,21 @@ Feature: Moodle Reader activity
     And I log out
     When I am on the "Reader 1" "moodlereader activity" page logged in as student1
     Then I should see "Reading progress: 2,200 of 5,000 words"
+
+  Scenario: With levels restricted, a student sees what they may still read at each level and the teacher sees the class's progress
+    Given the following "activities" exist:
+      | activity     | name     | course | idnumber | goal | levelcheck | thislevel | prevlevel | nextlevel |
+      | moodlereader | Reader 2 | C1     | reader2  | 5000 | 1          | 2         | 0         | 1         |
+    And the following moodlereader attempts exist:
+      | user     | activity | book         | percent | passed |
+      | student1 | reader2  | The Red Kite | 90      | 1      |
+    When I am on the "Reader 2" "moodlereader activity" page logged in as student1
+    Then I should see "Your current reading level: 0."
+    And I should see "Pass 2 more book(s) at level 0 to move up to level 1."
+    And I should see "Level 0 (yours)"
+    And I should see "0 of 1 left"
+    And I should see "Reading progress: 3,000 of 5,000 words"
+    And I log out
+    When I am on the "Reader 2" "moodlereader activity" page logged in as teacher1
+    And I follow "Reading report"
+    Then I should see "60%" in the "Student One" "table_row"

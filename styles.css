@@ -1,0 +1,101 @@
+/* Reading-progress bar: red, orange, yellow, green, then blue at the goal (as in mod_reader). */
+.path-mod-moodlereader .mr-progress {
+    height: 1.6rem;
+    font-size: 0.85rem;
+}
+
+.path-mod-moodlereader .mr-progress-red {
+    background-color: #d9534f;
+    color: #fff;
+}
+
+.path-mod-moodlereader .mr-progress-orange {
+    background-color: #fa4f00;
+    color: #fff;
+}
+
+.path-mod-moodlereader .mr-progress-yellow {
+    background-color: #ed9c2c;
+    color: #212529;
+}
+
+.path-mod-moodlereader .mr-progress-green {
+    background-color: #5cb85c;
+    color: #212529;
+}
+
+.path-mod-moodlereader .mr-progress-blue {
+    background-color: #1177d1;
+    color: #fff;
+}
+
+.path-mod-moodlereader .mr-progress-marks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    opacity: 0.8;
+}
+
+/* The miniature bar in the student summary. */
+.path-mod-moodlereader .mr-progress-mini {
+    display: inline-flex;
+    width: 6rem;
+    height: 0.6rem;
+    vertical-align: middle;
+}
+
+.path-mod-moodlereader .mr-progress-mini-label {
+    margin-left: 0.4rem;
+    font-size: 0.8rem;
+}
+
+/* Reading-level grid: a column per level, a square per book allowed, filled when passed. */
+.path-mod-moodlereader .mr-level-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: flex-end;
+}
+
+.path-mod-moodlereader .mr-level-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 0.4rem;
+}
+
+.path-mod-moodlereader .mr-level-own {
+    outline: 2px solid #1177d1;
+}
+
+.path-mod-moodlereader .mr-level-squares {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 0.25rem;
+    min-height: 1.6rem;
+}
+
+.path-mod-moodlereader .mr-level-square {
+    display: block;
+    width: 1.6rem;
+    height: 1.4rem;
+    border: 2px solid #6c757d;
+    border-radius: 0.2rem;
+}
+
+.path-mod-moodlereader .mr-level-done {
+    background-color: #5cb85c;
+    border-color: #3d8b3d;
+}
+
+.path-mod-moodlereader .mr-level-any {
+    font-size: 0.85rem;
+    max-width: 7rem;
+    text-align: center;
+}
+
+.path-mod-moodlereader .mr-level-label {
+    margin-top: 0.4rem;
+    font-weight: bold;
+}

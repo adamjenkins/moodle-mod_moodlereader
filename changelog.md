@@ -59,6 +59,12 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   search requires `hasquiz = 1`.
 - `attempt_admin::students_sql()` also includes everyone with attempts in the activity
   (only oneself when a group narrows the list).
+- `classes/local/progressbar.php` and `styles.css`: the colour-banded bar, the second bar
+  (`moodlereader.extraprogressbar`, version 2026102504) and the summary's mini bar.
+- `classes/local/levels.php`: quotas from `thislevel`/`prevlevel`/`nextlevel` (counts,
+  defaults 6/3/1; 0.1.0's on/off values are converted on upgrade), passes since the last
+  promotion, `maybe_promote()` from `attempt::finish()`, and the level grid on the activity
+  page. The summary shows and sets stop level and promotion again.
 - Completion rules use `ignoredate`, count each book once and include credit.
 - `mod_form` validation refuses `wordsorpoints = 1` when no enabled book has points.
 - `moodlereader_books.language` is NOT NULL with no default (XMLDB rejects `''` as a
