@@ -184,3 +184,32 @@ Feature: Moodle Reader activity
     When I am on the "Reader 2" "moodlereader activity" page logged in as teacher1
     And I follow "Reading report"
     Then I should see "60%" in the "Student One" "table_row"
+
+  Scenario: A teacher sees a student's reading page without logging in as them
+    Given the site is connected to mreader.org
+    And the following moodlereader attempts exist:
+      | user     | activity | book         | percent | passed |
+      | student1 | reader1  | The Red Kite | 90      | 1      |
+    When I am on the "Reader 1" "moodlereader activity" page logged in as teacher1
+    And I follow "Reading report"
+    And I follow "Student details"
+    And I follow "Reading page of Student One"
+    Then I should see "Reading page of Student One"
+    And I should see "Reading progress: 3,000 of 5,000 words"
+    When I press "Search"
+    Then I should see "Can take" in the "Blue Hills" "table_row"
+    And I should see "Already taken: Passed on"
+    And "Take the quiz" "button" should not exist
+
+  Scenario: A teacher sets the term start date, and the reports say which term they count
+    When I am on the "Reader 1" "moodlereader activity editing" page logged in as teacher1
+    Then I should see "Term start date"
+    When I am on the "Reader 1" "moodlereader activity" page
+    And I follow "Reading report"
+    Then I should see "This term (no term start date set, so all quizzes)"
+    And the following "activities" exist:
+      | activity     | name     | course | idnumber | goal | ignoredate        |
+      | moodlereader | Reader 3 | C1     | reader3  | 5000 | ##1 January 2026## |
+    When I am on the "Reader 3" "moodlereader activity" page
+    And I follow "Reading report"
+    Then I should see "This term (since 1 January 2026)"

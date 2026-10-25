@@ -80,6 +80,7 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         $data->course = $this->get_courseid();
         $data->availablefrom = $this->apply_date_offset($data->availablefrom);
         $data->availableuntil = $this->apply_date_offset($data->availableuntil);
+        $data->ignoredate = $this->apply_date_offset((int) ($data->ignoredate ?? 0));
         // A backup file is untrusted: on/off settings are 0 or 1, and only valid detection settings are kept.
         foreach (
             ['levelcheck', 'bookinstances', 'showprogressbar', 'extraprogressbar', 'showlevel', 'showbooksread',

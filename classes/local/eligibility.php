@@ -1,0 +1,140 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+namespace mod_moodlereader\local;
+
+/**
+ * Whether a student may take a book's quiz now, and if not, why.
+ *
+ * The rules are the ones the student's own book search applies
+ * ({@see reader::available_where()}); this class states the reason for a book the
+ * search would leave out, for the teacher's view of a student's reading page.
+ *
+ * @package    mod_moodlereader
+ * @copyright  2026 Adam Jenkins <adam@wisecat.net>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class eligibility {
+    /** @var reader */
+    protected $reader;
+
+    /** @var \stdClass[] Finished, not deleted attempts by book id (the latest). */
+    protected $finished = [];
+
+    /** @var array Same-title keys of finished books => true. */
+    protected $titles = [];
+
+    /** @var int[] Books with an unfinished attempt. */
+    protected $inprogress = [];
+
+    /** @var \stdClass|null Level status, when the activity restricts books to the level. */
+    protected $levels = null;
+
+    /** @var bool */
+    protected $connected;
+
+    /** @var bool */
+    protected $open;
+
+    /**
+     * Load what the rules need for one student.
+     *
+     * @param reader $reader
+     * @param int $userid
+     */
+    public function __construct(reader $reader, int $userid) {
+        global $DB;
+        $this->reader = $reader;
+        $attempts = $DB->get_records_sql(
+            "SELECT a.id, a.bookid, a.state, a.passed, a.credit, a.cheated, a.timefinish, b.sametitle
+               FROM {moodlereader_attempts} a
+               JOIN {moodlereader_books} b ON b.id = a.bookid
+              WHERE a.readerid = :readerid AND a.userid = :userid AND a.deleted = 0
+           ORDER BY a.timefinish, a.id",
+            ['readerid' => $reader->get_instance()->id, 'userid' => $userid]
+        );
+        foreach ($attempts as $a) {
+            if ($a->state === 'finished') {
+                $this->finished[$a->bookid] = $a;
+                if ($a->sametitle !== '') {
+                    $this->titles[$a->sametitle] = true;
+                }
+            } else {
+                $this->inprogress[$a->bookid] = true;
+            }
+        }
+        if (!empty($reader->get_instance()->levelcheck)) {
+            $this->levels = levels::status($reader, $userid);
+        }
+        $this->connected = connection::allows_launch();
+        $this->open = $reader->within_availability_window();
+    }
+
+    /**
+     * The reason the student cannot take this book's quiz now.
+     *
+     * @param \stdClass $book A {moodlereader_books} record (with a per-activity difficulty, if any, in difficulty).
+     * @return string|null Null when the student can take it.
+     */
+    public function reason(\stdClass $book): ?string {
+        $str = fn(string $key, $a = null) => get_string('cannot_' . $key, 'mod_moodlereader', $a);
+        if (!$this->connected) {
+            return $str('notconnected');
+        }
+        if (!$this->open) {
+            return $str('closed');
+        }
+        if (empty($book->hasquiz)) {
+            return $str('noquiz');
+        }
+        if (!empty($book->withdrawn)) {
+            return $str('withdrawn');
+        }
+        if (isset($this->finished[$book->id])) {
+            $a = $this->finished[$book->id];
+            $result = $a->cheated ? 'cheated' : ($a->credit ? 'credited' : ($a->passed ? 'passed' : 'failed'));
+            return $str('alreadytaken', [
+                'result' => get_string($result, 'mod_moodlereader'),
+                'date' => userdate($a->timefinish, get_string('strftimedate', 'langconfig')),
+            ]);
+        }
+        if ((string) $book->sametitle !== '' && isset($this->titles[$book->sametitle])) {
+            return $str('sametitle');
+        }
+        if ($this->levels !== null) {
+            $level = (int) $book->difficulty;
+            foreach ($this->levels->columns as $column) {
+                if ($column->level === $level) {
+                    return $column->remaining === 0
+                        ? $str('levelused', ['level' => $level, 'quota' => $column->quota])
+                        : null;
+                }
+            }
+            return $str('level', ['level' => $level, 'own' => $this->levels->level]);
+        }
+        return null;
+    }
+
+    /**
+     * Whether the student has started this book's quiz without finishing it.
+     *
+     * @param int $bookid
+     * @return bool
+     */
+    public function in_progress(int $bookid): bool {
+        return isset($this->inprogress[$bookid]);
+    }
+}

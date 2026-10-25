@@ -147,7 +147,8 @@ class userdetailed_table extends \table_sql {
             return fullname($row);
         }
         $url = new moodle_url($this->baseurl, ['userid' => $row->userid]);
-        return html_writer::link($url, fullname($row));
+        return html_writer::link($url, fullname($row)) .
+            report::reading_page_link($this->reader->get_cm()->id, (int) $row->userid, fullname($row));
     }
 
     /**

@@ -65,6 +65,9 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   defaults 6/3/1; 0.1.0's on/off values are converted on upgrade), passes since the last
   promotion, `maybe_promote()` from `attempt::finish()`, and the level grid on the activity
   page. The summary shows and sets stop level and promotion again.
+- `student.php`, `renderer::reading_page()` (shared with `view.php`) and
+  `classes/local/eligibility.php` (the search gate's rules as reasons);
+  `reader::search_catalogue()`/`catalogue_menus()`; `records.php?userid=` for teachers.
 - Completion rules use `ignoredate`, count each book once and include credit.
 - `mod_form` validation refuses `wordsorpoints = 1` when no enabled book has points.
 - `moodlereader_books.language` is NOT NULL with no default (XMLDB rejects `''` as a

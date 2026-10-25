@@ -64,6 +64,10 @@ class mod_moodlereader_mod_form extends moodleform_mod {
             1 => get_string('points', 'mod_moodlereader'),
         ]);
 
+        // The start of the current term: reading before it counts for no grade, progress or "this term" total.
+        $mform->addElement('date_selector', 'ignoredate', get_string('ignoredate', 'mod_moodlereader'), ['optional' => true]);
+        $mform->addHelpButton('ignoredate', 'ignoredate', 'mod_moodlereader');
+
         $mform->addElement('text', 'minpassgrade', get_string('minpassgrade', 'mod_moodlereader'), ['size' => 4]);
         $mform->setType('minpassgrade', PARAM_INT);
         $mform->setDefault('minpassgrade', 60);

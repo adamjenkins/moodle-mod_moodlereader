@@ -87,6 +87,24 @@ class report {
     }
 
     /**
+     * An icon link to a student's reading page, as the student sees it.
+     *
+     * @param int $cmid
+     * @param int $userid
+     * @param string $name The student's name, for the link's label.
+     * @return string HTML.
+     */
+    public static function reading_page_link(int $cmid, int $userid, string $name): string {
+        global $OUTPUT;
+        $label = get_string('readingpagefor', 'mod_moodlereader', $name);
+        return ' ' . html_writer::link(
+            new \moodle_url('/mod/moodlereader/student.php', ['id' => $cmid, 'userid' => $userid]),
+            $OUTPUT->pix_icon('i/preview', $label),
+            ['title' => $label, 'class' => 'mr-readingpage']
+        );
+    }
+
+    /**
      * One row's checkbox.
      *
      * @param string $name Form field name, e.g. 'userids[]'.
@@ -140,15 +158,21 @@ class report {
      *
      * @param \moodle_url $pageurl
      * @param string $term
+     * @param \stdClass $instance The activity, whose term start date "this term" counts from.
      * @return string HTML.
      */
-    public static function term_select(\moodle_url $pageurl, string $term): string {
+    public static function term_select(\moodle_url $pageurl, string $term, \stdClass $instance): string {
         global $OUTPUT;
         $select = new \single_select(
             new \moodle_url($pageurl),
             'term',
             [
-                'thisterm' => get_string('thisterm', 'mod_moodlereader'),
+                'thisterm' => $instance->ignoredate
+                    ? get_string('thistermsince', 'mod_moodlereader', userdate(
+                        $instance->ignoredate,
+                        get_string('strftimedate', 'langconfig')
+                    ))
+                    : get_string('thistermnostart', 'mod_moodlereader'),
                 'allterms' => get_string('allterms', 'mod_moodlereader'),
             ],
             $term,

@@ -289,6 +289,24 @@ class reader {
         global $DB;
         [$from, $where, $params] = $this->available_where($userid);
 
+        $this->filter_where($filters, $where, $params);
+
+        $wheresql = implode(' AND ', $where);
+        $total = $DB->count_records_sql("SELECT COUNT(1) FROM $from WHERE $wheresql", $params);
+        $sql = "SELECT b.* FROM $from WHERE $wheresql ORDER BY b.publisher, b.series, b.name";
+        return $DB->get_records_sql($sql, $params, 0, $limit);
+    }
+
+    /**
+     * Add a book search's filters to a query.
+     *
+     * @param array $filters See {@see self::search_books()}.
+     * @param string[] $where Conditions, added to.
+     * @param array $params Parameters, added to.
+     * @return void
+     */
+    protected function filter_where(array $filters, array &$where, array &$params): void {
+        global $DB;
         $i = 0;
         foreach (['name', 'publisher', 'series', 'genre'] as $field) {
             $value = trim((string) ($filters[$field] ?? ''));
@@ -309,11 +327,95 @@ class reader {
             $where[] = "(b.language = :slang OR b.language = '')";
             $params['slang'] = $language;
         }
+    }
 
+    /**
+     * The book search's filters as submitted in this request.
+     *
+     * @return array [array $filters, bool $searched, bool $hasfilter]
+     */
+    public static function request_search_filters(): array {
+        $searched = (bool) optional_param('searchsubmit', 0, PARAM_INT);
+        $difficulty = optional_param('searchdifficulty', -1, PARAM_INT);
+        $filters = [
+            'name'       => optional_param('searchname', '', PARAM_TEXT),
+            'publisher'  => optional_param('searchpublisher', '', PARAM_TEXT),
+            'series'     => optional_param('searchseries', '', PARAM_TEXT),
+            'genre'      => optional_param('searchgenre', '', PARAM_ALPHA),
+            'difficulty' => $difficulty,
+            // English is selected until another language (or any) is chosen.
+            'language'   => $searched
+                ? booklanguage::clean(optional_param('searchlanguage', '', PARAM_ALPHA))
+                : booklanguage::DEFAULT,
+        ];
+        $hasfilter = trim($filters['name']) !== '' || $filters['publisher'] !== '' || trim($filters['series']) !== ''
+            || $filters['genre'] !== '' || $difficulty >= 0;
+        return [$filters, $searched, $hasfilter];
+    }
+
+    /**
+     * The search menus over this activity's whole catalogue (see {@see self::search_catalogue()}).
+     *
+     * @return array publishers (name => book count), difficulties (int[]), languages (string[]).
+     */
+    public function catalogue_menus(): array {
+        global $DB;
+        $from = '{moodlereader_books} b';
+        $params = [];
+        $difficulty = 'b.difficulty';
+        if (!empty($this->instance->bookinstances)) {
+            $from .= ' JOIN {moodlereader_bookinstances} bi ON bi.bookid = b.id AND bi.readerid = :bireaderid';
+            $params['bireaderid'] = $this->instance->id;
+            $difficulty = 'COALESCE(bi.difficulty, b.difficulty)';
+        }
+        $publishers = [];
+        $sql = "SELECT b.publisher, COUNT(1) AS cnt FROM $from WHERE b.hidden = 0 GROUP BY b.publisher ORDER BY b.publisher";
+        foreach ($DB->get_records_sql($sql, $params) as $row) {
+            $publishers[$row->publisher] = (int) $row->cnt;
+        }
+        return [
+            'publishers' => $publishers,
+            'difficulties' => array_map('intval', $DB->get_fieldset_sql(
+                "SELECT DISTINCT $difficulty FROM $from WHERE b.hidden = 0 ORDER BY 1",
+                $params
+            )),
+            'languages' => $DB->get_fieldset_sql(
+                "SELECT DISTINCT b.language FROM $from WHERE b.hidden = 0 AND b.language <> '' ORDER BY 1",
+                $params
+            ),
+        ];
+    }
+
+    /**
+     * Search this activity's books for a teacher's view of a student's page: every book a
+     * student could be offered here (not disabled; on the activity's list, if it has one),
+     * whatever the student has read or may read.
+     *
+     * @param array $filters See {@see self::search_books()}.
+     * @param int $limit
+     * @param int|null $total Set to the full match count.
+     * @return stdClass[] Keyed by book id; difficulty is the level the activity gives the book.
+     */
+    public function search_catalogue(array $filters, int $limit = 0, ?int &$total = null): array {
+        global $DB;
+        $from = '{moodlereader_books} b';
+        $where = ['b.hidden = 0'];
+        $params = [];
+        $fields = 'b.*';
+        if (!empty($this->instance->bookinstances)) {
+            $from .= ' JOIN {moodlereader_bookinstances} bi ON bi.bookid = b.id AND bi.readerid = :bireaderid';
+            $params['bireaderid'] = $this->instance->id;
+            $fields = 'b.*, COALESCE(bi.difficulty, b.difficulty) AS difficulty';
+        }
+        $this->filter_where($filters, $where, $params);
         $wheresql = implode(' AND ', $where);
         $total = $DB->count_records_sql("SELECT COUNT(1) FROM $from WHERE $wheresql", $params);
-        $sql = "SELECT b.* FROM $from WHERE $wheresql ORDER BY b.publisher, b.series, b.name";
-        return $DB->get_records_sql($sql, $params, 0, $limit);
+        return $DB->get_records_sql(
+            "SELECT $fields FROM $from WHERE $wheresql ORDER BY b.publisher, b.series, b.name",
+            $params,
+            0,
+            $limit
+        );
     }
 
     /**

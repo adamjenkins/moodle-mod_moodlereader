@@ -27,13 +27,28 @@ require(__DIR__ . '/../../config.php');
 use mod_moodlereader\local\reader;
 
 $id = required_param('id', PARAM_INT);
+$userid = optional_param('userid', 0, PARAM_INT);
 
 $reader = reader::from_cmid($id);
 require_login($reader->get_course(), true, $reader->get_cm());
 $reader->require_cap('viewbooks');
 
-$PAGE->set_url('/mod/moodlereader/records.php', ['id' => $id]);
-$PAGE->set_title(get_string('myrecords', 'mod_moodlereader'));
+// A teacher may look at a student's records, as on the student's reading page.
+$targetid = (int) $USER->id;
+$heading = get_string('myrecords', 'mod_moodlereader');
+$backurl = $reader->view_url();
+if ($userid && $userid !== (int) $USER->id) {
+    $reader->require_cap('viewreports');
+    if (!\mod_moodlereader\local\attempt_admin::visible_userids($reader, [$userid])) {
+        throw new moodle_exception('notyourstudent', 'mod_moodlereader', $reader->view_url());
+    }
+    $targetid = $userid;
+    $heading = get_string('recordsfor', 'mod_moodlereader', fullname(core_user::get_user($userid, '*', MUST_EXIST)));
+    $backurl = new moodle_url('/mod/moodlereader/student.php', ['id' => $id, 'userid' => $userid]);
+}
+
+$PAGE->set_url('/mod/moodlereader/records.php', ['id' => $id] + ($targetid !== (int) $USER->id ? ['userid' => $targetid] : []));
+$PAGE->set_title($heading);
 $PAGE->set_heading(format_string($reader->get_course()->fullname));
 $PAGE->set_context($reader->get_context());
 
@@ -41,10 +56,10 @@ $PAGE->set_context($reader->get_context());
 $output = $PAGE->get_renderer('mod_moodlereader');
 
 echo $output->header();
-echo $output->heading(get_string('myrecords', 'mod_moodlereader'));
+echo $output->heading($heading);
 
 // Reading-progress panel (same bar the student sees on the activity page).
-echo $output->progress($reader, $USER->id);
+echo $output->progress($reader, $targetid);
 
 $readerid = $reader->get_instance()->id;
 $attempts = $DB->get_records_sql(
@@ -54,7 +69,7 @@ $attempts = $DB->get_records_sql(
       WHERE a.readerid = :readerid AND a.userid = :userid
             AND a.deleted = 0 AND a.state = 'finished'
    ORDER BY a.timefinish DESC",
-    ['readerid' => $readerid, 'userid' => $USER->id]
+    ['readerid' => $readerid, 'userid' => $targetid]
 );
 
 if ($attempts) {
@@ -85,8 +100,8 @@ if ($attempts) {
 
 echo html_writer::div(
     html_writer::link(
-        $reader->view_url(),
-        get_string('backtoactivity', 'mod_moodlereader'),
+        $backurl,
+        get_string('back'),
         ['class' => 'btn btn-secondary']
     ),
     'mt-3'

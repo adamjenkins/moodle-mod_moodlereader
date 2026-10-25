@@ -159,7 +159,8 @@ class usersummary_table extends \table_sql {
         $url = new moodle_url('/mod/moodlereader/report.php', [
             'id' => $this->reader->get_cm()->id, 'mode' => 'userdetailed', 'userid' => $row->id,
         ]);
-        return html_writer::link($url, fullname($row));
+        return html_writer::link($url, fullname($row)) .
+            report::reading_page_link($this->reader->get_cm()->id, (int) $row->id, fullname($row));
     }
 
     /**

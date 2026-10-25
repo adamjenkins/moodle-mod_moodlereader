@@ -157,7 +157,7 @@ if ($mode === 'books') {
         $rate = $r->attempts > 0 ? round(100 * $r->passes / $r->attempts) : 0;
         $table->data[] = [format_string($r->name), s($r->publisher), s((int) $r->attempts), s($rate) . '%'];
     }
-    echo html_writer::div(report::term_select($pageurl, $term), 'mb-3');
+    echo html_writer::div(report::term_select($pageurl, $term, $instance), 'mb-3');
     echo $table->data ? html_writer::table($table) : $OUTPUT->notification(get_string('noreportdata', 'mod_moodlereader'), 'info');
     echo $OUTPUT->footer();
     exit;
@@ -165,7 +165,7 @@ if ($mode === 'books') {
 
 // Filters: group, term, and (details) one student and deleted attempts.
 groups_print_activity_menu($reader->get_cm(), $pageurl);
-$filters = report::term_select($pageurl, $term);
+$filters = report::term_select($pageurl, $term, $instance);
 if ($mode === 'userdetailed') {
     $filters .= ' ' . html_writer::link(
         new moodle_url($pageurl, ['showdeleted' => $showdeleted ? 0 : 1]),
@@ -174,7 +174,12 @@ if ($mode === 'userdetailed') {
     );
     if ($userid && attempt_admin::visible_userids($reader, [$userid]) && ($student = core_user::get_user($userid))) {
         $filters .= ' ' . html_writer::span(get_string('reportforstudent', 'mod_moodlereader', fullname($student))) . ' ' .
-            html_writer::link(new moodle_url($pageurl, ['userid' => 0]), get_string('showallstudents', 'mod_moodlereader'));
+            html_writer::link(new moodle_url($pageurl, ['userid' => 0]), get_string('showallstudents', 'mod_moodlereader')) . ' ' .
+            html_writer::link(
+                new moodle_url('/mod/moodlereader/student.php', ['id' => $id, 'userid' => $userid]),
+                get_string('readingpagefor', 'mod_moodlereader', fullname($student)),
+                ['class' => 'btn btn-secondary btn-sm ml-2']
+            );
     }
 }
 echo html_writer::div($filters, 'mb-3 d-flex flex-wrap align-items-center');

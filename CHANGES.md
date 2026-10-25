@@ -57,6 +57,14 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   levels and turn moving up on or off per student. With levels restricted, students see a
   grid, as on mreader.org, of how many books they may still read at each level and how
   many more they need to move up.
+- Teachers can open any student's reading page from the reports (an icon next to each
+  name, or a button on a student's attempts), without logging in as them. It shows what
+  the student sees; in its book search each book has a badge saying whether that student
+  can take the quiz now and, if not, why (already taken, not at their level, level
+  allowance used, another edition read, no quiz, withdrawn, activity closed, not connected).
+- New activity setting "Term start date": "This term" in the grade, progress bar, levels
+  and reports counts from it (the reports show the date). It existed but could not be
+  set, so "this term" silently meant every quiz ever taken.
 - Books without a quiz are kept in the catalogue (from mod_reader, and from mreader.org
   once it offers them) so credit can be awarded for them; students never see them as quizzes.
 - The "read N words" completion rule now counts what the progress bar and the grade

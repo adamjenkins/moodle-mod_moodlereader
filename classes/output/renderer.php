@@ -99,6 +99,70 @@ class renderer extends \plugin_renderer_base {
     }
 
     /**
+     * A student's reading page: messages, progress, level, books read, report, records and the book search.
+     *
+     * The same page serves the student (quiz buttons) and a teacher looking at a student's page
+     * without logging in as them (badges saying whether that student can take each quiz).
+     *
+     * @param reader $reader
+     * @param stdClass $user Whose page it is.
+     * @param bool $teacherview A teacher is looking: badges instead of buttons, and the whole catalogue searched.
+     * @return string HTML.
+     */
+    public function reading_page(reader $reader, stdClass $user, bool $teacherview): string {
+        $instance = $reader->get_instance();
+        $cmid = $reader->get_cm()->id;
+        $userid = (int) $user->id;
+        $out = $this->messages($reader, $userid);
+        // Each section is shown only when the teacher has enabled it (Appearance settings).
+        if (!empty($instance->showprogressbar)) {
+            $out .= $this->progress($reader, $userid);
+        }
+        if (!empty($instance->showlevel)) {
+            $out .= $this->level_panel($reader, $userid);
+        }
+        if (!empty($instance->showbooksread)) {
+            $out .= $this->books_read($reader, $userid);
+        }
+        if (!empty($instance->showreport)) {
+            $out .= $this->reading_report($reader, $userid, fullname($user));
+        }
+        $recordsparams = ['id' => $cmid] + ($teacherview ? ['userid' => $userid] : []);
+        $recordsurl = new moodle_url('/mod/moodlereader/records.php', $recordsparams);
+        $out .= html_writer::div(
+            html_writer::link(
+                $recordsurl,
+                get_string($teacherview ? 'theirrecords' : 'myrecords', 'mod_moodlereader'),
+                ['class' => 'btn btn-outline-secondary btn-sm']
+            ),
+            'mod-moodlereader-recordslink mb-3'
+        );
+
+        // The book search. A student only ever sees books they may take; a teacher sees every
+        // book of the activity with whether this student may take it, and why not.
+        if (!empty($instance->showsearch)) {
+            [$filters, $searched, $hasfilter] = reader::request_search_filters();
+            $action = $teacherview
+                ? new moodle_url('/mod/moodlereader/student.php', ['id' => $cmid, 'userid' => $userid])
+                : new moodle_url('/mod/moodlereader/view.php', ['id' => $cmid]);
+            $out .= $this->search_form($reader, $userid, $filters, $action, $teacherview);
+            if ($searched) {
+                $limit = $hasfilter ? 200 : 50;
+                $total = 0;
+                if ($teacherview) {
+                    $books = $reader->search_catalogue($filters, $limit, $total);
+                    $eligibility = new \mod_moodlereader\local\eligibility($reader, $userid);
+                    $out .= $this->search_results($reader, $books, $total, $limit, $eligibility);
+                } else {
+                    $books = $reader->search_books($userid, $filters, $limit, $total);
+                    $out .= $this->search_results($reader, $books, $total, $limit);
+                }
+            }
+        }
+        return $out;
+    }
+
+    /**
      * The reading-progress panel for a user.
      *
      * @param reader $reader
@@ -318,15 +382,30 @@ class renderer extends \plugin_renderer_base {
      * @param reader $reader
      * @param int $userid
      * @param array $filters Current filter values (name, publisher, series, genre, difficulty, language).
+     * @param moodle_url|null $action Where the form goes (default: the activity page).
+     * @param bool $catalogue Offer the menus of the whole activity catalogue, not only of the
+     *     books this user may take (for a teacher's view of a student's page).
      * @return string HTML.
      */
-    public function search_form(reader $reader, int $userid, array $filters): string {
+    public function search_form(
+        reader $reader,
+        int $userid,
+        array $filters,
+        ?moodle_url $action = null,
+        bool $catalogue = false
+    ): string {
         $cmid = $reader->get_cm()->id;
+        $action = $action ?? new moodle_url('/mod/moodlereader/view.php', ['id' => $cmid]);
+        $menus = $catalogue ? $reader->catalogue_menus() : [
+            'publishers' => $reader->available_publishers($userid),
+            'difficulties' => $reader->available_difficulties($userid),
+            'languages' => $reader->available_languages($userid),
+        ];
 
         // Publisher select, from the books currently available to this user.
         // Option labels are not escaped by html_writer::select(), so stored values get s().
         $publishers = ['' => get_string('allpublishers', 'mod_moodlereader')];
-        foreach ($reader->available_publishers($userid) as $name => $count) {
+        foreach ($menus['publishers'] as $name => $count) {
             $label = ($name === '' ? get_string('nopublisher', 'mod_moodlereader') : $name) . " ($count)";
             $publishers[$name] = s($label);
         }
@@ -337,12 +416,12 @@ class renderer extends \plugin_renderer_base {
         // Reading-level select, from the levels present in the available books
         // ('-1' is the "any level" sentinel so difficulty 0 stays selectable).
         $levels = ['-1' => get_string('anylevel', 'mod_moodlereader')];
-        foreach ($reader->available_difficulties($userid) as $difficulty) {
+        foreach ($menus['difficulties'] as $difficulty) {
             $levels[(string) $difficulty] = (string) $difficulty;
         }
 
         $languages = ['' => get_string('anylanguage', 'mod_moodlereader')]
-            + array_map('s', booklanguage::options($reader->available_languages($userid)));
+            + array_map('s', booklanguage::options($menus['languages']));
 
         $row = function (string $labelkey, string $control, string $for): string {
             $label = html_writer::tag('label', get_string($labelkey, 'mod_moodlereader'), [
@@ -358,7 +437,11 @@ class renderer extends \plugin_renderer_base {
             ['class' => 'form-control', 'id' => 'mr-' . $name]
         );
 
-        $inner = html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'id', 'value' => $cmid]);
+        // The action's own parameters (the activity, and the student when a teacher is looking) travel as fields.
+        $inner = '';
+        foreach ($action->params() as $name => $value) {
+            $inner .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $name, 'value' => $value]);
+        }
         // Marks the request as a submitted search so results show only on demand.
         $inner .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'searchsubmit', 'value' => 1]);
         $inner .= $row('booktitle', html_writer::empty_tag('input', [
@@ -387,13 +470,13 @@ class renderer extends \plugin_renderer_base {
         );
         $inner .= html_writer::div(
             html_writer::tag('button', get_string('search'), ['type' => 'submit', 'class' => 'btn btn-primary']) . ' ' .
-            html_writer::link($reader->view_url(), get_string('reset'), ['class' => 'btn btn-link']),
+            html_writer::link($action, get_string('reset'), ['class' => 'btn btn-link']),
             'form-group'
         );
 
         $form = html_writer::tag('form', $inner, [
             'method' => 'get',
-            'action' => new moodle_url('/mod/moodlereader/view.php'),
+            'action' => $action->out_omit_querystring(),
             'class'  => 'mod-moodlereader-searchform',
         ]);
 
@@ -407,9 +490,18 @@ class renderer extends \plugin_renderer_base {
      * @param stdClass[] $books
      * @param int $total Total matches (may exceed the number shown).
      * @param int $limit The cap applied to the displayed list.
+     * @param \mod_moodlereader\local\eligibility|null $eligibility For a teacher's view of a student's page:
+     *     each book gets a badge saying whether that student can take its quiz, and why not,
+     *     instead of a button.
      * @return string HTML.
      */
-    public function search_results(reader $reader, array $books, int $total, int $limit): string {
+    public function search_results(
+        reader $reader,
+        array $books,
+        int $total,
+        int $limit,
+        ?\mod_moodlereader\local\eligibility $eligibility = null
+    ): string {
         if (!$books) {
             return $this->output->notification(get_string('nosearchresults', 'mod_moodlereader'), 'info');
         }
@@ -421,7 +513,8 @@ class renderer extends \plugin_renderer_base {
                 'info'
             );
         } else {
-            $out .= html_writer::tag('p', s(get_string('searchcount', 'mod_moodlereader', $total)), ['class' => 'text-muted']);
+            $count = get_string($eligibility ? 'awardsearchcount' : 'searchcount', 'mod_moodlereader', $total);
+            $out .= html_writer::tag('p', s($count), ['class' => 'text-muted']);
         }
 
         $table = new html_table();
@@ -447,11 +540,28 @@ class renderer extends \plugin_renderer_base {
                 s((int) $book->difficulty),
                 s($this->genre_labels($book->genre)),
                 s(number_format((int) $book->words)),
-                $this->take_quiz_button($reader, (int) $book->id),
+                $eligibility ? $this->eligibility_badge($eligibility, $book) : $this->take_quiz_button($reader, (int) $book->id),
             ];
         }
 
         return $out . html_writer::table($table);
+    }
+
+    /**
+     * A badge, not a button: whether the student can take this book's quiz, and if not, why.
+     *
+     * @param \mod_moodlereader\local\eligibility $eligibility
+     * @param stdClass $book
+     * @return string HTML.
+     */
+    protected function eligibility_badge(\mod_moodlereader\local\eligibility $eligibility, stdClass $book): string {
+        $reason = $eligibility->reason($book);
+        if ($reason === null) {
+            $text = get_string($eligibility->in_progress((int) $book->id) ? 'canresume' : 'cantake', 'mod_moodlereader');
+            return html_writer::span(s($text), 'badge bg-success');
+        }
+        return html_writer::span(s(get_string('cannottake', 'mod_moodlereader')), 'badge bg-secondary') .
+            html_writer::div(s($reason), 'small mt-1');
     }
 
     /**

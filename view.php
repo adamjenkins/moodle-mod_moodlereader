@@ -105,62 +105,7 @@ if (!\mod_moodlereader\local\connection::allows_launch()) {
     echo $OUTPUT->notification($message, \core\output\notification::NOTIFY_WARNING, false);
 }
 
-// Teacher messages.
-echo $output->messages($reader, $USER->id);
-
-// Reading progress, current level, book covers and this-term reading report —
-// each section is shown only when the teacher has enabled it (Appearance settings).
-$instance = $reader->get_instance();
-if (!empty($instance->showprogressbar)) {
-    echo $output->progress($reader, $USER->id);
-}
-if (!empty($instance->showlevel)) {
-    echo $output->level_panel($reader, $USER->id);
-}
-if (!empty($instance->showbooksread)) {
-    echo $output->books_read($reader, $USER->id);
-}
-if (!empty($instance->showreport)) {
-    echo $output->reading_report($reader, $USER->id, fullname($USER));
-}
-
-echo html_writer::div(
-    html_writer::link(
-        new moodle_url('/mod/moodlereader/records.php', ['id' => $id]),
-        get_string('myrecords', 'mod_moodlereader'),
-        ['class' => 'btn btn-outline-secondary btn-sm']
-    ),
-    'mod-moodlereader-recordslink mb-3'
-);
-
-// Search for the next book to read. Filters are layered on top of the availability
-// gate, so students only ever see books they may actually attempt. Results are shown
-// only once the student runs a search (the form does not list books by default).
-if (!empty($instance->showsearch)) {
-    $searched = optional_param('searchsubmit', 0, PARAM_INT);
-    $difficulty = optional_param('searchdifficulty', -1, PARAM_INT);
-    $filters = [
-        'name'       => optional_param('searchname', '', PARAM_TEXT),
-        'publisher'  => optional_param('searchpublisher', '', PARAM_TEXT),
-        'series'     => optional_param('searchseries', '', PARAM_TEXT),
-        'genre'      => optional_param('searchgenre', '', PARAM_ALPHA),
-        'difficulty' => $difficulty,
-        // English is selected until the student chooses another language (or any).
-        'language'   => $searched
-            ? \mod_moodlereader\local\booklanguage::clean(optional_param('searchlanguage', '', PARAM_ALPHA))
-            : \mod_moodlereader\local\booklanguage::DEFAULT,
-    ];
-    $hasfilter = trim($filters['name']) !== '' || $filters['publisher'] !== '' || trim($filters['series']) !== ''
-        || $filters['genre'] !== '' || $difficulty >= 0;
-
-    echo $output->search_form($reader, $USER->id, $filters);
-
-    if ($searched) {
-        $limit = $hasfilter ? 200 : 50;
-        $total = 0;
-        $books = $reader->search_books($USER->id, $filters, $limit, $total);
-        echo $output->search_results($reader, $books, $total, $limit);
-    }
-}
+// The student's reading page: messages, progress, level, books read, report, records and search.
+echo $output->reading_page($reader, $USER, false);
 
 echo $output->footer();
