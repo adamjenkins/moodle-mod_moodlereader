@@ -63,8 +63,6 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
             ['bookid', 'difficulty', 'words', 'points']
         );
 
-        // The course's Safe Exam Browser settings, applied when the whole course is restored.
-
         $attempts = new backup_nested_element('attempts');
         $attempt = new backup_nested_element('attempt', ['id'], [
             'userid', 'bookid', 'attempt', 'state', 'percentgrade', 'passed', 'credit',

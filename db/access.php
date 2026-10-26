@@ -101,7 +101,7 @@ $capabilities = [
         ],
     ],
 
-    // Safe Exam Browser for the quizzes of an activity, or of every activity in a course.
+    // Safe Exam Browser for the quizzes of an activity.
     'mod/moodlereader:manageseb' => [
         'riskbitmask'  => RISK_CONFIG,
         'captype'      => 'write',

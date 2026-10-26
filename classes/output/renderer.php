@@ -562,7 +562,7 @@ class renderer extends \plugin_renderer_base {
             $text = get_string($eligibility->in_progress((int) $book->id) ? 'canresume' : 'cantake', 'mod_moodlereader');
             return html_writer::span(s($text), 'badge bg-success');
         }
-        return html_writer::span(s(get_string('cannottake', 'mod_moodlereader')), 'badge bg-secondary') .
+        return html_writer::span(s(get_string('cannottake', 'mod_moodlereader')), 'badge bg-secondary text-dark') .
             html_writer::div(s($reason), 'small mt-1');
     }
 

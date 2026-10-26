@@ -148,7 +148,7 @@ class report {
         }
         $out = html_writer::span(s($labels[0]), 'badge ' . $class);
         if (!empty($row->deleted)) {
-            $out .= ' ' . html_writer::span(s($labels[1]), 'badge bg-secondary');
+            $out .= ' ' . html_writer::span(s($labels[1]), 'badge bg-secondary text-dark');
         }
         return $out;
     }

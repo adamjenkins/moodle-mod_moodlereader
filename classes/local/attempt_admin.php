@@ -99,6 +99,14 @@ class attempt_admin {
             if (in_array($action, [self::ACTION_PASS, self::ACTION_FAIL], true) && $attempt->state !== 'finished') {
                 continue;
             }
+            // A book counts once per student: an attempt is not restored while another one at the same book
+            // (or title) counts, in this activity or another.
+            if (
+                $action === self::ACTION_RESTORE && $attempt->state === 'finished'
+                    && \mod_moodlereader\local\attempt::already_finished($attempt)
+            ) {
+                continue;
+            }
             $changed = false;
             foreach ($changes[$action] as $field => $value) {
                 if ((int) $attempt->$field !== $value) {
@@ -187,10 +195,14 @@ class attempt_admin {
         $now = time();
         $credited = [];
         foreach (array_keys(self::visible_userids($reader, $userids)) as $userid) {
-            $counted = $DB->record_exists_select(
-                'moodlereader_attempts',
-                'userid = ? AND bookid = ? AND deleted = 0 AND cheated = 0 AND (passed = 1 OR credit = 1)',
-                [$userid, $book->id]
+            // Counted already, for this book or another edition of its title.
+            $counted = $DB->record_exists_sql(
+                "SELECT 1
+                   FROM {moodlereader_attempts} a
+                   JOIN {moodlereader_books} b ON b.id = a.bookid
+                  WHERE a.userid = :userid AND a.deleted = 0 AND a.cheated = 0 AND (a.passed = 1 OR a.credit = 1)
+                        AND (a.bookid = :bookid OR (b.sametitle <> '' AND b.sametitle = :sametitle))",
+                ['userid' => $userid, 'bookid' => $book->id, 'sametitle' => (string) $book->sametitle]
             );
             if ($counted) {
                 continue;

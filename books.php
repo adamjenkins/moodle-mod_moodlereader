@@ -320,7 +320,7 @@ foreach ($books as $book) {
             'data-action' => 'toggle', 'data-toggle' => 'target', 'data-togglegroup' => 'mrbooks',
         ]);
     if ($book->hidden) {
-        $status = html_writer::span(get_string('disabled', 'mod_moodlereader'), 'badge bg-secondary');
+        $status = html_writer::span(get_string('disabled', 'mod_moodlereader'), 'badge bg-secondary text-dark');
         $toggle = html_writer::link(
             new moodle_url($pageurl, $filterparams + ['show' => $book->id, 'page' => $page, 'sesskey' => sesskey()]),
             get_string('enablebook', 'mod_moodlereader'),

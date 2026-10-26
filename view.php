@@ -50,12 +50,8 @@ $PAGE->set_activity_record($reader->get_instance());
 /** @var \mod_moodlereader\output\renderer $output */
 $output = $PAGE->get_renderer('mod_moodlereader');
 
+// The activity header shows the name and the description: they are not repeated here.
 echo $output->header();
-echo $output->heading(format_string($reader->get_instance()->name));
-
-if (!empty($reader->get_instance()->intro)) {
-    echo $output->box(format_module_intro('moodlereader', $reader->get_instance(), $reader->get_cm()->id), 'generalbox');
-}
 
 // Teacher tools.
 $tools = [

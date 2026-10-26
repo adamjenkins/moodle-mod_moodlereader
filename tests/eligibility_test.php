@@ -172,5 +172,10 @@ final class eligibility_test extends \advanced_testcase {
         $this->assertEquals(0, $DB->get_field('moodlereader_attempts', 'deleted', ['id' => $first->id]));
         $this->assertEquals(1, $DB->get_field('moodlereader_attempts', 'deleted', ['id' => $second->id]));
         $this->assertEquals('finished', $DB->get_field('moodlereader_attempts', 'state', ['id' => $second->id]));
+
+        // A teacher's Restore does not bring it back while the first one counts.
+        $this->setAdminUser();
+        $this->assertSame(0, \mod_moodlereader\local\attempt_admin::update($readerb, [(int) $second->id], 'restore'));
+        $this->assertEquals(1, $DB->get_field('moodlereader_attempts', 'deleted', ['id' => $second->id]));
     }
 }
