@@ -381,5 +381,14 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026102603, 'moodlereader');
     }
 
+    if ($oldversion < 2026102604) {
+        // Books unchanged since the last sync would never bring their "same book" key: the next sync of each
+        // list is a full one (mreader.org's 31 §10 amendment 6 adds the key without touching updated_at).
+        unset_config('v2lastbooksync', 'mod_moodlereader');
+        unset_config('v2lastnoquizsync', 'mod_moodlereader');
+
+        upgrade_mod_savepoint(true, 2026102604, 'moodlereader');
+    }
+
     return true;
 }

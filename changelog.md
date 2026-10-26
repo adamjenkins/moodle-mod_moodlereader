@@ -100,7 +100,8 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - `classes/local/sametitle.php`: the "same book" key normalised as mreader.org's `SameTitleKey::normalise()`
   (lower-case, trimmed, white-space runs incl. no-break and full-width spaces to one space). The sync reads
   `same_title` (proposed for API v2 after v3.8; `sametitle` accepted) and keeps the stored key when an item
-  carries neither; the importer and restore normalise; upgrade 2026102603 normalises stored keys.
+  carries neither; the importer and restore normalise; upgrade 2026102603 normalises stored keys, and
+  2026102604 clears both lists' last-sync dates so the next sync is full and brings every key.
 - Capability `mod/moodlereader:managecatalogue` (system, manager) replaces `managebooks` for
   Manage books (version 2026102601).
 - `reader::require_quiz_taker()`: quiz pages need `attempt` (or `viewreports` for a teacher trying
