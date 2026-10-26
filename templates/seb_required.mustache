@@ -1,0 +1,86 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_moodlereader/seb_required
+
+    The quizzes need Safe Exam Browser: the page shown instead of a quiz, or (notice) a box on the
+    activity page. Only the quizzes are locked.
+
+    Classes required for JS:
+    * none; data-region="mr-sebcheck" is used by mod_moodlereader/sebcheck.
+
+    Context variables required for this template:
+    * notice - shown on the activity page rather than instead of a quiz
+    * allowed - (notice) this browser already passes the check
+    * insideseb - the browser says it is SEB (its keys did not match)
+    * isconfig - Moodle makes the SEB configuration
+    * launchurl - seb:// or sebs:// link that opens SEB with the configuration (isconfig)
+    * configurl - http(s) link that downloads the configuration (isconfig)
+    * downloadurl - where to get SEB, or empty
+    * quiturl - (notice) the link that closes SEB, or empty
+    * backurl - the activity page
+
+    Example context (json):
+    {
+        "notice": false, "allowed": false, "insideseb": false, "isconfig": true,
+        "launchurl": "sebs://example.com/mod/moodlereader/sebconfig.php?id=5",
+        "configurl": "https://example.com/mod/moodlereader/sebconfig.php?id=5",
+        "downloadurl": "https://safeexambrowser.org/download_en.html", "quiturl": "",
+        "backurl": "https://example.com/mod/moodlereader/view.php?id=5"
+    }
+}}
+{{#notice}}
+<div class="alert alert-info mod-moodlereader-seb" role="status">
+    {{#allowed}}
+        <p class="mb-0">{{#str}} sebnoticeinside, mod_moodlereader {{/str}}</p>
+        {{#quiturl}}
+        <a class="btn btn-secondary mt-2" href="{{quiturl}}">{{#str}} sebquit, mod_moodlereader {{/str}}</a>
+        {{/quiturl}}
+    {{/allowed}}
+    {{^allowed}}
+        <p>{{#str}} sebnotice, mod_moodlereader {{/str}}</p>
+        {{#isconfig}}
+        <a class="btn btn-primary" href="{{launchurl}}">{{#str}} seblaunch, mod_moodlereader {{/str}}</a>
+        {{/isconfig}}
+        {{#downloadurl}}
+        <a class="btn btn-secondary" href="{{downloadurl}}">{{#str}} sebdownload, mod_moodlereader {{/str}}</a>
+        {{/downloadurl}}
+    {{/allowed}}
+</div>
+{{/notice}}
+{{^notice}}
+<div class="mod-moodlereader-seb" data-region="mr-sebcheck">
+    <h2 class="h3">{{#str}} sebrequired, mod_moodlereader {{/str}}</h2>
+    <div class="d-none alert alert-info" data-region="mr-sebchecking" role="status">{{#str}} sebchecking, mod_moodlereader {{/str}}</div>
+    {{#insideseb}}
+        <p data-region="mr-sebmessage">{{#str}} sebwrongconfig, mod_moodlereader {{/str}}</p>
+    {{/insideseb}}
+    {{^insideseb}}
+        <p data-region="mr-sebmessage">{{#str}} sebrequired_desc, mod_moodlereader {{/str}}</p>
+    {{/insideseb}}
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        {{#isconfig}}
+        <a class="btn btn-primary me-2 mr-2 mb-2" href="{{launchurl}}">{{#str}} seblaunch, mod_moodlereader {{/str}}</a>
+        <a class="btn btn-secondary me-2 mr-2 mb-2" href="{{configurl}}">{{#str}} sebconfigdownload, mod_moodlereader {{/str}}</a>
+        {{/isconfig}}
+        {{#downloadurl}}
+        <a class="btn btn-secondary me-2 mr-2 mb-2" href="{{downloadurl}}">{{#str}} sebdownload, mod_moodlereader {{/str}}</a>
+        {{/downloadurl}}
+    </div>
+    <p><a href="{{backurl}}">{{#str}} sebback, mod_moodlereader {{/str}}</a></p>
+</div>
+{{/notice}}

@@ -77,6 +77,18 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   `timelimit`, `slots`, `currentslot`, `secondsused`, `timeserved`, `timeheartbeat` (version
   2026102505). No question text is stored; pages are sent `no-store`. Behat runs against a fake
   mreader.org (`tests/behat/fake_mreader.php`, Behat site only).
+- Safe Exam Browser (plan/50 §5, §9.4): `classes/local/seb.php` (site, course, activity
+  precedence; the configuration made with core's `quizaccess_seb\property_list` and its Config Key
+  from `config_key`; header and JS-API key checks as core's `seb_access_manager`, with access kept
+  per session and activity), checked on `startquiz.php`, `quiz/mreader.php` and every
+  `quiz/render.php` request (not the heartbeat, which serves nothing). `sebconfig.php` serves the
+  `.seb` file, `sebcheck.php` and AMD `sebcheck` check SEB's JS-API keys, template
+  `seb_required`, course page `sebcourse.php` (navigation via `moodlereader_extend_navigation_course`),
+  capability `mod/moodlereader:manageseb`, site settings `sebmode`, `sebmethod`, `sebkeys`,
+  `sebquitpassword`, `sebdownloadlink`. Fields `moodlereader.seb`, `sebmethod`, `sebkeys`,
+  `sebquitpassword` and table `moodlereader_sebcourse` (version 2026102600), deleted with the
+  course (hook `before_course_deleted`). Backup carries both; restore drops Browser Exam Keys from
+  another site and applies course settings only to a course restored whole.
 - Completion rules use `ignoredate`, count each book once and include credit.
 - `mod_form` validation refuses `wordsorpoints = 1` when no enabled book has points.
 - `moodlereader_books.language` is NOT NULL with no default (XMLDB rejects `''` as a

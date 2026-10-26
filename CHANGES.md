@@ -71,6 +71,13 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   question is on screen, and stops while the next one loads or the page is closed. At the end
   students can answer mreader.org's short book survey. This needs mreader.org's next release;
   until then quizzes are shown in mreader.org's frame as before.
+- Book quizzes can require Safe Exam Browser (SEB). A site administrator chooses
+  "Teachers decide", "Required everywhere" or "Never". Teachers can require it for every
+  reading activity in a course (new "Safe Exam Browser for reading quizzes" page in the
+  course's More menu) or per activity. Moodle makes the SEB configuration and checks its
+  Config Key, or checks the Browser Exam Keys of SEB's own configuration. Only the quizzes
+  are locked: progress, the book search and records stay open in any browser. Students
+  outside SEB see a "Launch Safe Exam Browser" link instead of the quiz.
 - Books without a quiz are kept in the catalogue (from mod_reader, and from mreader.org
   once it offers them) so credit can be awarded for them; students never see them as quizzes.
 - The "read N words" completion rule now counts what the progress bar and the grade

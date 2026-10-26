@@ -105,6 +105,16 @@ if (!\mod_moodlereader\local\connection::allows_launch()) {
     echo $OUTPUT->notification($message, \core\output\notification::NOTIFY_WARNING, false);
 }
 
+// Quizzes that need Safe Exam Browser: how to open it, or, inside it, how to leave.
+if ($sebrule = \mod_moodlereader\local\seb::rule($reader->get_instance())) {
+    $seb = \mod_moodlereader\local\seb::export_required($reader, $sebrule);
+    $seb['notice'] = true;
+    $seb['allowed'] = \mod_moodlereader\local\seb::allows($reader);
+    $seb['quiturl'] = $seb['allowed'] && $seb['isconfig'] && $seb['insideseb']
+        ? \mod_moodlereader\local\seb::quit_url((int) $reader->get_cm()->id)->out(false) : '';
+    echo $output->render_from_template('mod_moodlereader/seb_required', $seb);
+}
+
 // The student's reading page: messages, progress, level, books read, report, records and search.
 echo $output->reading_page($reader, $USER, false);
 

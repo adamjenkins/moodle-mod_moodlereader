@@ -47,6 +47,10 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
             'moodlereader_bookinstance',
             '/activity/moodlereader/bookinstancelinks/bookinstance'
         );
+        $paths[] = new restore_path_element(
+            'moodlereader_sebcourse',
+            '/activity/moodlereader/sebcourse'
+        );
         if ($userinfo) {
             $paths[] = new restore_path_element(
                 'moodlereader_attempt',
@@ -88,11 +92,66 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         ) {
             $data->$flag = empty($data->$flag) ? 0 : 1;
         }
+        $this->clean_seb($data, 'seb', 'sebmethod', 'sebkeys', 'sebquitpassword');
         $settings = json_decode((string) ($data->cheatsettings ?? ''), true);
         $data->cheatsettings = is_array($settings)
             ? json_encode(\mod_moodlereader\local\cheatdetector::clean_settings($settings)) : null;
         $newid = $DB->insert_record('moodlereader', $data);
         $this->apply_activity_instance($newid);
+    }
+
+    /**
+     * Clean Safe Exam Browser settings from a backup.
+     *
+     * Browser Exam Keys belong to the SEB set-up of the site that made the backup: from another site they
+     * are dropped, and the teacher enters this site's keys.
+     *
+     * @param \stdClass $data
+     * @param string|null $seb The on/off field, or null for the course settings.
+     * @param string $method
+     * @param string $keys
+     * @param string $password
+     * @return void
+     */
+    protected function clean_seb(\stdClass $data, ?string $seb, string $method, string $keys, string $password): void {
+        if ($seb !== null) {
+            $data->$seb = in_array((int) ($data->$seb ?? 0), [1, 2], true) ? (int) $data->$seb : 0;
+        }
+        $data->$method = (int) ($data->$method ?? 0) === 1 ? 1 : 0;
+        $data->$keys = $this->get_task()->is_samesite()
+            ? implode("\n", \mod_moodlereader\local\seb::split_keys((string) ($data->$keys ?? ''))) : '';
+        if (!\mod_moodlereader\local\seb::valid_keys($data->$keys)) {
+            $data->$keys = '';
+        }
+        $data->$password = \core_text::substr((string) ($data->$password ?? ''), 0, 255);
+    }
+
+    /**
+     * Restore the course's Safe Exam Browser settings, only into a course being restored whole that has none.
+     *
+     * @param array $data
+     * @return void
+     */
+    protected function process_moodlereader_sebcourse($data) {
+        global $DB;
+        $whole = [backup::TARGET_NEW_COURSE, backup::TARGET_EXISTING_DELETING, backup::TARGET_CURRENT_DELETING];
+        $courseid = $this->get_courseid();
+        if (!in_array($this->get_task()->get_target(), $whole)) {
+            return;
+        }
+        if ($DB->record_exists('moodlereader_sebcourse', ['courseid' => $courseid])) {
+            return;
+        }
+        $data = (object) $data;
+        $this->clean_seb($data, null, 'method', 'sebkeys', 'quitpassword');
+        $DB->insert_record('moodlereader_sebcourse', (object) [
+            'courseid' => $courseid,
+            'required' => empty($data->required) ? 0 : 1,
+            'method' => $data->method,
+            'sebkeys' => $data->sebkeys,
+            'quitpassword' => $data->quitpassword,
+            'timemodified' => time(),
+        ]);
     }
 
     /**

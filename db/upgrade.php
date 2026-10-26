@@ -284,5 +284,37 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026102505, 'moodlereader');
     }
 
+    if ($oldversion < 2026102600) {
+        // Safe Exam Browser for the quizzes: per activity, per course, or forced site-wide.
+        $table = new xmldb_table('moodlereader');
+        $fields = [
+            new xmldb_field('seb', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'quizdelivery'),
+            new xmldb_field('sebmethod', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'seb'),
+            new xmldb_field('sebkeys', XMLDB_TYPE_TEXT, null, null, null, null, null, 'sebmethod'),
+            new xmldb_field('sebquitpassword', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'sebkeys'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+
+        $table = new xmldb_table('moodlereader_sebcourse');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('required', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('method', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('sebkeys', XMLDB_TYPE_TEXT, null, null, null, null, null);
+        $table->add_field('quitpassword', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_key('courseid', XMLDB_KEY_FOREIGN_UNIQUE, ['courseid'], 'course', ['id']);
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        upgrade_mod_savepoint(true, 2026102600, 'moodlereader');
+    }
+
     return true;
 }

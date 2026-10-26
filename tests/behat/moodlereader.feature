@@ -252,3 +252,19 @@ Feature: Moodle Reader activity
     And I press "Finish"
     And I press "No thanks"
     Then I should see "Your result for \"Blue Hills\" has been recorded: 100%, passed."
+
+  Scenario: A teacher requires Safe Exam Browser for the course, and a student's quiz asks for it
+    Given mreader.org draws quizzes for Moodle
+    And I am on the "Course 1" course page logged in as teacher1
+    And I navigate to "Safe Exam Browser for reading quizzes" in current page administration
+    And I set the field "Require Safe Exam Browser for all Moodle Reader quizzes in this course" to "1"
+    And I press "Save changes"
+    And I am on the "Reader 1" "moodlereader activity editing" page
+    Then I should see "Required for this course"
+    When I am on the "Reader 1" "moodlereader activity" page logged in as student1
+    Then I should see "The book quizzes here need Safe Exam Browser."
+    And I press "Search"
+    And I click on "Take the quiz" "button" in the "The Red Kite" "table_row"
+    Then I should see "This quiz needs Safe Exam Browser"
+    And "Launch Safe Exam Browser" "link" should exist
+    And I should not see "Question 1 of 3"

@@ -42,6 +42,8 @@ $reader->require_cap('viewbooks');
 if ((int) $attempt->userid !== (int) $USER->id) {
     throw new moodle_exception('notyourattempt', 'mod_moodlereader', $reader->view_url());
 }
+// Every question page and every answer post, when Safe Exam Browser is required.
+\mod_moodlereader\local\seb::require_access($reader);
 if ($attempt->delivery !== quizsession::DELIVERY_MOODLE || empty($attempt->attemptref)) {
     redirect(new moodle_url('/mod/moodlereader/quiz/mreader.php', ['attempt' => $attempt->id]));
 }

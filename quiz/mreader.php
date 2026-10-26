@@ -53,6 +53,7 @@ if ($attempt->state !== 'inprogress') {
     redirect($reader->view_url());
 }
 $reader->require_available();
+\mod_moodlereader\local\seb::require_access($reader);
 if (!connection::allows_launch()) {
     throw new moodle_exception('notconnected', 'mod_moodlereader', $reader->view_url());
 }

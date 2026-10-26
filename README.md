@@ -56,7 +56,7 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
   search** (title, language, publisher, series, genre, reading level; English is
   selected until the student picks another language). Search results appear
   only after a search and each carries a cover thumbnail and a "take the quiz"
-  button; the quiz is delivered by mreader.org in a frame.
+  button.
 - Each passed book's word count contributes once to the gradebook grade.
 - Teachers can **manage the site's catalogue** (filter by several publishers, levels and
   languages at once, plus series and status, and enable or disable single books, the ticked
@@ -74,6 +74,10 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
   questions and marks the answers; Moodle shows one question at a time in its own look, never
   stores the questions, runs a countdown that pauses while the next question loads, and offers
   mreader.org's book survey at the end. Otherwise quizzes show in mreader.org's frame.
+- **Safe Exam Browser** for the quizzes: required site-wide by an administrator, or per course
+  (the course's More menu) or per activity by teachers. Moodle can make the SEB configuration
+  (students open it with a "Launch Safe Exam Browser" link) or accept SEB's own configuration by
+  its Browser Exam Keys. Only the quizzes are locked. Needs core's `quizaccess_seb`.
 - **Cheating detection** with a settings page per activity: three markers (same book
   from the same address or network, a quiz finished too quickly, many quizzes in a short
   time), each can be switched off and tuned. Addresses on an allow-list (the site's

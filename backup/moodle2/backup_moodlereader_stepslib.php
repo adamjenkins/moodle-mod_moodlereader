@@ -40,8 +40,8 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         $reader = new backup_nested_element('moodlereader', ['id'], [
             'name', 'intro', 'introformat', 'availablefrom', 'availableuntil', 'maxgrade',
             'goal', 'wordsorpoints', 'minpassgrade', 'ignoredate', 'levelcheck', 'thislevel',
-            'prevlevel', 'nextlevel', 'bookinstances', 'showprogressbar', 'extraprogressbar', 'quizdelivery', 'showlevel',
-            'showbooksread', 'showreport', 'showsearch', 'completionpass',
+            'prevlevel', 'nextlevel', 'bookinstances', 'showprogressbar', 'extraprogressbar', 'quizdelivery', 'seb', 'sebmethod',
+            'sebkeys', 'sebquitpassword', 'showlevel', 'showbooksread', 'showreport', 'showsearch', 'completionpass',
             'completiontotalwords', 'cheatsettings', 'timecreated', 'timemodified',
         ]);
 
@@ -61,6 +61,9 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
             ['id'],
             ['bookid', 'difficulty', 'words', 'points']
         );
+
+        // The course's Safe Exam Browser settings, applied when the whole course is restored.
+        $sebcourse = new backup_nested_element('sebcourse', ['id'], ['required', 'method', 'sebkeys', 'quitpassword']);
 
         $attempts = new backup_nested_element('attempts');
         $attempt = new backup_nested_element('attempt', ['id'], [
@@ -94,6 +97,7 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         $books->add_child($book);
         $reader->add_child($bookinstances);
         $bookinstances->add_child($bookinstance);
+        $reader->add_child($sebcourse);
         $reader->add_child($attempts);
         $attempts->add_child($attempt);
         $reader->add_child($grades);
@@ -105,6 +109,7 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
 
         $reader->set_source_table('moodlereader', ['id' => backup::VAR_ACTIVITYID]);
         $bookinstance->set_source_table('moodlereader_bookinstances', ['readerid' => backup::VAR_PARENTID]);
+        $sebcourse->set_source_table('moodlereader_sebcourse', ['courseid' => backup::VAR_COURSEID]);
 
         // Books referenced by this activity's bookinstances or (when included) attempts.
         $book->set_source_sql(

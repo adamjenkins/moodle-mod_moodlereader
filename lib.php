@@ -56,12 +56,39 @@ function moodlereader_supports($feature) {
  */
 function moodlereader_add_instance($data, $mform = null) {
     global $DB;
+    moodlereader_clean_seb($data, context_course::instance($data->course));
     $data->timecreated = time();
     $data->timemodified = $data->timecreated;
     $data->maxgrade = moodlereader_maxgrade_from_form($data);
     $data->id = $DB->insert_record('moodlereader', $data);
     moodlereader_grade_item_update($data);
     return $data->id;
+}
+
+/**
+ * Keep the Safe Exam Browser settings only from someone who may set them, and in their allowed form.
+ *
+ * @param stdClass $data Form data.
+ * @param context $context
+ * @return void
+ */
+function moodlereader_clean_seb($data, $context) {
+    $fields = ['seb', 'sebmethod', 'sebkeys', 'sebquitpassword'];
+    if (!\mod_moodlereader\local\seb::teachers_decide() || !has_capability('mod/moodlereader:manageseb', $context)) {
+        foreach ($fields as $field) {
+            unset($data->$field);
+        }
+        return;
+    }
+    if (isset($data->seb)) {
+        $data->seb = in_array((int) $data->seb, [1, 2], true) ? (int) $data->seb : 0;
+    }
+    if (isset($data->sebmethod)) {
+        $data->sebmethod = (int) $data->sebmethod === 1 ? 1 : 0;
+    }
+    if (isset($data->sebkeys)) {
+        $data->sebkeys = implode("\n", \mod_moodlereader\local\seb::split_keys((string) $data->sebkeys));
+    }
 }
 
 /**
@@ -94,6 +121,10 @@ function moodlereader_update_instance($data, $mform = null) {
     $data->timemodified = time();
     $data->id = $data->instance;
     $data->maxgrade = moodlereader_maxgrade_from_form($data);
+    moodlereader_clean_seb(
+        $data,
+        empty($data->coursemodule) ? context_course::instance($data->course) : context_module::instance($data->coursemodule)
+    );
     $result = $DB->update_record('moodlereader', $data);
     moodlereader_grade_item_update($data);
     moodlereader_update_grades($data);
@@ -398,4 +429,29 @@ function moodlereader_get_coursemodule_info($coursemodule) {
     }
 
     return $info;
+}
+
+/**
+ * Add the course's Safe Exam Browser page to its More menu, for teachers who may set it.
+ *
+ * @param navigation_node $navigation The course settings node.
+ * @param stdClass $course
+ * @param context $context The course context.
+ * @return void
+ */
+function moodlereader_extend_navigation_course($navigation, $course, $context) {
+    if (!\mod_moodlereader\local\seb::teachers_decide() || !has_capability('mod/moodlereader:manageseb', $context)) {
+        return;
+    }
+    if (empty(get_fast_modinfo($course)->get_instances_of('moodlereader'))) {
+        return;
+    }
+    $navigation->add_node(navigation_node::create(
+        get_string('sebcourse', 'mod_moodlereader'),
+        new moodle_url('/mod/moodlereader/sebcourse.php', ['id' => $course->id]),
+        navigation_node::TYPE_SETTING,
+        null,
+        'moodlereaderseb',
+        new pix_icon('i/settings', '')
+    ));
 }

@@ -110,6 +110,8 @@ class mod_moodlereader_mod_form extends moodleform_mod {
             $mform->disabledIf($field, 'levelcheck');
         }
 
+        $this->add_seb_elements();
+
         // Availability window.
         $mform->addElement('header', 'availabilityheader', get_string('availability'));
         $mform->addElement(
@@ -133,6 +135,57 @@ class mod_moodlereader_mod_form extends moodleform_mod {
     }
 
     /**
+     * Safe Exam Browser for the quizzes, unless the site or the course already decides it.
+     *
+     * @return void
+     */
+    protected function add_seb_elements(): void {
+        $mform = $this->_form;
+        if (!\mod_moodlereader\local\seb::available()) {
+            return;
+        }
+        $mode = \mod_moodlereader\local\seb::site_mode();
+        if ($mode === \mod_moodlereader\local\seb::SITE_NEVER) {
+            return;
+        }
+        $mform->addElement('header', 'sebheader', get_string('seb', 'mod_moodlereader'));
+        $course = \mod_moodlereader\local\seb::course_settings((int) $this->get_course()->id);
+        if ($mode === \mod_moodlereader\local\seb::SITE_REQUIRED) {
+            $mform->addElement(
+                'static',
+                'sebforced',
+                get_string('sebactivity', 'mod_moodlereader'),
+                get_string('sebbysite', 'mod_moodlereader')
+            );
+            return;
+        }
+        if ($course && !empty($course->required)) {
+            $mform->addElement(
+                'static',
+                'sebforced',
+                get_string('sebactivity', 'mod_moodlereader'),
+                get_string('sebbycourse', 'mod_moodlereader')
+            );
+            return;
+        }
+        if (!has_capability('mod/moodlereader:manageseb', $this->context)) {
+            $current = (int) ($this->current->seb ?? 0) === \mod_moodlereader\local\seb::ACTIVITY_YES ? 'yes' : 'no';
+            $mform->addElement('static', 'sebcurrent', get_string('sebactivity', 'mod_moodlereader'), get_string($current));
+            return;
+        }
+        $mform->addElement('select', 'seb', get_string('sebactivity', 'mod_moodlereader'), [
+            \mod_moodlereader\local\seb::ACTIVITY_COURSE => get_string('sebactivity_course', 'mod_moodlereader'),
+            \mod_moodlereader\local\seb::ACTIVITY_YES => get_string('yes'),
+            \mod_moodlereader\local\seb::ACTIVITY_NO => get_string('no'),
+        ]);
+        $mform->addHelpButton('seb', 'sebactivity', 'mod_moodlereader');
+        \mod_moodlereader\form\sebcourse_form::add_rule_elements($mform);
+        foreach (['sebmethod', 'sebkeys', 'sebquitpassword'] as $name) {
+            $mform->hideIf($name, 'seb', 'neq', \mod_moodlereader\local\seb::ACTIVITY_YES);
+        }
+    }
+
+    /**
      * Validate the settings.
      *
      * @param array $data
@@ -146,6 +199,15 @@ class mod_moodlereader_mod_form extends moodleform_mod {
             if (isset($data[$field]) && ((int) $data[$field] < 0 || (int) $data[$field] > 99)) {
                 $errors[$field] = get_string('levelcountrange', 'mod_moodlereader');
             }
+        }
+        if (isset($data['sebkeys']) && !\mod_moodlereader\local\seb::valid_keys($data['sebkeys'])) {
+            $errors['sebkeys'] = get_string('sebkeysinvalid', 'mod_moodlereader');
+        } else if (
+            (int) ($data['seb'] ?? 0) === \mod_moodlereader\local\seb::ACTIVITY_YES
+                && (int) ($data['sebmethod'] ?? 0) === \mod_moodlereader\local\seb::METHOD_CLIENT
+                && trim($data['sebkeys'] ?? '') === ''
+        ) {
+            $errors['sebkeys'] = get_string('sebkeysneeded', 'mod_moodlereader');
         }
         // The mreader.org catalogue has no points, so grading by points needs books that have them.
         if (!empty($data['wordsorpoints']) && !$DB->record_exists_select('moodlereader_books', 'points > 0 AND hidden = 0')) {

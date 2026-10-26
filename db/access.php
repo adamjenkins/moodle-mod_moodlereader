@@ -100,4 +100,15 @@ $capabilities = [
             'manager' => CAP_ALLOW,
         ],
     ],
+
+    // Safe Exam Browser for the quizzes of an activity, or of every activity in a course.
+    'mod/moodlereader:manageseb' => [
+        'riskbitmask'  => RISK_CONFIG,
+        'captype'      => 'write',
+        'contextlevel' => CONTEXT_MODULE,
+        'archetypes'   => [
+            'editingteacher' => CAP_ALLOW,
+            'manager'        => CAP_ALLOW,
+        ],
+    ],
 ];

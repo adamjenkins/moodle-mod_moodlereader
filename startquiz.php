@@ -37,6 +37,8 @@ require_sesskey();
 // Everyone who sees the books may take a quiz, teachers included; reports list students only.
 $reader->require_cap('viewbooks');
 $reader->require_available();
+// Safe Exam Browser, when the site, course or activity requires it: only the quizzes are locked.
+\mod_moodlereader\local\seb::require_access($reader);
 if (!connection::allows_launch()) {
     throw new moodle_exception('notconnected', 'mod_moodlereader', $reader->view_url());
 }

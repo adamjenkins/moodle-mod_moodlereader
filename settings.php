@@ -53,6 +53,57 @@ if ($ADMIN->fulltree) {
         5
     ));
 
+    // Safe Exam Browser: teachers decide, or required for every quiz, or never.
+    $settings->add(new admin_setting_heading(
+        'mod_moodlereader/sebheading',
+        get_string('seb', 'mod_moodlereader'),
+        \mod_moodlereader\local\seb::available() ? '' : get_string('sebunavailable', 'mod_moodlereader')
+    ));
+    $settings->add(new admin_setting_configselect(
+        'mod_moodlereader/sebmode',
+        get_string('sebmode', 'mod_moodlereader'),
+        get_string('sebmode_desc', 'mod_moodlereader'),
+        \mod_moodlereader\local\seb::SITE_TEACHERS,
+        [
+            \mod_moodlereader\local\seb::SITE_TEACHERS => get_string('sebmode_teachers', 'mod_moodlereader'),
+            \mod_moodlereader\local\seb::SITE_REQUIRED => get_string('sebmode_required', 'mod_moodlereader'),
+            \mod_moodlereader\local\seb::SITE_NEVER => get_string('sebmode_never', 'mod_moodlereader'),
+        ]
+    ));
+    // How a site-wide requirement is checked.
+    $settings->add(new admin_setting_configselect(
+        'mod_moodlereader/sebmethod',
+        get_string('sebmethod', 'mod_moodlereader'),
+        get_string('sebmethod_desc', 'mod_moodlereader'),
+        \mod_moodlereader\local\seb::METHOD_CONFIG,
+        [
+            \mod_moodlereader\local\seb::METHOD_CONFIG => get_string('sebmethod_config', 'mod_moodlereader'),
+            \mod_moodlereader\local\seb::METHOD_CLIENT => get_string('sebmethod_client', 'mod_moodlereader'),
+        ]
+    ));
+    $settings->add(new \mod_moodlereader\local\admin_setting_sebkeys(
+        'mod_moodlereader/sebkeys',
+        get_string('sebkeys', 'mod_moodlereader'),
+        get_string('sebkeys_help', 'mod_moodlereader'),
+        ''
+    ));
+    $settings->add(new admin_setting_configpasswordunmask(
+        'mod_moodlereader/sebquitpassword',
+        get_string('sebquitpassword', 'mod_moodlereader'),
+        get_string('sebquitpassword_help', 'mod_moodlereader'),
+        ''
+    ));
+    $settings->add(new admin_setting_configtext(
+        'mod_moodlereader/sebdownloadlink',
+        get_string('sebdownloadlink', 'mod_moodlereader'),
+        get_string('sebdownloadlink_desc', 'mod_moodlereader'),
+        'https://safeexambrowser.org/download_en.html',
+        PARAM_URL
+    ));
+    foreach (['sebmethod', 'sebkeys', 'sebquitpassword'] as $name) {
+        $settings->hide_if("mod_moodlereader/$name", 'mod_moodlereader/sebmode', 'neq', \mod_moodlereader\local\seb::SITE_REQUIRED);
+    }
+
     // Connection state and link; the connection itself is managed on its own page.
     $state = \mod_moodlereader\local\connection::state();
     $settings->add(new admin_setting_description(

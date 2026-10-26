@@ -26,6 +26,10 @@
         <FIELD NAME="showprogressbar" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
         <FIELD NAME="extraprogressbar" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="1 = once the goal is reached, a second bar shows the extra reading."/>
         <FIELD NAME="quizdelivery" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="1 = quizzes drawn by Moodle (API v2 31 §11); 0 = mreader.org's pages in a frame. Falls back to the frame when mreader.org does not offer Moodle drawing."/>
+        <FIELD NAME="seb" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Safe Exam Browser for the quizzes: 0 = as the course says, 1 = required, 2 = not required. The site setting comes first."/>
+        <FIELD NAME="sebmethod" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="0 = a configuration made by Moodle (Config Key checked); 1 = SEB's own configuration (Browser Exam Keys checked)."/>
+        <FIELD NAME="sebkeys" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Allowed Browser Exam Keys, one per line."/>
+        <FIELD NAME="sebquitpassword" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="Password to quit SEB, put (hashed) into the configuration Moodle makes."/>
         <FIELD NAME="showlevel" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="Show the reading-level panel on the activity page."/>
         <FIELD NAME="showbooksread" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="Show the covers of books read on the activity page."/>
         <FIELD NAME="showreport" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="Show the this-term reading report on the activity page."/>
@@ -253,6 +257,21 @@
       <INDEXES>
         <INDEX NAME="item" UNIQUE="true" FIELDS="importid, itemtype, legacyid, legacysub"/>
       </INDEXES>
+    </TABLE>
+    <TABLE NAME="moodlereader_sebcourse" COMMENT="Safe Exam Browser for every Moodle Reader quiz in a course.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="required" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 = every reading activity in the course requires SEB."/>
+        <FIELD NAME="method" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="As moodlereader.sebmethod."/>
+        <FIELD NAME="sebkeys" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Allowed Browser Exam Keys, one per line."/>
+        <FIELD NAME="quitpassword" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign-unique" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+      </KEYS>
     </TABLE>
   </TABLES>
 </XMLDB>
