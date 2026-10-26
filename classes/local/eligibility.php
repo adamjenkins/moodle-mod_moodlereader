@@ -67,6 +67,16 @@ class eligibility {
            ORDER BY a.timefinish, a.id",
             ['readerid' => $reader->get_instance()->id, 'userid' => $userid]
         );
+        // Books used up for life (their attempts went with a course reset or a deleted activity) count as finished.
+        $used = $DB->get_records_sql(
+            "SELECT u.id, u.bookid, 'finished' AS state, u.passed, u.credit, u.cheated, u.timefinish, b.sametitle
+               FROM {moodlereader_booksused} u
+               JOIN {moodlereader_books} b ON b.id = u.bookid
+              WHERE u.userid = :userid
+           ORDER BY u.timefinish, u.id",
+            ['userid' => $userid]
+        );
+        $attempts = array_merge(array_values($used), array_values($attempts));
         // A finished attempt in any reading activity uses the book up; an unfinished one only here (to resume it).
         foreach ($attempts as $a) {
             if ($a->state === 'finished') {

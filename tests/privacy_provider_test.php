@@ -187,4 +187,28 @@ final class privacy_provider_test extends \advanced_testcase {
             [$readerid, $user->id, $user->id]
         ));
     }
+
+    /**
+     * Books used up for life are the student's own data: exported and deleted in their user context.
+     *
+     * @return void
+     */
+    public function test_books_used_are_exported_and_deleted(): void {
+        global $DB;
+        [$reader, $user] = $this->seed();
+        \mod_moodlereader\local\attempt::keep_books_used((int) $reader->get_instance()->id);
+        $this->assertSame(1, $DB->count_records('moodlereader_booksused', ['userid' => $user->id]));
+        $usercontext = \context_user::instance($user->id);
+        $contextids = array_map('intval', provider::get_contexts_for_userid($user->id)->get_contextids());
+        $this->assertContains((int) $usercontext->id, $contextids);
+
+        provider::export_user_data(new approved_contextlist($user, 'mod_moodlereader', [$usercontext->id]));
+        $data = writer::with_context($usercontext)->get_data(
+            [get_string('pluginname', 'mod_moodlereader'), get_string('privacy:booksused', 'mod_moodlereader')]
+        );
+        $this->assertCount(1, $data->books);
+
+        provider::delete_data_for_user(new approved_contextlist($user, 'mod_moodlereader', [$usercontext->id]));
+        $this->assertSame(0, $DB->count_records('moodlereader_booksused', ['userid' => $user->id]));
+    }
 }

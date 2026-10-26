@@ -82,7 +82,8 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - A book counts once for a student on the whole site: a quiz taken in one course, or another
   edition of the same title, is not offered again in any other course, and awarding credit skips
   students who already have the book counted anywhere. A quiz opened in two courses before either
-  was finished counts only once.
+  was finished counts only once. A book used up stays used up for life: resetting the course, or
+  deleting the activity or the course, does not free it.
 - Only site administrators (and managers) enable or disable books in "Manage books", which applies
   to the whole site; teachers no longer see it.
 - A quiz still open when the activity closes is finished with the answers already given.

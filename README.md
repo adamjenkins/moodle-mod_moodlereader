@@ -59,8 +59,9 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
   only after a search and each carries a cover thumbnail and a "take the quiz"
   button.
 - Each passed book's word count contributes once to the gradebook grade. A book counts once
-  for a student on the whole site: a quiz taken in one course (or another edition of the same
-  title) is not offered again in any other course.
+  for a student on the whole site and for life: a quiz taken in one course (or another edition of
+  the same title) is not offered again in any other course, and resetting the course or deleting
+  the activity or course does not free it.
 - **Site administrators manage the site's catalogue** (Manage books: filter by several
   publishers, levels and languages at once, plus series and status, and enable or disable
   single books, the ticked books, or every book matching the filter; a disabled book is offered

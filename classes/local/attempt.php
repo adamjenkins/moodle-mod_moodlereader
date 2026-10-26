@@ -159,6 +159,8 @@ class attempt {
      */
     public static function already_finished(stdClass $attempt): bool {
         global $DB;
+        $params = ['bookid' => $attempt->bookid, 'userid' => $attempt->userid, 'id' => $attempt->id,
+            'bookid2' => $attempt->bookid, 'userid2' => $attempt->userid];
         return $DB->record_exists_sql(
             "SELECT 1
                FROM {moodlereader_attempts} a
@@ -166,7 +168,47 @@ class attempt {
                JOIN {moodlereader_books} mine ON mine.id = :bookid
               WHERE a.userid = :userid AND a.id <> :id AND a.deleted = 0 AND a.state = 'finished'
                     AND (a.bookid = mine.id OR (mine.sametitle <> '' AND b.sametitle = mine.sametitle))",
-            ['bookid' => $attempt->bookid, 'userid' => $attempt->userid, 'id' => $attempt->id]
+            $params
+        ) || $DB->record_exists_sql(
+            "SELECT 1
+               FROM {moodlereader_booksused} u
+               JOIN {moodlereader_books} b ON b.id = u.bookid
+               JOIN {moodlereader_books} mine ON mine.id = :bookid2
+              WHERE u.userid = :userid2
+                    AND (u.bookid = mine.id OR (mine.sametitle <> '' AND b.sametitle = mine.sametitle))",
+            $params
         );
+    }
+
+    /**
+     * Keep a record of the books an activity's students have used up, before its attempts are deleted
+     * (course reset, activity or course deletion): a book used up stays used up for life.
+     *
+     * @param int $readerid
+     * @return void
+     */
+    public static function keep_books_used(int $readerid): void {
+        global $DB;
+        $rows = $DB->get_records_sql(
+            "SELECT a.id, a.userid, a.bookid, a.passed, a.credit, a.cheated, a.timefinish
+               FROM {moodlereader_attempts} a
+              WHERE a.readerid = :readerid AND a.state = 'finished' AND a.deleted = 0
+                    AND NOT EXISTS (SELECT 1 FROM {moodlereader_booksused} u WHERE u.userid = a.userid AND u.bookid = a.bookid)
+           ORDER BY a.timefinish, a.id",
+            ['readerid' => $readerid]
+        );
+        $now = time();
+        $seen = [];
+        foreach ($rows as $row) {
+            $key = $row->userid . ':' . $row->bookid;
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $DB->insert_record('moodlereader_booksused', (object) [
+                'userid' => $row->userid, 'bookid' => $row->bookid, 'passed' => $row->passed, 'credit' => $row->credit,
+                'cheated' => $row->cheated, 'timefinish' => $row->timefinish, 'timecreated' => $now,
+            ]);
+        }
     }
 }

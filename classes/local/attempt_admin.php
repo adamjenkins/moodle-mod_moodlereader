@@ -203,6 +203,13 @@ class attempt_admin {
                   WHERE a.userid = :userid AND a.deleted = 0 AND a.cheated = 0 AND (a.passed = 1 OR a.credit = 1)
                         AND (a.bookid = :bookid OR (b.sametitle <> '' AND b.sametitle = :sametitle))",
                 ['userid' => $userid, 'bookid' => $book->id, 'sametitle' => (string) $book->sametitle]
+            ) || $DB->record_exists_sql(
+                "SELECT 1
+                   FROM {moodlereader_booksused} u
+                   JOIN {moodlereader_books} b ON b.id = u.bookid
+                  WHERE u.userid = :userid AND u.cheated = 0 AND (u.passed = 1 OR u.credit = 1)
+                        AND (u.bookid = :bookid OR (b.sametitle <> '' AND b.sametitle = :sametitle))",
+                ['userid' => $userid, 'bookid' => $book->id, 'sametitle' => (string) $book->sametitle]
             );
             if ($counted) {
                 continue;

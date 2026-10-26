@@ -93,7 +93,10 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - Books count once per student site-wide: `reader::available_where()` and `eligibility` read
   finished attempts in every activity; `attempt::finish()` deletes a later duplicate result
   (`already_finished()`); `reader::require_still_available()` re-checks before a launch and before
-  the first question; `award_book()` skips books counted anywhere.
+  the first question; `award_book()` skips books counted anywhere. Table `moodlereader_booksused`
+  (version 2026102602) keeps the books used up when a course reset, `moodlereader_delete_instance()`
+  or a course deletion removes the attempts (`attempt::keep_books_used()`); every check reads it
+  too. It is the student's own data: privacy export and delete in the user context.
 - Capability `mod/moodlereader:managecatalogue` (system, manager) replaces `managebooks` for
   Manage books (version 2026102601).
 - `reader::require_quiz_taker()`: quiz pages need `attempt` (or `viewreports` for a teacher trying

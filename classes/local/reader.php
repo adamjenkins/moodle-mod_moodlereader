@@ -249,6 +249,8 @@ class reader {
         $params = [
             'userid'    => $userid,
             'userid2'   => $userid,
+            'userid3'   => $userid,
+            'userid4'   => $userid,
         ];
 
         // Finished attempts by this user in any reading activity on the site (the ones that "use up" a book):
@@ -272,9 +274,18 @@ class reader {
             $params['bireaderid'] = $this->instance->id;
         }
 
+        // Books used up for life (kept when a course was reset or an activity or course deleted).
+        $usedids = "SELECT u.bookid FROM {moodlereader_booksused} u WHERE u.userid = :userid3";
+        $usedtitles = "SELECT b3.sametitle
+                         FROM {moodlereader_booksused} u
+                         JOIN {moodlereader_books} b3 ON b3.id = u.bookid
+                        WHERE u.userid = :userid4 AND b3.sametitle <> ''";
+
         // Exclude books already finished — by book id, and by shared title.
         $where[] = "b.id NOT IN ($doneids)";
         $where[] = "(b.sametitle = '' OR b.sametitle NOT IN ($donetitles))";
+        $where[] = "b.id NOT IN ($usedids)";
+        $where[] = "(b.sametitle = '' OR b.sametitle NOT IN ($usedtitles))";
 
         // Level filtering: only the levels the student may still read at (none left means no books).
         if (!empty($this->instance->levelcheck)) {

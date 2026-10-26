@@ -24,6 +24,7 @@ use core_privacy\local\request\approved_contextlist;
 use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\contextlist;
 use core_privacy\local\request\userlist;
+use core_privacy\local\request\transform;
 use core_privacy\local\request\writer;
 use core_privacy\local\request\helper;
 
@@ -72,6 +73,12 @@ class provider implements
             'currentlevel' => 'privacy:metadata:moodlereader_levels:currentlevel',
         ], 'privacy:metadata:moodlereader_levels');
 
+        $collection->add_database_table('moodlereader_booksused', [
+            'userid'     => 'privacy:metadata:moodlereader_booksused:userid',
+            'bookid'     => 'privacy:metadata:moodlereader_booksused:bookid',
+            'passed'     => 'privacy:metadata:moodlereader_booksused:passed',
+            'timefinish' => 'privacy:metadata:moodlereader_booksused:timefinish',
+        ], 'privacy:metadata:moodlereader_booksused');
         $collection->add_database_table('moodlereader_users', [
             'uniqueid'   => 'privacy:metadata:moodlereader_users:uniqueid',
             'uniquename' => 'privacy:metadata:moodlereader_users:uniquename',
@@ -121,7 +128,10 @@ class provider implements
 
         // Site-wide identity map lives in the user's own context.
         global $DB;
-        if ($DB->record_exists('moodlereader_users', ['userid' => $userid])) {
+        if (
+            $DB->record_exists('moodlereader_users', ['userid' => $userid])
+                || $DB->record_exists('moodlereader_booksused', ['userid' => $userid])
+        ) {
             $contextlist->add_user_context($userid);
         }
 
@@ -162,7 +172,10 @@ class provider implements
             $userlist->add_from_sql('otheruserid', sprintf($cheatsql, 't.otheruserid'), $params);
         } else if ($context instanceof context_user) {
             global $DB;
-            if ($DB->record_exists('moodlereader_users', ['userid' => $context->instanceid])) {
+            if (
+                $DB->record_exists('moodlereader_users', ['userid' => $context->instanceid])
+                    || $DB->record_exists('moodlereader_booksused', ['userid' => $context->instanceid])
+            ) {
                 $userlist->add_user($context->instanceid);
             }
         }
@@ -239,6 +252,24 @@ class provider implements
                         (object) ['uniqueid' => $identity->uniqueid]
                     );
                 }
+                $used = $DB->get_records_sql(
+                    "SELECT u.id, b.name, u.passed, u.timefinish
+                       FROM {moodlereader_booksused} u
+                       JOIN {moodlereader_books} b ON b.id = u.bookid
+                      WHERE u.userid = :userid
+                   ORDER BY u.timefinish",
+                    ['userid' => $userid]
+                );
+                if ($used) {
+                    writer::with_context($context)->export_data(
+                        [get_string('pluginname', 'mod_moodlereader'), get_string('privacy:booksused', 'mod_moodlereader')],
+                        (object) ['books' => array_values(array_map(fn($u) => (object) [
+                            'book' => $u->name,
+                            'passed' => transform::yesno($u->passed),
+                            'finished' => transform::datetime($u->timefinish),
+                        ], $used))]
+                    );
+                }
             }
         }
     }
@@ -251,6 +282,11 @@ class provider implements
      */
     public static function delete_data_for_all_users_in_context(context $context) {
         global $DB;
+        if ($context instanceof context_user) {
+            $DB->delete_records('moodlereader_booksused', ['userid' => $context->instanceid]);
+            $DB->delete_records('moodlereader_users', ['userid' => $context->instanceid]);
+            return;
+        }
         if (!$context instanceof context_module) {
             return;
         }
@@ -291,6 +327,7 @@ class provider implements
                     ['readerid' => $cm->instance, 'uid1' => $userid, 'uid2' => $userid]
                 );
             } else if ($context instanceof context_user && $context->instanceid == $userid) {
+                $DB->delete_records('moodlereader_booksused', ['userid' => $userid]);
                 $DB->delete_records('moodlereader_users', ['userid' => $userid]);
             }
         }
@@ -331,6 +368,7 @@ class provider implements
             );
         } else if ($context instanceof context_user) {
             if (in_array($context->instanceid, $userids)) {
+                $DB->delete_records('moodlereader_booksused', ['userid' => $context->instanceid]);
                 $DB->delete_records('moodlereader_users', ['userid' => $context->instanceid]);
             }
         }

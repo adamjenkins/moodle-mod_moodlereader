@@ -171,6 +171,8 @@ function moodlereader_delete_instance($id) {
         return false;
     }
     $params = ['readerid' => $id];
+    // A book a student has used up stays used up for life, after the activity has gone too.
+    \mod_moodlereader\local\attempt::keep_books_used((int) $id);
     $DB->delete_records('moodlereader_attempts', $params);
     $DB->delete_records('moodlereader_grades', $params);
     $DB->delete_records('moodlereader_levels', $params);
@@ -380,6 +382,8 @@ function moodlereader_reset_userdata($data) {
     $instances = $DB->get_records('moodlereader', ['course' => $data->courseid]);
     foreach ($instances as $instance) {
         $params = ['readerid' => $instance->id];
+        // A reset frees nothing: a book a student has used up stays used up for life.
+        \mod_moodlereader\local\attempt::keep_books_used((int) $instance->id);
         $DB->delete_records('moodlereader_attempts', $params);
         $DB->delete_records('moodlereader_grades', $params);
         $DB->delete_records('moodlereader_levels', $params);
