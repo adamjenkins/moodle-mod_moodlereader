@@ -367,5 +367,19 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026102602, 'moodlereader');
     }
 
+    if ($oldversion < 2026102603) {
+        // Store the "same book" keys normalised, as mreader.org compares them.
+        $rs = $DB->get_recordset_select('moodlereader_books', "sametitle <> ''", null, '', 'id, sametitle');
+        foreach ($rs as $book) {
+            $key = \mod_moodlereader\local\sametitle::normalise((string) $book->sametitle);
+            if ($key !== $book->sametitle) {
+                $DB->set_field('moodlereader_books', 'sametitle', $key, ['id' => $book->id]);
+            }
+        }
+        $rs->close();
+
+        upgrade_mod_savepoint(true, 2026102603, 'moodlereader');
+    }
+
     return true;
 }

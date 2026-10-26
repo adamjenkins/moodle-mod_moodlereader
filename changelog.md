@@ -97,6 +97,10 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   (version 2026102602) keeps the books used up when a course reset, `moodlereader_delete_instance()`
   or a course deletion removes the attempts (`attempt::keep_books_used()`); every check reads it
   too. It is the student's own data: privacy export and delete in the user context.
+- `classes/local/sametitle.php`: the "same book" key normalised as mreader.org's `SameTitleKey::normalise()`
+  (lower-case, trimmed, white-space runs incl. no-break and full-width spaces to one space). The sync reads
+  `same_title` (proposed for API v2 after v3.8; `sametitle` accepted) and keeps the stored key when an item
+  carries neither; the importer and restore normalise; upgrade 2026102603 normalises stored keys.
 - Capability `mod/moodlereader:managecatalogue` (system, manager) replaces `managebooks` for
   Manage books (version 2026102601).
 - `reader::require_quiz_taker()`: quiz pages need `attempt` (or `viewreports` for a teacher trying

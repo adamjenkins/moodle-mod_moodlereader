@@ -166,4 +166,40 @@ final class downloader_test extends \advanced_testcase {
         $this->expectException(\moodle_exception::class);
         downloader::sync_books(false, new fake_client());
     }
+
+    /**
+     * The "same book" key: normalised as mreader.org compares it, set from the item when it carries one,
+     * and kept when an update does not (a key from mod_reader is not wiped by a server that sends none).
+     *
+     * @return void
+     */
+    public function test_same_book_key(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->approve();
+        $this->assertSame('the red kite', \mod_moodlereader\local\sametitle::normalise("  The\u{00A0}RED\u{3000}\t kite "));
+        $this->assertSame('', \mod_moodlereader\local\sametitle::normalise("\u{3000} "));
+        $this->assertArrayNotHasKey('sametitle', (array) downloader::clean_book($this->book(1)));
+        $this->assertSame('red kite', downloader::clean_book($this->book(1, ['same_title' => 'Red  Kite']))->sametitle);
+
+        $client = (new fake_client())
+            ->queue('GET', '/books', 200, ['books' => [$this->book(1, ['same_title' => 'The Red Kite']),
+                $this->book(2, ['publisher' => 'Other Press', 'same_title' => 'the red kite']), $this->book(3)],
+                'next_cursor' => null])
+            ->queue('GET', '/books-noquiz', 200, ['books' => [], 'next_cursor' => null]);
+        downloader::sync_books(false, $client);
+        $key = fn(int $id) => $DB->get_field('moodlereader_books', 'sametitle', ['remoteid' => $id, 'hasquiz' => 1]);
+        $this->assertSame('the red kite', $key(1));
+        $this->assertSame('the red kite', $key(2));
+        $this->assertSame('', $key(3));
+
+        // An update without the field keeps the key; one with an empty key clears it.
+        $client = (new fake_client())
+            ->queue('GET', '/books', 200, ['books' => [$this->book(1, ['title' => 'Renamed']),
+                $this->book(2, ['same_title' => ''])], 'next_cursor' => null])
+            ->queue('GET', '/books-noquiz', 200, ['books' => [], 'next_cursor' => null]);
+        downloader::sync_books(true, $client);
+        $this->assertSame('the red kite', $key(1));
+        $this->assertSame('', $key(2));
+    }
 }

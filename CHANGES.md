@@ -84,6 +84,11 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   students who already have the book counted anywhere. A quiz opened in two courses before either
   was finished counts only once. A book used up stays used up for life: resetting the course, or
   deleting the activity or the course, does not free it.
+- "Same books" (the same title from another publisher, another edition) follow mreader.org's own
+  grouping: the book sync takes each book's "same title" key from mreader.org when it sends one,
+  compared as mreader.org compares it (case and spacing do not matter). mreader.org does not check
+  this rule for Moodle students, so the plugin is where it is applied. Sending the key needs a small
+  addition on mreader.org after v3.8; until then keys imported from mod_reader are kept.
 - Only site administrators (and managers) enable or disable books in "Manage books", which applies
   to the whole site; teachers no longer see it.
 - A quiz still open when the activity closes is finished with the answers already given.

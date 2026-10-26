@@ -165,7 +165,7 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
             'fiction'    => $text('fiction', 255),
             'points'     => (float) ($data->points ?? 0),
             'image'      => $text('image', 255),
-            'sametitle'  => $text('sametitle', 255),
+            'sametitle'  => \mod_moodlereader\local\sametitle::normalise((string) ($data->sametitle ?? '')),
             'language'   => \mod_moodlereader\local\booklanguage::clean((string) ($data->language ?? '')),
             'hidden'     => empty($data->hidden) ? 0 : 1,
             'hasquiz'    => isset($data->hasquiz) && empty($data->hasquiz) ? 0 : 1,

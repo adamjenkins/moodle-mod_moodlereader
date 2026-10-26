@@ -143,6 +143,8 @@ class downloader {
         $book->time = time();
         if (!$existing) {
             $book->hidden = 0;
+            // The "same book" key, when mreader.org sends one (an update without it keeps the stored key).
+            $book->sametitle = $book->sametitle ?? '';
             return $DB->insert_record('moodlereader_books', $book);
         }
         $book->id = $existing->id;
@@ -191,7 +193,7 @@ class downloader {
         }
         // The local 'series' column holds what mreader.org calls the level label.
         $series = $get('level') !== '' ? $get('level') : $get('series');
-        return (object) [
+        return (object) ([
             'remoteid'   => $remoteid,
             'publisher'  => \core_text::substr(clean_param($get('publisher'), PARAM_TEXT), 0, 100),
             'series'     => \core_text::substr(clean_param($series, PARAM_TEXT), 0, 100),
@@ -203,11 +205,10 @@ class downloader {
             'points'     => (float) clean_param($get('points'), PARAM_FLOAT),
             // The legacy image name is kept as text, never run through PARAM_FILE (contract defect B1).
             'image'      => \core_text::substr(clean_param($get('legacy_image'), PARAM_TEXT), 0, 255),
-            'sametitle'  => \core_text::substr(clean_param($get('sametitle'), PARAM_TEXT), 0, 255),
             'language'   => booklanguage::clean($get('language')),
             'withdrawn'  => !empty($row['withdrawn']) ? 1 : 0,
             'hasquiz'    => isset($row['has_quiz']) && !$row['has_quiz'] ? 0 : 1,
             'coveretag'  => $get('cover_etag') !== '' ? \core_text::substr($get('cover_etag'), 0, 255) : null,
-        ];
+        ] + (($same = sametitle::from_item($row)) !== null ? ['sametitle' => $same] : []));
     }
 }

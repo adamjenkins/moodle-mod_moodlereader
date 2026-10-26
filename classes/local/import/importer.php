@@ -281,7 +281,7 @@ class importer {
                 'fiction'    => $text($old->fiction, 255),
                 'points'     => (float) $old->points,
                 'image'      => $text($old->image, 255),
-                'sametitle'  => $text($old->sametitle, 255),
+                'sametitle'  => \mod_moodlereader\local\sametitle::normalise((string) $old->sametitle),
                 // A book mod_reader has no quiz for has quizid 0.
                 'hasquiz'    => empty($old->quizid) ? 0 : 1,
             ];
