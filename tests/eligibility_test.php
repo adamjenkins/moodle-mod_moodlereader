@@ -77,9 +77,11 @@ final class eligibility_test extends \advanced_testcase {
         $this->assertSame('They have passed all 1 book(s) allowed at level 1 for now.', $reasons['up1b']);
         $this->assertSame('Level 2 is not one they may read at (their level is 0).', $reasons['up2']);
 
-        // Exactly the books without a reason are the ones the student's own search offers.
+        // Exactly the books without a reason are the ones the student's own search offers, plus a book without a
+        // quiz, which is listed so the student can ask the teacher for credit.
         $offered = array_keys($reader->search_books((int) $student->id, []));
         $free = array_map(fn($k) => (int) $books[$k]->id, array_keys(array_filter($reasons, fn($r) => $r === null)));
+        $free[] = (int) $books['noquiz']->id;
         sort($offered);
         sort($free);
         $this->assertEquals($free, $offered);

@@ -240,8 +240,8 @@ class attempt_admin {
      * including books without a quiz and books whose quiz mreader.org withdrew.
      *
      * Filters (all optional): 'name' and 'series' (partial, case-insensitive), 'publisher'
-     * (exact), 'difficulty' (a value below 0 means any) and 'language' (a book whose language
-     * is unknown always matches).
+     * (exact), 'difficulty' (a value below 0 means any), 'language' (a book whose language
+     * is unknown always matches) and 'quiz' ('withquiz' or 'noquiz'; anything else means all).
      *
      * @param array $filters
      * @param int $limit Maximum rows to return.
@@ -271,6 +271,11 @@ class attempt_admin {
         if ($language !== '') {
             $where[] = "(language = :language OR language = '')";
             $params['language'] = $language;
+        }
+        if (($filters['quiz'] ?? '') === 'withquiz') {
+            $where[] = 'hasquiz = 1';
+        } else if (($filters['quiz'] ?? '') === 'noquiz') {
+            $where[] = 'hasquiz = 0';
         }
         $wheresql = implode(' AND ', $where);
         $total = $DB->count_records_select('moodlereader_books', $wheresql, $params);

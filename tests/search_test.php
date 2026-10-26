@@ -62,4 +62,37 @@ final class search_test extends \advanced_testcase {
         $this->assertSame(['a1en'], $find(['publisher' => 'A', 'difficulty' => 1, 'language' => 'en']));
         $this->assertSame(['en', 'es'], $reader->available_languages($student->id));
     }
+
+    /**
+     * A book without a quiz is found by the student's search (to ask the teacher for credit), but no quiz can be
+     * started on it; an "Extra points" entry at level 99 is never offered.
+     *
+     * @return void
+     */
+    public function test_books_without_quiz_and_level_99(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course(['summary' => '']);
+        $gen = $this->getDataGenerator()->get_plugin_generator('mod_moodlereader');
+        $instance = $gen->create_instance(['course' => $course->id, 'goal' => 5000, 'levelcheck' => 0]);
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $quiz = $gen->create_book(['name' => 'With Quiz', 'language' => 'en']);
+        $noquiz = $gen->create_book(['name' => 'No Quiz', 'language' => 'en', 'hasquiz' => 0]);
+        $extra = $gen->create_book(['name' => 'Extra points', 'series' => '99', 'language' => 'en']);
+        $reader = reader::from_instanceid($instance->id);
+
+        $found = $reader->search_books($student->id, []);
+        $this->assertArrayHasKey($quiz->id, $found);
+        $this->assertArrayHasKey($noquiz->id, $found);
+        $this->assertArrayNotHasKey($extra->id, $found);
+        $this->assertTrue($reader->book_is_available((int) $quiz->id, (int) $student->id));
+        $this->assertFalse($reader->book_is_available((int) $noquiz->id, (int) $student->id));
+        $this->assertFalse($reader->book_is_available((int) $extra->id, (int) $student->id));
+
+        // The result row tells the student to see their teacher instead of offering the quiz.
+        global $PAGE;
+        $PAGE->set_url('/mod/moodlereader/view.php');
+        $html = $PAGE->get_renderer('mod_moodlereader')->search_results($reader, [$noquiz->id => $noquiz], 1, 50);
+        $this->assertStringContainsString('Please see your teacher', $html);
+        $this->assertStringNotContainsString('startquiz.php', $html);
+    }
 }

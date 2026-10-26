@@ -237,6 +237,9 @@ final class attempt_admin_test extends \advanced_testcase {
         $this->assertSame(3, $total);
         $this->assertSame(['Kite Withdrawn'], $names(attempt_admin::search_award_books(['publisher' => 'B'])));
         $this->assertCount(4, attempt_admin::search_award_books(['name' => 'kite']));
+        // Books with or without a quiz.
+        $this->assertSame(['Kite Without Quiz'], $names(attempt_admin::search_award_books(['name' => 'kite', 'quiz' => 'noquiz'])));
+        $this->assertCount(3, attempt_admin::search_award_books(['name' => 'kite', 'quiz' => 'withquiz']));
 
         // A disabled book cannot be awarded even by id.
         [$course, $instance, $student, $teacher] = $this->setup_activity();

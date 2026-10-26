@@ -390,5 +390,24 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026102604, 'moodlereader');
     }
 
+    if ($oldversion < 2026102605) {
+        // Level "99" holds mreader.org's "Extra points" entries, which are not books and are no longer synced.
+        // Those an earlier sync brought in are removed, unless an attempt or a book list uses them (then hidden).
+        $rs = $DB->get_recordset_select('moodlereader_books', "series = '99' AND remoteid > 0", null, '', 'id');
+        foreach ($rs as $book) {
+            $used = $DB->record_exists('moodlereader_attempts', ['bookid' => $book->id])
+                || $DB->record_exists('moodlereader_bookinstances', ['bookid' => $book->id])
+                || $DB->record_exists('moodlereader_booksused', ['bookid' => $book->id]);
+            if ($used) {
+                $DB->set_field('moodlereader_books', 'hidden', 1, ['id' => $book->id]);
+            } else {
+                $DB->delete_records('moodlereader_books', ['id' => $book->id]);
+            }
+        }
+        $rs->close();
+
+        upgrade_mod_savepoint(true, 2026102605, 'moodlereader');
+    }
+
     return true;
 }

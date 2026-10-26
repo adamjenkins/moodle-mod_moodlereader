@@ -542,7 +542,9 @@ class renderer extends \plugin_renderer_base {
                 s((int) $book->difficulty),
                 s($this->genre_labels($book->genre)),
                 s(number_format((int) $book->words)),
-                $eligibility ? $this->eligibility_badge($eligibility, $book) : $this->take_quiz_button($reader, (int) $book->id),
+                $eligibility ? $this->eligibility_badge($eligibility, $book) : (empty($book->hasquiz)
+                    ? html_writer::div(s(get_string('noquizseeteacher', 'mod_moodlereader')), 'small text-muted')
+                    : $this->take_quiz_button($reader, (int) $book->id)),
             ];
         }
 

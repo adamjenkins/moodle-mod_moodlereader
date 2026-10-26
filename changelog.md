@@ -102,6 +102,13 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   `same_title` (proposed for API v2 after v3.8; `sametitle` accepted) and keeps the stored key when an item
   carries neither; the importer and restore normalise; upgrade 2026102603 normalises stored keys, and
   2026102604 clears both lists' last-sync dates so the next sync is full and brings every key.
+- `downloader::clean_book()` skips level "99" (mreader.org's "Extra points"); upgrade 2026102605 deletes such
+  synced rows (hides them when attempts, book lists or used-up records reference them);
+  `reader::available_where()` never offers series '99'.
+- `reader::available_where($userid, true)` for the student search lists books without a quiz (with
+  `noquizseeteacher` in place of the quiz button); `available_books()` still requires a quiz.
+- `books.php` filter `fquiz` and `award.php` filter `searchquiz` (`search_award_books()` 'quiz'):
+  all, with a quiz, without a quiz.
 - Capability `mod/moodlereader:managecatalogue` (system, manager) replaces `managebooks` for
   Manage books (version 2026102601).
 - `reader::require_quiz_taker()`: quiz pages need `attempt` (or `viewreports` for a teacher trying

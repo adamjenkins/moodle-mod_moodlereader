@@ -61,7 +61,12 @@ $filters = [
     'difficulty' => optional_param('searchdifficulty', -1, PARAM_INT),
     // English is selected until the teacher chooses another language (or any).
     'language'   => $searched ? booklanguage::clean(optional_param('searchlanguage', '', PARAM_ALPHA)) : booklanguage::DEFAULT,
+    // Books with or without a quiz (a book without one can only be given as credit).
+    'quiz'       => optional_param('searchquiz', 'all', PARAM_ALPHA),
 ];
+if (!in_array($filters['quiz'], ['all', 'withquiz', 'noquiz'], true)) {
+    $filters['quiz'] = 'all';
+}
 
 if ($award) {
     require_sesskey();
@@ -143,6 +148,12 @@ $inner .= $row('series', html_writer::empty_tag('input', [
     'type' => 'text', 'name' => 'searchseries', 'value' => $filters['series'], 'id' => 'mr-searchseries', 'class' => 'form-control',
 ]), 'mr-searchseries');
 $inner .= $row('readinglevel', $select($levels, 'searchdifficulty', (string) $filters['difficulty']), 'mr-searchdifficulty');
+$quizoptions = [
+    'all'      => get_string('quizfilter_all', 'mod_moodlereader'),
+    'withquiz' => get_string('quizfilter_withquiz', 'mod_moodlereader'),
+    'noquiz'   => get_string('quizfilter_noquiz', 'mod_moodlereader'),
+];
+$inner .= $row('quizfilter', $select($quizoptions, 'searchquiz', $filters['quiz']), 'mr-searchquiz');
 $inner .= html_writer::div(
     html_writer::tag('button', get_string('search'), ['type' => 'submit', 'class' => 'btn btn-primary']) . ' ' .
     html_writer::link($summaryurl, get_string('cancel'), ['class' => 'btn btn-link']),

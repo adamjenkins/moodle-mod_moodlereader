@@ -52,6 +52,11 @@ $fstatus = optional_param('fstatus', 'all', PARAM_ALPHA);
 if (!in_array($fstatus, ['all', 'enabled', 'disabled'], true)) {
     $fstatus = 'all';
 }
+// Books with or without a quiz (a book without one can only be given as credit).
+$fquiz = optional_param('fquiz', 'all', PARAM_ALPHA);
+if (!in_array($fquiz, ['all', 'withquiz', 'noquiz'], true)) {
+    $fquiz = 'all';
+}
 // Filter values carried on every link/redirect so the view is preserved.
 $filterparams = [
     'filtered'    => 1,
@@ -60,6 +65,7 @@ $filterparams = [
     'fdifficulty' => $fdifficulties,
     'flanguage'   => $flanguages,
     'fstatus'     => $fstatus,
+    'fquiz'       => $fquiz,
 ];
 
 $reader = reader::from_cmid($id);
@@ -115,6 +121,11 @@ if ($fstatus === 'enabled') {
     $where[] = 'hidden = 0';
 } else if ($fstatus === 'disabled') {
     $where[] = 'hidden = 1';
+}
+if ($fquiz === 'withquiz') {
+    $where[] = 'hasquiz = 1';
+} else if ($fquiz === 'noquiz') {
+    $where[] = 'hasquiz = 0';
 }
 $wheresql = $where ? implode(' AND ', $where) : '1 = 1';
 
@@ -187,6 +198,11 @@ foreach ($DB->get_fieldset_sql('SELECT DISTINCT difficulty FROM {moodlereader_bo
 $languages = array_map('s', booklanguage::options(
     $DB->get_fieldset_sql("SELECT DISTINCT language FROM {moodlereader_books} WHERE language <> ''")
 ));
+$quizoptions = [
+    'all'      => get_string('quizfilter_all', 'mod_moodlereader'),
+    'withquiz' => get_string('quizfilter_withquiz', 'mod_moodlereader'),
+    'noquiz'   => get_string('quizfilter_noquiz', 'mod_moodlereader'),
+];
 $statuses = [
     'all'      => get_string('allbooks', 'mod_moodlereader'),
     'enabled'  => get_string('enabledonly', 'mod_moodlereader'),
@@ -233,6 +249,11 @@ $filterinner .= $filterrow(
     get_string('status', 'mod_moodlereader'),
     html_writer::select($statuses, 'fstatus', $fstatus, false, ['class' => 'form-control', 'id' => 'mr-fstatus']),
     'mr-fstatus'
+);
+$filterinner .= $filterrow(
+    get_string('quizfilter', 'mod_moodlereader'),
+    html_writer::select($quizoptions, 'fquiz', $fquiz, false, ['class' => 'form-control', 'id' => 'mr-fquiz']),
+    'mr-fquiz'
 );
 $filterinner .= html_writer::div(get_string('multiselecthint', 'mod_moodlereader'), 'form-text text-muted small mb-2');
 $filterinner .= html_writer::tag('button', get_string('filter'), ['type' => 'submit', 'class' => 'btn btn-secondary mb-2']);

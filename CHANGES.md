@@ -89,6 +89,11 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   compared as mreader.org compares it (case and spacing do not matter). mreader.org does not check
   this rule for Moodle students, so the plugin is where it is applied. Sending the key needs a small
   addition on mreader.org after v3.8; until then keys imported from mod_reader are kept.
+- mreader.org's level "99" entries ("Extra points") are not books: they are no longer synced, and
+  any brought in by an earlier sync are removed (or hidden, if already used).
+- Students now find books without a quiz in their book search, with "There is no quiz for this book.
+  Please see your teacher to get credit for reading it." instead of a quiz button, as in mod_reader.
+- "Manage books" and "Award credit for a book" can filter books with or without a quiz.
 - Only site administrators (and managers) enable or disable books in "Manage books", which applies
   to the whole site; teachers no longer see it.
 - A quiz still open when the activity closes is finished with the answers already given.

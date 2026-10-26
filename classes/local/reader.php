@@ -241,9 +241,11 @@ class reader {
      * {@see available_books()}, {@see search_books()} and {@see available_publishers()}.
      *
      * @param int $userid
+     * @param bool $search For the student's book search: books without a quiz are listed too (the student is
+     *     told to see their teacher for credit); a quiz can only be started on a book that has one.
      * @return array [string $from, string[] $where, array $params]
      */
-    protected function available_where(int $userid): array {
+    protected function available_where(int $userid, bool $search = false): array {
         global $DB;
 
         $params = [
@@ -267,7 +269,11 @@ class reader {
 
         $from = '{moodlereader_books} b';
         // Never a book disabled in Manage books, withdrawn by mreader.org, or without a quiz.
-        $where = ['b.hidden = 0', 'b.withdrawn = 0', 'b.hasquiz = 1'];
+        // Never a book at level "99": mreader.org's "Extra points" entries are not books.
+        $where = ['b.hidden = 0', 'b.withdrawn = 0', "b.series <> '99'"];
+        if (!$search) {
+            $where[] = 'b.hasquiz = 1';
+        }
 
         if (!empty($this->instance->bookinstances)) {
             $from .= ' JOIN {moodlereader_bookinstances} bi ON bi.bookid = b.id AND bi.readerid = :bireaderid';
@@ -323,7 +329,8 @@ class reader {
      * 'genre' (a genre code, matched within the book's comma-separated genre list),
      * 'difficulty' (exact reading level; a value below 0 means "any") and 'language'
      * (a language code; a book whose language is unknown always matches). Every filter
-     * is layered on top of the same availability gate as {@see available_books()}.
+     * is layered on top of the same availability gate as {@see available_books()}, except that books without a
+     * quiz are listed too: the student is told to see their teacher for credit.
      *
      * @param int $userid
      * @param array $filters
@@ -333,7 +340,7 @@ class reader {
      */
     public function search_books(int $userid, array $filters, int $limit = 0, ?int &$total = null): array {
         global $DB;
-        [$from, $where, $params] = $this->available_where($userid);
+        [$from, $where, $params] = $this->available_where($userid, true);
 
         $this->filter_where($filters, $where, $params);
 
@@ -472,7 +479,7 @@ class reader {
      */
     public function available_languages(int $userid): array {
         global $DB;
-        [$from, $where, $params] = $this->available_where($userid);
+        [$from, $where, $params] = $this->available_where($userid, true);
         $sql = "SELECT DISTINCT b.language
                   FROM $from WHERE " . implode(' AND ', $where) . " AND b.language <> '' ORDER BY b.language";
         return array_map('strval', array_keys($DB->get_records_sql($sql, $params)));
@@ -486,7 +493,7 @@ class reader {
      */
     public function available_publishers(int $userid): array {
         global $DB;
-        [$from, $where, $params] = $this->available_where($userid);
+        [$from, $where, $params] = $this->available_where($userid, true);
         $sql = "SELECT b.publisher, COUNT(1) AS cnt
                   FROM $from WHERE " . implode(' AND ', $where) . '
               GROUP BY b.publisher ORDER BY b.publisher';
@@ -505,7 +512,7 @@ class reader {
      */
     public function available_difficulties(int $userid): array {
         global $DB;
-        [$from, $where, $params] = $this->available_where($userid);
+        [$from, $where, $params] = $this->available_where($userid, true);
         $sql = "SELECT DISTINCT b.difficulty
                   FROM $from WHERE " . implode(' AND ', $where) . ' ORDER BY b.difficulty';
         return array_map('intval', array_keys($DB->get_records_sql($sql, $params)));

@@ -57,7 +57,7 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
   search** (title, language, publisher, series, genre, reading level; English is
   selected until the student picks another language). Search results appear
   only after a search and each carries a cover thumbnail and a "take the quiz"
-  button.
+  button; a book without a quiz tells the student to see their teacher for credit.
 - Each passed book's word count contributes once to the gradebook grade. A book counts once
   for a student on the whole site and for life: a quiz taken in one course (or another edition of
   the same title) is not offered again in any other course, and resetting the course or deleting

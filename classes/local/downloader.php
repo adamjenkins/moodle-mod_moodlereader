@@ -183,7 +183,7 @@ class downloader {
      * Every stored value is cleaned before it reaches the database.
      *
      * @param array $row
-     * @return \stdClass|null Null if the row has no id or title.
+     * @return \stdClass|null Null if the row has no id or title, or is at level "99" (not a book).
      */
     public static function clean_book(array $row): ?\stdClass {
         $get = fn($k) => isset($row[$k]) && is_scalar($row[$k]) ? trim((string) $row[$k]) : '';
@@ -193,6 +193,10 @@ class downloader {
         }
         // The local 'series' column holds what mreader.org calls the level label.
         $series = $get('level') !== '' ? $get('level') : $get('series');
+        // Level "99" holds mreader.org's "Extra points" entries, which are not books: they are not synced.
+        if ($series === '99') {
+            return null;
+        }
         return (object) ([
             'remoteid'   => $remoteid,
             'publisher'  => \core_text::substr(clean_param($get('publisher'), PARAM_TEXT), 0, 100),

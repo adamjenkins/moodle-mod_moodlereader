@@ -83,6 +83,8 @@ final class downloader_test extends \advanced_testcase {
         $this->assertSame('', $book->language);
         $this->assertSame('es', downloader::clean_book($this->book(9, ['language' => 'ES']))->language);
         $this->assertSame('', downloader::clean_book($this->book(9, ['language' => '../x']))->language);
+        // Level "99" ("Extra points") is not a book: not synced.
+        $this->assertNull(downloader::clean_book($this->book(10, ['level' => '99'])));
     }
 
     /**
