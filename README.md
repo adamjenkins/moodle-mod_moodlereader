@@ -139,6 +139,20 @@ this plugin) and the local-quiz questions (the local quiz engine was removed).
 - Ships a complete privacy (GDPR) provider and PHPUnit tests, including the shared
   signature test vectors.
 
+## Acknowledgements
+
+This plugin stands on the work of Gordon Bateson, who created the original Reader
+module for Moodle ([mod_reader](https://github.com/gbateson/moodle-mod_reader)). Over more
+than twelve years, from 2013 to 2025, and more than five hundred commits, he built
+it and took care of it, keeping it working through each new Moodle release for the schools
+that depended on it. It was his module that brought mReader's extensive reading
+quizzes to Moodle sites, and to their teachers and students, around the world.
+
+Much of how this plugin works follows his design: the reading goal, the reading-level
+rules and promotion, the progress bar, the cheating checks and the teachers' reports.
+The files that adapt his code carry his copyright line, and the importer brings each
+site's mod_reader history across so that none of it is lost. Thank you, Gordon.
+
 ## Licence
 
 GNU GPL v3 or later.
