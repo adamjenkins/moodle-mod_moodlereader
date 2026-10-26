@@ -17,7 +17,11 @@
 /**
  * Settings form for a moodlereader activity instance.
  *
+ * The reading-level settings (level check, books at, below and above the level, with their defaults)
+ * follow mod_reader's form.
+ *
  * @package    mod_moodlereader
+ * @copyright  2013 Gordon Bateson (gordon.bateson@gmail.com)
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -30,6 +34,7 @@ require_once($CFG->dirroot . '/course/moodleform_mod.php');
  * The moodlereader instance settings form.
  *
  * @package    mod_moodlereader
+ * @copyright  2013 Gordon Bateson (gordon.bateson@gmail.com)
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
