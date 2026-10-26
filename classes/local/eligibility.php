@@ -31,7 +31,7 @@ class eligibility {
     /** @var reader */
     protected $reader;
 
-    /** @var \stdClass[] Finished, not deleted attempts by book id (the latest). */
+    /** @var \stdClass[] Finished, not deleted attempts in any activity by book id (the latest). */
     protected $finished = [];
 
     /** @var array Same-title keys of finished books => true. */
@@ -62,10 +62,12 @@ class eligibility {
             "SELECT a.id, a.bookid, a.state, a.passed, a.credit, a.cheated, a.timefinish, b.sametitle
                FROM {moodlereader_attempts} a
                JOIN {moodlereader_books} b ON b.id = a.bookid
-              WHERE a.readerid = :readerid AND a.userid = :userid AND a.deleted = 0
+              WHERE a.userid = :userid AND a.deleted = 0
+                    AND (a.readerid = :readerid OR a.state = 'finished')
            ORDER BY a.timefinish, a.id",
             ['readerid' => $reader->get_instance()->id, 'userid' => $userid]
         );
+        // A finished attempt in any reading activity uses the book up; an unfinished one only here (to resume it).
         foreach ($attempts as $a) {
             if ($a->state === 'finished') {
                 $this->finished[$a->bookid] = $a;

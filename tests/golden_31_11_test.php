@@ -111,7 +111,8 @@ final class golden_31_11_test extends \advanced_testcase {
         // Launch: the plugin's request has the recorded shape, and the reply makes a Moodle-drawn attempt.
         $attempt = attempt::start($reader, (int) $student->id, (int) $book->id);
         $this->queue($client, '01-launch-moodle', $ref);
-        $this->assertSame(['moodle'], quizsession::launch($reader, $attempt, $book, $client));
+        quizsession::launch($reader, $attempt, $book, $client);
+        $this->assertSame('moodle', $attempt->delivery);
         $this->assert_same_request_shape($client, '01-launch-moodle');
         $this->assertEquals(4, $attempt->slots);
 

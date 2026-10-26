@@ -650,11 +650,14 @@ class importer {
                     if (!isset($this->bookmap[$old->bookid])) {
                         continue;
                     }
+                    // Abandoned and overdue attempts are over too, even where mod_reader left timefinish at 0.
+                    $over = (int) $old->timefinish > 0
+                        || in_array((string) ($old->state ?? ''), ['finished', 'abandoned', 'overdue'], true);
                     $add((int) $old->id, 0, [
                         'userid'       => (int) $old->userid,
                         'bookid'       => $this->bookmap[$old->bookid],
                         'attempt'      => (int) $old->attempt,
-                        'state'        => ((int) $old->timefinish > 0) ? 'finished' : 'inprogress',
+                        'state'        => $over ? 'finished' : 'inprogress',
                         'percentgrade' => (float) $old->percentgrade,
                         'passed'       => (int) $old->passed,
                         'credit'       => (int) $old->credit,
@@ -662,7 +665,7 @@ class importer {
                         'deleted'      => (int) $old->deleted,
                         'bookrating'   => (int) $old->bookrating,
                         'timestart'    => (int) $old->timestart,
-                        'timefinish'   => (int) $old->timefinish,
+                        'timefinish'   => $over ? max((int) $old->timefinish, (int) $old->timestart) : 0,
                         'timemodified' => (int) $old->timemodified,
                         'ip'           => (string) ($old->ip ?? ''),
                     ]);
@@ -784,12 +787,25 @@ class importer {
         $table = self::table_for($type);
         $counts = self::counts();
         $maps = $importid ? $this->load_maps($importid, $type) : [];
+        // Rows taken over by a new legacy key (a student's level row whose newest legacy row changed).
+        $reused = [];
 
         foreach ($rows as $key => $row) {
             $hash = self::hash($row['values']);
             $map = $maps[$key] ?? null;
             unset($maps[$key]);
             $exists = $map && $DB->record_exists($table, ['id' => $map->newid]);
+            if (!$exists && $type === 'level') {
+                // One level row per student: take over the copy's row rather than add a second one.
+                $current = $DB->get_field($table, 'id', ['readerid' => $newreaderid, 'userid' => $row['values']['userid']]);
+                if ($current) {
+                    $map = $map ?? (object) ['id' => 0];
+                    $map->newid = (int) $current;
+                    $map->hash = '';
+                    $exists = true;
+                    $reused[(int) $current] = true;
+                }
+            }
             if ($exists && $map->hash === $hash) {
                 $counts['unchanged']++;
                 continue;
@@ -799,10 +815,14 @@ class importer {
                 continue;
             }
             $record = (object) ($row['values'] + ['readerid' => $newreaderid]);
-            if ($exists) {
+            if ($exists && empty($map->id)) {
                 $record->id = $map->newid;
                 $DB->update_record($table, $record);
-                $DB->set_field('moodlereader_importmap', 'hash', $hash, ['id' => $map->id]);
+                $this->save_map(null, $importid, $type, $row['legacyid'], $row['sub'], (int) $map->newid, $hash);
+            } else if ($exists) {
+                $record->id = $map->newid;
+                $DB->update_record($table, $record);
+                $this->save_map($map, $importid, $type, $row['legacyid'], $row['sub'], (int) $map->newid, $hash);
             } else {
                 $newid = (int) $DB->insert_record($table, $record);
                 $this->save_map($map, $importid, $type, $row['legacyid'], $row['sub'], $newid, $hash);
@@ -811,6 +831,13 @@ class importer {
 
         // What mod_reader no longer has is removed from the (still hidden) copy.
         foreach ($maps as $map) {
+            if (isset($reused[(int) $map->newid])) {
+                // The row lives on under its new key: only the old map goes.
+                if ($this->write) {
+                    $DB->delete_records('moodlereader_importmap', ['id' => $map->id]);
+                }
+                continue;
+            }
             $counts['removed']++;
             if ($this->write) {
                 $DB->delete_records($table, ['id' => $map->newid, 'readerid' => $newreaderid]);

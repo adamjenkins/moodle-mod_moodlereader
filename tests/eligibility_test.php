@@ -91,4 +91,86 @@ final class eligibility_test extends \advanced_testcase {
             (new eligibility($reader, (int) $student->id))->reason($books['free'])
         );
     }
+
+    /**
+     * A quiz taken in one course cannot be taken again in another course's reading activity.
+     *
+     * @return void
+     */
+    public function test_a_book_taken_in_one_course_is_used_up_in_every_course(): void {
+        global $DB;
+        $this->resetAfterTest();
+        set_config('v2siteid', 'site-1', 'mod_moodlereader');
+        set_config('v2secret', 'Zm9vYmFyLWV4YW1wbGUtc2VjcmV0LTMyLWJ5dGVzISE', 'mod_moodlereader');
+        set_config('v2state', 'approved', 'mod_moodlereader');
+        $gen = $this->getDataGenerator()->get_plugin_generator('mod_moodlereader');
+        $coursea = $this->getDataGenerator()->create_course(['summary' => '']);
+        $courseb = $this->getDataGenerator()->create_course(['summary' => '']);
+        $readera = reader::from_instanceid($gen->create_instance(['course' => $coursea->id])->id);
+        $readerb = reader::from_instanceid($gen->create_instance(['course' => $courseb->id])->id);
+        $student = $this->getDataGenerator()->create_and_enrol($coursea, 'student');
+        $this->getDataGenerator()->enrol_user($student->id, $courseb->id, 'student');
+        $taken = $gen->create_book(['difficulty' => 0, 'sametitle' => 'T1']);
+        $edition = $gen->create_book(['difficulty' => 0, 'sametitle' => 'T1']);
+        $other = $gen->create_book(['difficulty' => 0]);
+
+        // A failed attempt uses the book up too, as in the same activity.
+        $now = time();
+        $attemptid = $DB->insert_record('moodlereader_attempts', (object) [
+            'readerid' => $readera->get_instance()->id, 'userid' => $student->id, 'bookid' => $taken->id, 'attempt' => 1,
+            'state' => 'finished', 'percentgrade' => 20, 'passed' => 0, 'credit' => 0, 'cheated' => 0,
+            'deleted' => 0, 'bookrating' => 0, 'timestart' => $now - 600, 'timefinish' => $now,
+            'timemodified' => $now, 'ip' => '',
+        ]);
+
+        $uid = (int) $student->id;
+        foreach ([$readera, $readerb] as $reader) {
+            $this->assertFalse($reader->book_is_available((int) $taken->id, $uid));
+            $this->assertFalse($reader->book_is_available((int) $edition->id, $uid));
+            $this->assertTrue($reader->book_is_available((int) $other->id, $uid));
+            $this->assertSame([(int) $other->id], array_keys($reader->search_books($uid, [])));
+        }
+        $eligibility = new eligibility($readerb, $uid);
+        $this->assertStringStartsWith('Already taken: Failed', $eligibility->reason($taken));
+        $this->assertSame('They have already read another edition of this title.', $eligibility->reason($edition));
+        $this->assertFalse($eligibility->in_progress((int) $taken->id));
+
+        // A teacher who deletes the attempt in course A frees the book everywhere.
+        $DB->set_field('moodlereader_attempts', 'deleted', 1, ['id' => $attemptid]);
+        $this->assertTrue($readerb->book_is_available((int) $taken->id, $uid));
+        $this->assertNull((new eligibility($readerb, $uid))->reason($taken));
+    }
+
+    /**
+     * Two attempts opened in two courses before either is finished: the second result is recorded but deleted,
+     * so the book counts once; and an attempt not launched yet is refused once the book is used up.
+     *
+     * @return void
+     */
+    public function test_a_second_result_for_a_used_book_does_not_count(): void {
+        global $DB;
+        $this->resetAfterTest();
+        set_config('v2siteid', 'site-1', 'mod_moodlereader');
+        set_config('v2secret', 'Zm9vYmFyLWV4YW1wbGUtc2VjcmV0LTMyLWJ5dGVzISE', 'mod_moodlereader');
+        set_config('v2state', 'approved', 'mod_moodlereader');
+        $gen = $this->getDataGenerator()->get_plugin_generator('mod_moodlereader');
+        $coursea = $this->getDataGenerator()->create_course(['summary' => '']);
+        $courseb = $this->getDataGenerator()->create_course(['summary' => '']);
+        $readera = reader::from_instanceid($gen->create_instance(['course' => $coursea->id, 'minpassgrade' => 60])->id);
+        $readerb = reader::from_instanceid($gen->create_instance(['course' => $courseb->id, 'minpassgrade' => 60])->id);
+        $student = $this->getDataGenerator()->create_and_enrol($coursea, 'student');
+        $this->getDataGenerator()->enrol_user($student->id, $courseb->id, 'student');
+        $book = $gen->create_book(['difficulty' => 0, 'words' => 1000]);
+        $uid = (int) $student->id;
+
+        $first = \mod_moodlereader\local\attempt::start($readera, $uid, (int) $book->id);
+        $second = \mod_moodlereader\local\attempt::start($readerb, $uid, (int) $book->id);
+        \mod_moodlereader\local\attempt::finish($readera, $first, 90.0);
+        $this->assertFalse($readerb->book_is_available((int) $book->id, $uid));
+        \mod_moodlereader\local\attempt::finish($readerb, $second, 95.0);
+
+        $this->assertEquals(0, $DB->get_field('moodlereader_attempts', 'deleted', ['id' => $first->id]));
+        $this->assertEquals(1, $DB->get_field('moodlereader_attempts', 'deleted', ['id' => $second->id]));
+        $this->assertEquals('finished', $DB->get_field('moodlereader_attempts', 'state', ['id' => $second->id]));
+    }
 }

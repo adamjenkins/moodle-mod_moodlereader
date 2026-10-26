@@ -23,10 +23,11 @@ use mod_moodlereader\local\api\client;
  * A quiz drawn by Moodle (API v2 31 §11): mreader.org keeps the questions, the answer key and the
  * marking; Moodle shows one question at a time and runs the clock.
  *
- * The clock counts only time a question is on the student's screen. A question's time runs from when
- * Moodle sent its page (which it can only do once mreader.org has answered) to when the answer arrives,
- * or to the last heartbeat from the page if it went away. Time spent waiting for mreader.org is never
- * counted, so the countdown pauses while the next question loads.
+ * Moodle is the only way this plugin shows a quiz. The clock counts the time each question is on the
+ * student's screen: from when Moodle sent its page (which it can only do once mreader.org has answered)
+ * to when the answer arrives, by the wall clock, whatever the page did meanwhile (closed, reloaded,
+ * silent). Time spent waiting for mreader.org between an answer and the next page is never counted, so
+ * the countdown pauses while the next question loads.
  *
  * Question text is never stored: not in the database, the session or a cache. Each page asks
  * mreader.org for the pinned item again.
@@ -39,14 +40,8 @@ class quizsession {
     /** @var string The attempt is drawn by Moodle. */
     const DELIVERY_MOODLE = 'moodle';
 
-    /** @var string The attempt runs in mreader.org's pages in a frame. */
-    const DELIVERY_IFRAME = 'iframe';
-
-    /** @var int Seconds between the question page's heartbeats. */
+    /** @var int Seconds between the question page's heartbeats (they keep the countdown true). */
     const HEARTBEAT = 10;
-
-    /** @var int How long after the last heartbeat a page still counts as on screen. */
-    const HEARTBEAT_GRACE = 15;
 
     /** @var int Seconds allowed past the limit for an answer already on its way. */
     const ANSWER_GRACE = 5;
@@ -67,55 +62,67 @@ class quizsession {
     }
 
     /**
-     * Launch an attempt, asking mreader.org to let Moodle draw it.
+     * Reserve the attempt on mreader.org for Moodle drawing (31 §11.1).
      *
-     * A server without Moodle drawing ignores the request and answers with a frame URL (31 §11.10);
-     * the attempt then runs in the frame.
+     * The reference is saved before it is sent, so a lost answer is retried with the same reference;
+     * mreader.org then names it as the student's open attempt, and it is taken up again. A server that
+     * can only offer its own pages in a frame is refused: this plugin shows quizzes in Moodle only.
      *
      * @param reader $reader
      * @param \stdClass $attempt
      * @param \stdClass $book
      * @param client|null $client
-     * @return array ['moodle'] or ['iframe', string $url]
+     * @return void
      */
-    public static function launch(reader $reader, \stdClass $attempt, \stdClass $book, ?client $client = null): array {
+    public static function launch(reader $reader, \stdClass $attempt, \stdClass $book, ?client $client = null): void {
         global $DB;
-        if (
-            empty($reader->get_instance()->quizdelivery) || $attempt->delivery === self::DELIVERY_IFRAME
-                && !empty($attempt->attemptref) && $attempt->remotestate !== 'abandoned'
-        ) {
-            return [self::DELIVERY_IFRAME, results::launch($attempt, $book, $client)];
-        }
         if ((int) $book->remoteid <= 0) {
             throw new \moodle_exception('booknotlinked', 'mod_moodlereader');
         }
-        // A fresh reference, so a ref never changes mode (31 §11.10).
-        if (empty($attempt->attemptref) || $attempt->remotestate === 'abandoned' || $attempt->delivery !== self::DELIVERY_MOODLE) {
+        // A fresh reference, unless an earlier try with this one never got its answer back.
+        $retry = !empty($attempt->attemptref) && $attempt->delivery === self::DELIVERY_MOODLE
+            && (int) $attempt->timelimit === 0 && $attempt->remotestate !== 'abandoned';
+        if (!$retry) {
             $attempt->attemptref = $attempt->id . '-' . random_string(16);
+            $reset = ['attemptref' => $attempt->attemptref, 'remotestate' => null, 'delivery' => self::DELIVERY_MOODLE,
+                'timelimit' => 0, 'slots' => 0, 'currentslot' => 0, 'secondsused' => 0, 'timeserved' => 0,
+                'timeheartbeat' => 0];
+            $DB->update_record('moodlereader_attempts', (object) (['id' => $attempt->id] + $reset));
+            foreach ($reset as $field => $value) {
+                $attempt->$field = $value;
+            }
         }
         $identity = (new mreader_site())->get_identity((int) $attempt->userid);
         $client = $client ?? new client();
-        // Only the opaque id and the random display name identify the student.
-        $data = $client->post('/launches', [
-            'uid'          => $identity->uniqueid,
-            'display_name' => $identity->uniquename,
-            'book_id'      => (int) $book->remoteid,
-            'attempt_ref'  => $attempt->attemptref,
-            'locale'       => current_language(),
-            'delivery'     => self::DELIVERY_MOODLE,
-        ]);
-        $url = clean_param((string) ($data['launch_url'] ?? ''), PARAM_URL);
-        if ($url !== '') {
-            // The server does not draw for Moodle yet: this ref is a frame attempt from now on.
-            if (!preg_match('#^https?://#', $url)) {
-                throw new api_exception('badresponse', 'mreader.org did not return a launch URL.');
-            }
-            $DB->update_record('moodlereader_attempts', (object) [
-                'id' => $attempt->id, 'attemptref' => $attempt->attemptref, 'remotestate' => null,
-                'delivery' => self::DELIVERY_IFRAME,
+        try {
+            // Only the opaque id and the random display name identify the student.
+            $data = $client->post('/launches', [
+                'uid'          => $identity->uniqueid,
+                'display_name' => $identity->uniquename,
+                'book_id'      => (int) $book->remoteid,
+                'attempt_ref'  => $attempt->attemptref,
+                'locale'       => current_language(),
+                'delivery'     => self::DELIVERY_MOODLE,
             ]);
-            $attempt->delivery = self::DELIVERY_IFRAME;
-            return [self::DELIVERY_IFRAME, $url];
+        } catch (api_exception $e) {
+            // Our own reservation, whose answer was lost: take it up from its state.
+            if ($e->apicode !== 'attempt_open' || ($e->response['attempt_ref'] ?? '') !== $attempt->attemptref) {
+                throw $e;
+            }
+            try {
+                $state = self::call($client, '/attempt/current', ['ref' => $attempt->attemptref]);
+            } catch (api_exception $notstarted) {
+                if ($notstarted->apicode !== 'not_started') {
+                    throw $notstarted;
+                }
+                $state = self::call($client, '/attempt/start', ['ref' => $attempt->attemptref]);
+            }
+            $data = ['attempt_ref' => $attempt->attemptref, 'time_limit' => $state['time_limit'], 'slots' => $state['slots']];
+            $attempt->currentslot = $state['state'] === 'in_progress' ? $state['slot'] : 0;
+        }
+        if ((string) ($data['launch_url'] ?? '') !== '') {
+            // The server offers only its own pages in a frame, which this plugin does not show.
+            throw new api_exception('nomoodledrawing', 'mreader.org cannot yet send quizzes for Moodle to show.');
         }
         $limit = (int) ($data['time_limit'] ?? 0);
         $slots = (int) ($data['slots'] ?? 0);
@@ -123,15 +130,13 @@ class quizsession {
             throw new api_exception('badresponse', 'mreader.org did not accept the attempt for Moodle drawing.');
         }
         $update = [
-            'id' => $attempt->id, 'attemptref' => $attempt->attemptref, 'remotestate' => null,
-            'delivery' => self::DELIVERY_MOODLE, 'timelimit' => min($limit, DAYSECS), 'slots' => min($slots, 100),
-            'currentslot' => 0, 'secondsused' => 0, 'timeserved' => 0, 'timeheartbeat' => 0,
+            'id' => $attempt->id, 'remotestate' => null, 'timelimit' => min($limit, DAYSECS), 'slots' => min($slots, 100),
+            'currentslot' => (int) $attempt->currentslot, 'secondsused' => 0, 'timeserved' => 0, 'timeheartbeat' => 0,
         ];
         $DB->update_record('moodlereader_attempts', (object) $update);
         foreach ($update as $field => $value) {
             $attempt->$field = $value;
         }
-        return [self::DELIVERY_MOODLE];
     }
 
     /**
@@ -145,7 +150,7 @@ class quizsession {
      */
     public static function show(\stdClass $attempt, ?client $client = null): array {
         $client = $client ?? new client();
-        // A page left open earlier stops counting at its last heartbeat.
+        // A page shown earlier counts until now: reloading or coming back does not stop the clock.
         self::close_segment($attempt);
         if (self::time_left($attempt) <= 0) {
             return self::finish($attempt, $client);
@@ -183,7 +188,7 @@ class quizsession {
      */
     protected static function forget_launch(\stdClass $attempt): void {
         global $DB;
-        $reset = ['attemptref' => null, 'remotestate' => null, 'delivery' => self::DELIVERY_IFRAME, 'timelimit' => 0,
+        $reset = ['attemptref' => null, 'remotestate' => null, 'delivery' => self::DELIVERY_MOODLE, 'timelimit' => 0,
             'slots' => 0, 'currentslot' => 0, 'timeserved' => 0, 'timeheartbeat' => 0];
         $DB->update_record('moodlereader_attempts', (object) (['id' => $attempt->id] + $reset));
         foreach ($reset as $field => $value) {
@@ -249,10 +254,11 @@ class quizsession {
         try {
             $client->post('/attempt/survey', ['ref' => $attempt->attemptref, 'responses' => $list]);
         } catch (api_exception $e) {
-            // Already sent, or (should never happen here) not finished yet: either way there is nothing to send.
+            // Already sent, or not finished yet: nothing is sent, and nothing is recorded.
             if (!in_array($e->apicode, ['survey_done', 'not_finished'], true)) {
                 throw $e;
             }
+            return;
         }
         // The answer to the first question ("How did you like this book?") is kept as the book rating.
         if ($list) {
@@ -292,16 +298,15 @@ class quizsession {
     /**
      * The seconds of the question on screen so far.
      *
+     * By the wall clock from when the page was sent: a page that stops its heartbeats, is closed or is
+     * reloaded is still counted, so the time limit cannot be stretched by silencing the page.
+     *
      * @param \stdClass $attempt
      * @param bool $answered The answer has just arrived (the same rule applies; kept for the callers' clarity).
      * @return int
      */
     protected static function segment(\stdClass $attempt, bool $answered): int {
-        $served = (int) $attempt->timeserved;
-        // To now, but never past the page's last sign of life (plus grace): a page that went away,
-        // or an answer from a page that had gone silent, stops counting there.
-        $end = min(self::now(), max($served, (int) $attempt->timeheartbeat) + self::HEARTBEAT_GRACE);
-        return max(0, $end - $served);
+        return max(0, self::now() - (int) $attempt->timeserved);
     }
 
     /**
@@ -368,7 +373,7 @@ class quizsession {
      *
      * @param array $data
      * @param string $ref The attempt asked about.
-     * @return array state, slot, slots, item (cleaned, or null), survey (list, or null)
+     * @return array state, slot, slots, time_limit, item (cleaned, or null), survey (list, or null)
      */
     public static function clean_state(array $data, string $ref): array {
         if (($data['attempt_ref'] ?? null) !== $ref || !in_array($data['state'] ?? '', ['in_progress', 'finished'], true)) {
@@ -378,6 +383,7 @@ class quizsession {
             'state' => $data['state'],
             'slot' => max(0, (int) ($data['slot'] ?? 0)),
             'slots' => max(0, (int) ($data['slots'] ?? 0)),
+            'time_limit' => max(0, (int) ($data['time_limit'] ?? 0)),
             'item' => null,
             'survey' => null,
         ];

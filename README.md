@@ -1,23 +1,25 @@
 # Moodle Reader (mod_moodlereader)
 
 An activity module for extensive-reading programmes. Students read graded books
-and take a short comprehension quiz — **hosted on [mreader.org](https://mreader.org)
-and shown in an iframe** — to confirm they have read each one. Words in passed
+and take a short comprehension quiz — **chosen and marked by [mreader.org](https://mreader.org)
+and shown in Moodle's own pages** — to confirm they have read each one. Words in passed
 books count toward a reading goal that is reported to the Moodle gradebook.
 
 This is a security-focused, single-purpose rebuild of the legacy `mod_reader`
 plugin. It keeps the live mreader.org integration and drops the obsolete local
-Moodle-quiz engine that `mod_reader` carried (dead since the 2018 migration to the
-mreader.org iframe model).
+Moodle-quiz engine that `mod_reader` carried (dead since mreader.org took over the
+quizzes in 2018).
 
 ## Requirements
 
 - Moodle 5.2 – 5.3.
   CI-tested (GitHub Actions, moodle-plugin-ci) on MOODLE_502_STABLE and MOODLE_503_STABLE
   with PHP 8.3 and 8.4.
-- mreader.org with API v2 (the mreader.org release after v3.6). If the connection page
-  reports `http404` when a request is sent, the mreader.org instance does not offer API v2
-  yet; `503 not_configured` means v2 is deployed but not configured there.
+- mreader.org with API v2 and quizzes for Moodle to show (mreader.org v3.8 or later). If the
+  connection page reports `http404` when a request is sent, the mreader.org instance does not
+  offer API v2 yet; `503 not_configured` means v2 is deployed but not configured there. A server
+  that can only show quizzes in its own pages is refused, and students are told quizzes are not
+  available yet.
 - An approved connection to mreader.org (see below). Cron must run, for the result,
   book-sync and connection-check tasks.
 
@@ -36,10 +38,9 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
 - **No student names, usernames, email addresses or Moodle user ids are ever sent.**
   Each student is known to mreader.org only by a random 8-character code and a random
   display name.
-- The quiz runs on mreader.org in a frame. The score is then fetched by this site
-  directly from mreader.org with its own credential, never taken from the browser, and a
-  task collects any result whose browser hand-back was lost (a closed tab no longer loses
-  a grade).
+- The score is fetched by this site directly from mreader.org with its own credential,
+  never taken from the browser, and a task collects any result that was not collected when
+  the quiz ended.
 - If mod_reader is installed and registered with mreader.org, the request can ask
   mreader.org to link that registration's quiz history to the new connection (proved by
   a signature made with the old key; the key itself is never sent).
@@ -57,12 +58,14 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
   selected until the student picks another language). Search results appear
   only after a search and each carries a cover thumbnail and a "take the quiz"
   button.
-- Each passed book's word count contributes once to the gradebook grade.
-- Teachers can **manage the site's catalogue** (filter by several publishers, levels and
-  languages at once, plus series and status, and enable or disable single books, the ticked
-  books, or every book matching the filter; a disabled book is offered to no student),
-  **sync** it from mreader.org,
-  **message** students, and set **per-student reading goals**.
+- Each passed book's word count contributes once to the gradebook grade. A book counts once
+  for a student on the whole site: a quiz taken in one course (or another edition of the same
+  title) is not offered again in any other course.
+- **Site administrators manage the site's catalogue** (Manage books: filter by several
+  publishers, levels and languages at once, plus series and status, and enable or disable
+  single books, the ticked books, or every book matching the filter; a disabled book is offered
+  to no student) and **sync** it from mreader.org. Teachers **message** students and set
+  **per-student reading goals**.
 - **Reports** (modelled on mod_reader's): the *student summary* (levels, goal, passed,
   failed and cheated counts, average time and score, words this term and in all terms)
   and *student details* (every attempt with its result and running total), both
@@ -70,14 +73,17 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
   award credit for a book and message students; from the details, set attempts to
   passed or failed, mark or unmark them as cheated, delete or restore them. Every change
   regrades the student and is logged.
-- **Quizzes in Moodle's own pages** (with mreader.org's next release): mreader.org chooses the
+- **Quizzes in Moodle's own pages**, the only way they are shown: mreader.org chooses the
   questions and marks the answers; Moodle shows one question at a time in its own look, never
-  stores the questions, runs a countdown that pauses while the next question loads, and offers
-  mreader.org's book survey at the end. Otherwise quizzes show in mreader.org's frame.
-- **Safe Exam Browser** for the quizzes: required site-wide by an administrator, or per course
-  (the course's More menu) or per activity by teachers. Moodle can make the SEB configuration
-  (students open it with a "Launch Safe Exam Browser" link) or accept SEB's own configuration by
-  its Browser Exam Keys. Only the quizzes are locked. Needs core's `quizaccess_seb`.
+  stores the questions, and offers mreader.org's book survey at the end. The countdown runs by
+  the clock while a question is on screen (closing or reloading the page does not stop it) and
+  pauses only while the next question loads. A quiz still open when the activity closes is
+  finished with the answers already given.
+- **Safe Exam Browser** for the quizzes: required site-wide by an administrator, or per activity
+  by teachers. The configuration can be made by Moodle (students open it with a "Launch Safe Exam
+  Browser" link), be one of the site's SEB templates (the ones quizzes use), be copied from a quiz
+  in the same course that has one, or be SEB's own configuration, accepted by its Browser Exam
+  Keys. Only the quizzes are locked. Needs core's `quizaccess_seb`.
 - **Cheating detection** with a settings page per activity: three markers (same book
   from the same address or network, a quiz finished too quickly, many quizzes in a short
   time), each can be switched off and tuned. Addresses on an allow-list (the site's

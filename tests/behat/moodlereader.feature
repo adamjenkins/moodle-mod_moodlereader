@@ -46,6 +46,7 @@ Feature: Moodle Reader activity
     When I am on the "Reader 1" "moodlereader activity" page logged in as teacher1
     Then I should see "Reading report"
     And I should see "Messages"
+    And I should not see "Manage books"
     When I follow "Messages"
     And I set the field "Send to" to "Everyone"
     And I set the field "Message" to "Welcome to the reading programme"
@@ -127,11 +128,11 @@ Feature: Moodle Reader activity
     Then I should see "El Gato Negro"
     And I should not see "Green Fields"
 
-  Scenario: A teacher disables every book matching a multi-select filter, and students no longer see them
+  Scenario: An administrator disables every book matching a multi-select filter, and students no longer see them
     Given the following moodlereader books exist:
       | name         | publisher | series  | difficulty | words |
       | Night Train  | Orbit     | Level 2 | 2          | 3500  |
-    When I am on the "Reader 1" "moodlereader activity" page logged in as teacher1
+    When I am on the "Reader 1" "moodlereader activity" page logged in as admin
     And I follow "Manage books"
     And I set the field "Publisher" to "Acme,Orbit"
     And I press "Filter"
@@ -253,14 +254,14 @@ Feature: Moodle Reader activity
     And I press "No thanks"
     Then I should see "Your result for \"Blue Hills\" has been recorded: 100%, passed."
 
-  Scenario: A teacher requires Safe Exam Browser for the course, and a student's quiz asks for it
+  Scenario: A teacher requires Safe Exam Browser in the activity, and a student's quiz asks for it
     Given mreader.org draws quizzes for Moodle
-    And I am on the "Course 1" course page logged in as teacher1
-    And I navigate to "Safe Exam Browser for reading quizzes" in current page administration
-    And I set the field "Require Safe Exam Browser for all Moodle Reader quizzes in this course" to "1"
-    And I press "Save changes"
-    And I am on the "Reader 1" "moodlereader activity editing" page
-    Then I should see "Required for this course"
+    And I am on the "Reader 1" "moodlereader activity editing" page logged in as teacher1
+    And I expand all fieldsets
+    And I set the following fields to these values:
+      | Require Safe Exam Browser for the quizzes | Yes                                                        |
+      | Safe Exam Browser configuration           | A configuration made by Moodle (its Config Key is checked) |
+    And I press "Save and display"
     When I am on the "Reader 1" "moodlereader activity" page logged in as student1
     Then I should see "The book quizzes here need Safe Exam Browser."
     And I press "Search"

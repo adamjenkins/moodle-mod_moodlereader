@@ -78,7 +78,7 @@ class attempt {
             'attemptref'   => null,
             'remotestate'  => null,
             'timeresultchecked' => 0,
-            'delivery'     => 'iframe',
+            'delivery'     => 'moodle',
             'timelimit'    => 0,
             'slots'        => 0,
             'currentslot'  => 0,
@@ -95,14 +95,18 @@ class attempt {
     /**
      * Finish an in-progress attempt with the grade returned by mreader.org.
      *
-     * Idempotent: a finished attempt is left unchanged.
+     * Idempotent: a finished attempt is left unchanged. A book counts once for a student on the whole
+     * site: when the same book, or another edition of its title, was already finished in any reading
+     * activity, this result is recorded but deleted, so it never counts twice (two attempts opened in
+     * two courses before either was finished).
      *
      * @param reader    $reader
      * @param stdClass  $attempt The {moodlereader_attempts} record.
      * @param float     $percentgrade The quiz percentage (0-100) from mreader.org.
+     * @param int       $finishedat When mreader.org finished it (0: now); kept within the attempt's start and now.
      * @return void
      */
-    public static function finish(reader $reader, stdClass $attempt, float $percentgrade): void {
+    public static function finish(reader $reader, stdClass $attempt, float $percentgrade, int $finishedat = 0): void {
         global $CFG, $DB;
         require_once($CFG->dirroot . '/mod/moodlereader/lib.php');
 
@@ -118,15 +122,17 @@ class attempt {
         $attempt->state = 'finished';
         $attempt->percentgrade = $percentgrade;
         $attempt->passed = $percentgrade >= $minpass ? 1 : 0;
-        $attempt->timefinish = $now;
+        $attempt->timefinish = $finishedat > 0 ? max((int) $attempt->timestart, min($now, $finishedat)) : $now;
         $attempt->timemodified = $now;
+        $attempt->deleted = self::already_finished($attempt) ? 1 : (int) ($attempt->deleted ?? 0);
 
         // Guarded update: once finished, a later/replayed callback cannot overwrite the grade.
         $DB->execute(
             "UPDATE {moodlereader_attempts}
-                SET state = ?, percentgrade = ?, passed = ?, timefinish = ?, timemodified = ?
+                SET state = ?, percentgrade = ?, passed = ?, timefinish = ?, timemodified = ?, deleted = ?
               WHERE id = ? AND state = 'inprogress'",
-            ['finished', $attempt->percentgrade, $attempt->passed, $now, $now, $attempt->id]
+            ['finished', $attempt->percentgrade, $attempt->passed, $attempt->timefinish, $now, $attempt->deleted,
+                $attempt->id]
         );
 
         \mod_moodlereader\event\attempt_submitted::create_from_attempt($reader, $attempt)->trigger();
@@ -142,5 +148,25 @@ class attempt {
         if ($completion->is_enabled($reader->get_cm())) {
             $completion->update_state($reader->get_cm(), COMPLETION_UNKNOWN, $attempt->userid);
         }
+    }
+
+    /**
+     * Whether the student already finished this book, or another edition of its title, in another attempt
+     * in any reading activity on the site (not deleted).
+     *
+     * @param stdClass $attempt
+     * @return bool
+     */
+    public static function already_finished(stdClass $attempt): bool {
+        global $DB;
+        return $DB->record_exists_sql(
+            "SELECT 1
+               FROM {moodlereader_attempts} a
+               JOIN {moodlereader_books} b ON b.id = a.bookid
+               JOIN {moodlereader_books} mine ON mine.id = :bookid
+              WHERE a.userid = :userid AND a.id <> :id AND a.deleted = 0 AND a.state = 'finished'
+                    AND (a.bookid = mine.id OR (mine.sametitle <> '' AND b.sametitle = mine.sametitle))",
+            ['bookid' => $attempt->bookid, 'userid' => $attempt->userid, 'id' => $attempt->id]
+        );
     }
 }

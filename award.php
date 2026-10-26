@@ -122,7 +122,7 @@ $row = function (string $labelkey, string $control, string $for): string {
             'class' => 'col-sm-3 col-form-label', 'for' => $for,
         ]) .
         html_writer::div($control, 'col-sm-9'),
-        'row mb-2'
+        'row mb-2 mx-0'
     );
 };
 $select = fn(array $options, string $name, string $selected) => html_writer::select(

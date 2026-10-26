@@ -58,14 +58,14 @@ $capabilities = [
         ],
     ],
 
-    // A teacher syncs and manages the book catalogue.
-    'mod/moodlereader:managebooks' => [
+    // A site administrator enables and disables books in the site's catalogue (Manage books): it applies to
+    // every course, so it is not a course teacher's decision.
+    'mod/moodlereader:managecatalogue' => [
         'riskbitmask'  => RISK_DATALOSS,
         'captype'      => 'write',
-        'contextlevel' => CONTEXT_MODULE,
+        'contextlevel' => CONTEXT_SYSTEM,
         'archetypes'   => [
-            'editingteacher' => CAP_ALLOW,
-            'manager'        => CAP_ALLOW,
+            'manager' => CAP_ALLOW,
         ],
     ],
 

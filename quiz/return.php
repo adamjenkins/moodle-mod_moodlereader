@@ -15,12 +15,10 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Where a student lands after a quiz: from mreader.org's "Return" link
- * (?ref=&ts=&sig=) or from the quiz page once its result is in (?attempt=).
+ * Where a student lands after a quiz drawn by Moodle (?attempt=), once its result is in.
  *
- * Nothing in the URL is trusted for the grade. The result is fetched from
- * mreader.org with this site's own credential; the link's signature only
- * decides whether the reference is worth looking up.
+ * Nothing in the URL is trusted for the grade: the result is fetched from mreader.org
+ * with this site's own credential.
  *
  * The path of this script is registered with mreader.org as the site's return
  * address: do not move it.
@@ -33,32 +31,11 @@
 require(__DIR__ . '/../../../config.php');
 
 use mod_moodlereader\local\api\api_exception;
-use mod_moodlereader\local\api\signer;
 use mod_moodlereader\local\reader;
 use mod_moodlereader\local\results;
 
-$attemptid = optional_param('attempt', 0, PARAM_INT);
-$ref = optional_param('ref', '', PARAM_ALPHANUMEXT);
-$ts = optional_param('ts', 0, PARAM_INT);
-$sig = optional_param('sig', '', PARAM_ALPHANUMEXT);
-
-if ($attemptid) {
-    $attempt = $DB->get_record('moodlereader_attempts', ['id' => $attemptid], '*', MUST_EXIST);
-} else {
-    $secret = (string) get_config('mod_moodlereader', 'v2secret');
-    $valid = $ref !== '' && $secret !== '' && abs(time() - $ts) < DAYSECS &&
-        hash_equals(signer::return_link($secret, $ref, $ts), $sig);
-    $attempt = $valid ? $DB->get_record('moodlereader_attempts', ['attemptref' => $ref]) : false;
-    if (!$attempt) {
-        require_login();
-        redirect(
-            new moodle_url('/my/'),
-            get_string('returnunknown', 'mod_moodlereader'),
-            null,
-            \core\output\notification::NOTIFY_WARNING
-        );
-    }
-}
+$attemptid = required_param('attempt', PARAM_INT);
+$attempt = $DB->get_record('moodlereader_attempts', ['id' => $attemptid], '*', MUST_EXIST);
 
 $reader = reader::from_instanceid((int) $attempt->readerid);
 require_login($reader->get_course(), false, $reader->get_cm());

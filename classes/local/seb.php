@@ -24,16 +24,19 @@ use moodle_url;
 /**
  * Safe Exam Browser for the book quizzes: which rule is in force, its configuration, and the key checks.
  *
- * Three levels, the higher one winning: the site (an administrator may require SEB everywhere or turn it
- * off), the course, and the activity. The level that requires SEB also says how it is checked:
+ * Two levels, the site's winning: an administrator may require SEB for every activity or turn it off, and
+ * otherwise each activity decides. The level that requires SEB also says how it is checked:
  *
  * - METHOD_CONFIG: Moodle makes the SEB configuration; SEB's Config Key header (or JS API value) must match
  *   it, and Browser Exam Keys too when any are listed;
- * - METHOD_CLIENT: the student's SEB uses its own configuration; the browser must be SEB, and its Browser
- *   Exam Key must be one of those listed when any are.
+ * - METHOD_TEMPLATE: as METHOD_CONFIG, the configuration being one of the site's SEB templates
+ *   (quizaccess_seb's, the ones quizzes use), with the activity's start page, keys and quit password;
+ * - METHOD_QUIZ: as METHOD_TEMPLATE, the configuration copied from a quiz that has one (an activity only);
+ * - METHOD_CLIENT: the student's SEB uses its own configuration; its Browser Exam Key must be one of those
+ *   listed (without any, nothing passes).
  *
  * The key checks and the configuration follow core's quizaccess_seb (seb_access_manager, seb_quiz_settings),
- * whose general classes (property_list, config_key) are used directly.
+ * whose general classes (property_list, config_key, template, seb_quiz_settings) are used directly.
  *
  * @package    mod_moodlereader
  * @copyright  2019 Catalyst IT
@@ -41,24 +44,26 @@ use moodle_url;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class seb {
-    /** Site: teachers decide per course and activity. */
+    /** Site: each activity decides. */
     const SITE_TEACHERS = 0;
     /** Site: required for every quiz. */
     const SITE_REQUIRED = 1;
-    /** Site: never; the course and activity settings are hidden. */
+    /** Site: never; the activity settings are hidden. */
     const SITE_NEVER = 2;
 
-    /** Activity: as the course says. */
-    const ACTIVITY_COURSE = 0;
+    /** Activity: not required. */
+    const ACTIVITY_NO = 0;
     /** Activity: required. */
     const ACTIVITY_YES = 1;
-    /** Activity: not required. */
-    const ACTIVITY_NO = 2;
 
     /** Moodle makes the configuration; its Config Key is checked. */
     const METHOD_CONFIG = 0;
     /** The student's SEB uses its own configuration; only Browser Exam Keys are checked. */
     const METHOD_CLIENT = 1;
+    /** One of the site's SEB templates is the configuration; its Config Key is checked. */
+    const METHOD_TEMPLATE = 2;
+    /** A configuration copied from a quiz; its Config Key is checked. */
+    const METHOD_QUIZ = 3;
 
     /** Header sent by SEB with the Config Key hash. */
     const CONFIG_KEY_HEADER = 'HTTP_X_SAFEEXAMBROWSER_CONFIGKEYHASH';
@@ -85,7 +90,7 @@ class seb {
     }
 
     /**
-     * Whether teachers may set SEB for courses and activities.
+     * Whether teachers may set SEB for their activities.
      *
      * @return bool
      */
@@ -94,21 +99,78 @@ class seb {
     }
 
     /**
-     * The course's SEB settings, or null when it has none.
+     * Whether a rule's SEB runs a configuration Moodle hands out (every method but SEB's own).
+     *
+     * @param \stdClass $rule
+     * @return bool
+     */
+    public static function has_config(\stdClass $rule): bool {
+        return $rule->method !== self::METHOD_CLIENT;
+    }
+
+    /**
+     * The site's enabled SEB templates (quizaccess_seb), by id.
+     *
+     * @return string[] id => name
+     */
+    public static function templates(): array {
+        if (!class_exists('\quizaccess_seb\template')) {
+            return [];
+        }
+        $out = [];
+        foreach (\quizaccess_seb\template::get_records(['enabled' => 1], 'name') as $template) {
+            $out[(int) $template->get('id')] = format_string($template->get('name'));
+        }
+        return $out;
+    }
+
+    /**
+     * The quizzes of a course that have a SEB configuration to copy (made in Moodle, a template, or uploaded).
      *
      * @param int $courseid
-     * @return \stdClass|null
+     * @return string[] quiz course-module id => name
      */
-    public static function course_settings(int $courseid): ?\stdClass {
+    public static function quizzes(int $courseid): array {
         global $DB;
-        return $DB->get_record('moodlereader_sebcourse', ['courseid' => $courseid]) ?: null;
+        if (!class_exists('\quizaccess_seb\seb_quiz_settings')) {
+            return [];
+        }
+        $rows = $DB->get_records_sql(
+            "SELECT s.cmid, q.name
+               FROM {quizaccess_seb_quizsettings} s
+               JOIN {quiz} q ON q.id = s.quizid
+              WHERE q.course = :course AND s.requiresafeexambrowser IN (1, 2, 3)
+           ORDER BY q.name",
+            ['course' => $courseid]
+        );
+        return array_map(fn($r) => format_string($r->name), array_column($rows, null, 'cmid'));
+    }
+
+    /**
+     * The SEB configuration of a quiz, as plist XML, or null when it has none (or it cannot be read).
+     *
+     * @param int $quizcmid
+     * @param int $courseid The course the quiz must be in.
+     * @return string|null
+     */
+    public static function quiz_config(int $quizcmid, int $courseid): ?string {
+        if (!array_key_exists($quizcmid, self::quizzes($courseid))) {
+            return null;
+        }
+        try {
+            $settings = \quizaccess_seb\seb_quiz_settings::get_record(['cmid' => $quizcmid]);
+            return $settings ? $settings->get_config() : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**
      * The rule in force for an activity, or null when SEB is not required.
      *
      * @param \stdClass $instance The moodlereader record.
-     * @return \stdClass|null level ('site', 'course' or 'activity'), method, keys (list of lower-case hex), quitpassword
+     * @return \stdClass|null level ('site' or 'activity'), method, keys (list of lower-case hex), quitpassword,
+     *     base (plist XML of a template or copied quiz configuration, or null)
      */
     public static function rule(\stdClass $instance): ?\stdClass {
         if (!self::available()) {
@@ -123,39 +185,60 @@ class seb {
                 'site',
                 (int) get_config('mod_moodlereader', 'sebmethod'),
                 (string) get_config('mod_moodlereader', 'sebkeys'),
-                (string) get_config('mod_moodlereader', 'sebquitpassword')
+                (string) get_config('mod_moodlereader', 'sebquitpassword'),
+                (int) get_config('mod_moodlereader', 'sebtemplate'),
+                null
             );
-        }
-        $course = self::course_settings((int) $instance->course);
-        if ($course && !empty($course->required)) {
-            return self::make_rule('course', (int) $course->method, (string) $course->sebkeys, (string) $course->quitpassword);
         }
         if ((int) ($instance->seb ?? 0) === self::ACTIVITY_YES) {
             return self::make_rule(
                 'activity',
                 (int) $instance->sebmethod,
                 (string) $instance->sebkeys,
-                (string) $instance->sebquitpassword
+                (string) $instance->sebquitpassword,
+                (int) ($instance->sebtemplateid ?? 0),
+                isset($instance->sebconfigxml) ? (string) $instance->sebconfigxml : null
             );
         }
         return null;
     }
 
     /**
-     * Build a rule.
+     * Build a rule. A template that is gone or disabled, or a copied configuration that cannot be read,
+     * falls back to the configuration Moodle makes: SEB stays required.
      *
      * @param string $level
      * @param int $method
      * @param string $keys Browser Exam Keys as typed: separated by spaces, commas, semicolons or new lines.
      * @param string $quitpassword
+     * @param int $templateid For METHOD_TEMPLATE.
+     * @param string|null $copied For METHOD_QUIZ: the copied plist XML.
      * @return \stdClass
      */
-    protected static function make_rule(string $level, int $method, string $keys, string $quitpassword): \stdClass {
+    protected static function make_rule(
+        string $level,
+        int $method,
+        string $keys,
+        string $quitpassword,
+        int $templateid,
+        ?string $copied
+    ): \stdClass {
+        $base = null;
+        if ($method === self::METHOD_TEMPLATE && array_key_exists($templateid, self::templates())) {
+            $base = (string) \quizaccess_seb\template::get_record(['id' => $templateid])->get('content');
+        } else if ($method === self::METHOD_QUIZ && $copied !== null && trim($copied) !== '') {
+            $base = $copied;
+        }
+        if (!in_array($method, [self::METHOD_CONFIG, self::METHOD_CLIENT], true) && $base === null) {
+            $method = self::METHOD_CONFIG;
+        }
         return (object) [
             'level' => $level,
-            'method' => $method === self::METHOD_CLIENT ? self::METHOD_CLIENT : self::METHOD_CONFIG,
+            'method' => in_array($method, [self::METHOD_CLIENT, self::METHOD_TEMPLATE, self::METHOD_QUIZ], true)
+                ? $method : self::METHOD_CONFIG,
             'keys' => self::split_keys($keys),
             'quitpassword' => $quitpassword,
+            'base' => $base,
         ];
     }
 
@@ -206,32 +289,44 @@ class seb {
     }
 
     /**
-     * The configuration file Moodle makes for an activity (METHOD_CONFIG), as plist XML.
+     * The configuration file Moodle hands out for an activity, as plist XML.
      *
-     * Only the settings a reading quiz needs: start on the activity, send the keys, allow quitting (by the
-     * quit link, or with the password when one is set), keep Moodle's login, and no preferences window.
+     * Made by Moodle (METHOD_CONFIG): only the settings a reading quiz needs: start on the activity, send the
+     * keys, allow quitting (by the quit link, or with the password when one is set), keep Moodle's login,
+     * and no preferences window. From a template or a copied quiz configuration: that configuration, with the
+     * activity's start page, the keys sent, the quit password, and the quit link when it has none (as core's
+     * seb_quiz_settings does for a template).
      *
      * @param int $cmid
      * @param \stdClass $rule
      * @return string
      */
     public static function config_xml(int $cmid, \stdClass $rule): string {
-        $plist = new \quizaccess_seb\property_list();
+        if (!empty($rule->base)) {
+            $plist = new \quizaccess_seb\property_list($rule->base);
+            if (empty($plist->get_element_value('quitURL'))) {
+                $plist->set_or_update_value('quitURL', new CFString(self::quit_url($cmid)->out(false)));
+            }
+        } else {
+            $plist = new \quizaccess_seb\property_list();
+            $plist->set_or_update_value('allowQuit', new CFBoolean(true));
+            $plist->set_or_update_value('quitURL', new CFString(self::quit_url($cmid)->out(false)));
+            $plist->set_or_update_value('quitURLConfirm', new CFBoolean(true));
+            $plist->set_or_update_value('showTaskBar', new CFBoolean(true));
+            $plist->set_or_update_value('showReloadButton', new CFBoolean(true));
+            $plist->set_or_update_value('browserWindowAllowReload', new CFBoolean(true));
+            $plist->set_or_update_value('URLFilterEnable', new CFBoolean(false));
+            $plist->set_or_update_value('examSessionClearCookiesOnStart', new CFBoolean(false));
+            $plist->set_or_update_value('allowPreferencesWindow', new CFBoolean(false));
+        }
         $plist->set_or_update_value('startURL', new CFString(self::start_url($cmid)->out(false)));
         $plist->set_or_update_value('sendBrowserExamKey', new CFBoolean(true));
         // The modern WebView and the JS API, as core sets them.
         $plist->set_or_update_value('browserWindowWebView', new CFNumber(3));
-        $plist->set_or_update_value('allowQuit', new CFBoolean(true));
-        $plist->set_or_update_value('quitURL', new CFString(self::quit_url($cmid)->out(false)));
-        $plist->set_or_update_value('quitURLConfirm', new CFBoolean(true));
-        $plist->set_or_update_value('showTaskBar', new CFBoolean(true));
-        $plist->set_or_update_value('showReloadButton', new CFBoolean(true));
-        $plist->set_or_update_value('browserWindowAllowReload', new CFBoolean(true));
-        $plist->set_or_update_value('URLFilterEnable', new CFBoolean(false));
-        $plist->set_or_update_value('examSessionClearCookiesOnStart', new CFBoolean(false));
-        $plist->set_or_update_value('allowPreferencesWindow', new CFBoolean(false));
         if ($rule->quitpassword !== '') {
             $plist->set_or_update_value('hashedQuitPassword', new CFString(hash('sha256', $rule->quitpassword)));
+        } else if (!is_null($plist->get_element_value('hashedQuitPassword'))) {
+            $plist->delete_element('hashedQuitPassword');
         }
         return $plist->to_xml();
     }
@@ -258,7 +353,7 @@ class seb {
      * @param string $url The page's full URL.
      * @param string|null $confighash
      * @param string|null $bekhash
-     * @param bool $isseb Whether the browser says it is SEB (only used for METHOD_CLIENT without keys).
+     * @param bool $isseb Whether the browser says it is SEB (never enough on its own: a user agent can be faked).
      * @return bool
      */
     public static function check_keys(
@@ -269,11 +364,13 @@ class seb {
         ?string $bekhash,
         bool $isseb
     ): bool {
-        if ($rule->method === self::METHOD_CONFIG) {
+        if (self::has_config($rule)) {
             if ($confighash === null || !hash_equals(hash('sha256', $url . self::config_key($cmid, $rule)), $confighash)) {
                 return false;
             }
-        } else if (!$rule->keys && !$isseb) {
+        } else if (!$rule->keys) {
+            // SEB's own configuration can only be told apart by its Browser Exam Keys: without any, nothing
+            // passes (a user agent saying "SEB" is easy to fake).
             return false;
         }
         if ($rule->keys) {
@@ -380,9 +477,9 @@ class seb {
         $download = clean_param((string) get_config('mod_moodlereader', 'sebdownloadlink'), PARAM_URL);
         return [
             'insideseb' => self::is_seb(),
-            'isconfig' => $rule->method === self::METHOD_CONFIG,
-            'launchurl' => $rule->method === self::METHOD_CONFIG ? self::config_link($cmid, true) : '',
-            'configurl' => $rule->method === self::METHOD_CONFIG ? self::config_link($cmid, false) : '',
+            'isconfig' => self::has_config($rule),
+            'launchurl' => self::has_config($rule) ? self::config_link($cmid, true) : '',
+            'configurl' => self::has_config($rule) ? self::config_link($cmid, false) : '',
             'downloadurl' => $download,
             'backurl' => $reader->view_url()->out(false),
         ];

@@ -43,12 +43,6 @@ $PAGE->set_context($reader->get_context());
 $PAGE->set_title(get_string('messages', 'mod_moodlereader'));
 $PAGE->set_heading(format_string($reader->get_course()->fullname));
 
-if ($delete) {
-    require_sesskey();
-    message::delete($delete, $readerid);
-    redirect($pageurl, get_string('messagedeleted', 'mod_moodlereader'));
-}
-
 // Build the recipient menu: each student this teacher can see (their own groups in separate-groups
 // mode), plus "everyone" for a teacher who can see every student.
 $recipients = [];
@@ -68,6 +62,23 @@ foreach ($enrolled as $student) {
     $recipients[$student->id] = fullname($student);
 }
 
+// In separate groups a teacher sees, and deletes, only the messages to students they can see; a message to
+// everyone is theirs to delete only when they can see every student.
+$allgroups = isset($recipients[0]);
+$mine = function (\stdClass $m) use ($reader, $allgroups): bool {
+    return (int) $m->userid === 0 ? $allgroups
+        : (bool) \mod_moodlereader\local\attempt_admin::visible_userids($reader, [(int) $m->userid]);
+};
+
+if ($delete) {
+    require_sesskey();
+    $target = $DB->get_record('moodlereader_messages', ['id' => $delete, 'readerid' => $readerid]);
+    if ($target && $mine($target)) {
+        message::delete($delete, $readerid);
+    }
+    redirect($pageurl, get_string('messagedeleted', 'mod_moodlereader'));
+}
+
 $mform = new message_form($pageurl->out(false), ['cmid' => $id, 'recipients' => $recipients]);
 if ($data = $mform->get_data()) {
     if (!array_key_exists($data->target, $recipients)) {
@@ -82,7 +93,7 @@ echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('messages', 'mod_moodlereader'));
 $mform->display();
 
-$messages = message::all($readerid);
+$messages = array_filter(message::all($readerid), fn($m) => (int) $m->userid === 0 || $mine($m));
 if ($messages) {
     echo $OUTPUT->heading(get_string('existingmessages', 'mod_moodlereader'), 4);
     $table = new html_table();
@@ -96,7 +107,7 @@ if ($messages) {
             s($to),
             format_text($m->messagetext, $m->messageformat, ['context' => $reader->get_context()]),
             userdate($m->timecreated),
-            $OUTPUT->single_button($delurl, get_string('delete'), 'post'),
+            $mine($m) ? $OUTPUT->single_button($delurl, get_string('delete'), 'post') : '',
         ];
     }
     echo html_writer::table($table);

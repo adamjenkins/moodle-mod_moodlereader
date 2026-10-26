@@ -104,39 +104,64 @@ final class quizsession_test extends \advanced_testcase {
         $client->queue_callback('POST', '/launches', 201, fn($in) => [
             'attempt_ref' => $in['attempt_ref'], 'time_limit' => 600, 'slots' => 3,
         ]);
-        $this->assertSame(
-            [quizsession::DELIVERY_MOODLE],
-            quizsession::launch($this->reader, $this->attempt, $this->book, $client)
-        );
+        quizsession::launch($this->reader, $this->attempt, $this->book, $client);
+        $this->assertSame(quizsession::DELIVERY_MOODLE, $this->attempt->delivery);
         return $this->attempt->attemptref;
     }
 
     /**
-     * An old server answers with a frame URL: the attempt falls back to the frame and keeps that ref.
+     * An old server answers with a frame URL: the quiz is refused, as quizzes are shown in Moodle only.
+     * Only the pseudonym, the random display name, the book, the ref, the locale and the delivery are sent.
      *
      * @return void
      */
-    public function test_old_server_falls_back_to_the_frame(): void {
-        global $DB;
-        $url = 'https://mreader.example/api/v2/launch?t=x';
-        $client = (new fake_client())->queue('POST', '/launches', 201, ['launch_url' => $url]);
-        $this->assertSame(
-            ['iframe', 'https://mreader.example/api/v2/launch?t=x'],
-            quizsession::launch($this->reader, $this->attempt, $this->book, $client)
-        );
+    public function test_old_server_is_refused(): void {
+        $client = (new fake_client())->queue('POST', '/launches', 201, ['launch_url' => 'https://mreader.example/q']);
+        try {
+            quizsession::launch($this->reader, $this->attempt, $this->book, $client);
+            $this->fail('A frame launch was accepted.');
+        } catch (\mod_moodlereader\local\api\api_exception $e) {
+            $this->assertSame('nomoodledrawing', $e->apicode);
+        }
         $sent = json_decode($client->requests[0]['body'], true);
         $this->assertSame('moodle', $sent['delivery']);
-        // Only the pseudonym, the random display name, the book, the ref and the locale are sent.
         $this->assertSame(['uid', 'display_name', 'book_id', 'attempt_ref', 'locale', 'delivery'], array_keys($sent));
-        $this->assertSame('iframe', $DB->get_field('moodlereader_attempts', 'delivery', ['id' => $this->attempt->id]));
     }
 
     /**
-     * The clock counts only time on screen: not the wait for mreader.org, not a page that went away.
+     * A launch whose answer was lost is retried with the same ref; mreader.org names it as the open attempt,
+     * and it is taken up from its state instead of blocking the student.
      *
      * @return void
      */
-    public function test_clock_pauses_while_waiting_and_after_the_page_goes_away(): void {
+    public function test_lost_launch_answer_is_taken_up(): void {
+        global $DB;
+        $client = (new fake_client())->queue('POST', '/launches', 502, ['error' => ['code' => 'bad_gateway', 'message' => 'x']]);
+        try {
+            quizsession::launch($this->reader, $this->attempt, $this->book, $client);
+            $this->fail('A failed launch was accepted.');
+        } catch (\mod_moodlereader\local\api\api_exception $e) {
+            $this->assertNotSame('', (string) $e->apicode);
+        }
+        $ref = $DB->get_field('moodlereader_attempts', 'attemptref', ['id' => $this->attempt->id]);
+        $this->assertNotEmpty($ref);
+
+        $attempt = $DB->get_record('moodlereader_attempts', ['id' => $this->attempt->id]);
+        $client = (new fake_client())
+            ->queue('POST', '/launches', 409, ['error' => ['code' => 'attempt_open', 'message' => 'x'], 'attempt_ref' => $ref])
+            ->queue('POST', '/attempt/current', 200, $this->state($ref, 2));
+        quizsession::launch($this->reader, $attempt, $this->book, $client);
+        $this->assertSame($ref, json_decode($client->requests[0]['body'], true)['attempt_ref']);
+        $this->assertEquals(600, $attempt->timelimit);
+        $this->assertEquals(2, $attempt->currentslot);
+    }
+
+    /**
+     * The clock counts the time each question is on screen, by the wall clock, but not the wait for mreader.org.
+     *
+     * @return void
+     */
+    public function test_clock_pauses_only_while_waiting(): void {
         global $DB;
         $client = new fake_client();
         $ref = $this->launch($client);
@@ -162,18 +187,22 @@ final class quizsession_test extends \advanced_testcase {
         quizsession::show($this->attempt, $client);
         $this->assertSame(600 - 40, quizsession::time_left($this->attempt));
 
-        // The page beats for 20 seconds, then the tab is closed; the student returns an hour later.
+        // The page beats for 20 seconds, then goes silent (closed, or heartbeats blocked) for 100 seconds:
+        // the silence is counted, so an answer sent afterwards is charged all 120 seconds.
         quizsession::$now += 20;
         $this->assertSame(600 - 60, quizsession::heartbeat($this->attempt));
-        quizsession::$now += HOURSECS;
-        $this->assertSame(600 - 60 - quizsession::HEARTBEAT_GRACE, quizsession::time_left($this->attempt));
-        $client->queue('POST', '/attempt/current', 200, $this->state($ref, 2));
+        quizsession::$now += 100;
+        $this->assertSame(600 - 160, quizsession::time_left($this->attempt));
+        $client->queue('POST', '/attempt/answer', 200, $this->state($ref, 3));
+        quizsession::answer($this->attempt, 2, ['option' => 'opt1'], $client);
+        $this->assertEquals(160, $DB->get_field('moodlereader_attempts', 'secondsused', ['id' => $this->attempt->id]));
+
+        // Coming back an hour after closing the tab finds the time used up: the quiz is finished.
+        $client->queue('POST', '/attempt/current', 200, $this->state($ref, 3));
         quizsession::show($this->attempt, $client);
-        $this->assertEquals(60 + quizsession::HEARTBEAT_GRACE, $DB->get_field(
-            'moodlereader_attempts',
-            'secondsused',
-            ['id' => $this->attempt->id]
-        ));
+        quizsession::$now += HOURSECS;
+        $client->queue('POST', '/attempt/finish', 200, $this->state($ref, 3, 'finished', ['survey' => []]));
+        $this->assertSame('finished', quizsession::show($this->attempt, $client)['state']);
     }
 
     /**
@@ -251,11 +280,12 @@ final class quizsession_test extends \advanced_testcase {
         );
         $this->assertEquals(2, $DB->get_field('moodlereader_attempts', 'bookrating', ['id' => $this->attempt->id]));
 
-        // A second send is refused as done, and is not an error for the student.
+        // A second send is refused as done: not an error for the student, and the rating stays as it was.
         $client->queue('POST', '/attempt/survey', 409, ['error' => ['code' => 'survey_done', 'message' => 'x']]);
-        quizsession::survey($this->attempt, [], $client);
+        quizsession::survey($this->attempt, [1 => 5], $client);
+        $this->assertEquals(2, $DB->get_field('moodlereader_attempts', 'bookrating', ['id' => $this->attempt->id]));
         $this->assertSame(
-            ['ref' => $ref, 'responses' => []],
+            ['ref' => $ref, 'responses' => [['question' => 1, 'answer' => 5]]],
             json_decode($client->requests[count($client->requests) - 1]['body'], true)
         );
     }

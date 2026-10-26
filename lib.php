@@ -73,7 +73,7 @@ function moodlereader_add_instance($data, $mform = null) {
  * @return void
  */
 function moodlereader_clean_seb($data, $context) {
-    $fields = ['seb', 'sebmethod', 'sebkeys', 'sebquitpassword'];
+    $fields = ['seb', 'sebsource', 'sebmethod', 'sebtemplateid', 'sebconfigxml', 'sebkeys', 'sebquitpassword'];
     if (!\mod_moodlereader\local\seb::teachers_decide() || !has_capability('mod/moodlereader:manageseb', $context)) {
         foreach ($fields as $field) {
             unset($data->$field);
@@ -81,10 +81,38 @@ function moodlereader_clean_seb($data, $context) {
         return;
     }
     if (isset($data->seb)) {
-        $data->seb = in_array((int) $data->seb, [1, 2], true) ? (int) $data->seb : 0;
+        $data->seb = (int) $data->seb === 1 ? 1 : 0;
     }
-    if (isset($data->sebmethod)) {
-        $data->sebmethod = (int) $data->sebmethod === 1 ? 1 : 0;
+    if (isset($data->sebsource)) {
+        // The configuration source: only a template that is enabled, or a quiz in this activity's course.
+        $source = (string) $data->sebsource;
+        unset($data->sebsource);
+        $data->sebtemplateid = 0;
+        if ($source === 'client') {
+            $data->sebmethod = \mod_moodlereader\local\seb::METHOD_CLIENT;
+            $data->sebconfigxml = null;
+        } else if ($source === 'keep') {
+            $data->sebmethod = \mod_moodlereader\local\seb::METHOD_QUIZ;
+        } else if (
+            preg_match('/^template:(\d+)$/', $source, $m)
+                && array_key_exists((int) $m[1], \mod_moodlereader\local\seb::templates())
+        ) {
+            $data->sebmethod = \mod_moodlereader\local\seb::METHOD_TEMPLATE;
+            $data->sebtemplateid = (int) $m[1];
+            $data->sebconfigxml = null;
+        } else if (
+            preg_match('/^quiz:(\d+)$/', $source, $m)
+                && ($xml = \mod_moodlereader\local\seb::quiz_config((int) $m[1], (int) $data->course)) !== null
+        ) {
+            // A copy, taken now: later changes to the quiz do not change this activity.
+            $data->sebmethod = \mod_moodlereader\local\seb::METHOD_QUIZ;
+            $data->sebconfigxml = $xml;
+        } else {
+            $data->sebmethod = \mod_moodlereader\local\seb::METHOD_CONFIG;
+            $data->sebconfigxml = null;
+        }
+    } else {
+        unset($data->sebmethod, $data->sebtemplateid, $data->sebconfigxml);
     }
     if (isset($data->sebkeys)) {
         $data->sebkeys = implode("\n", \mod_moodlereader\local\seb::split_keys((string) $data->sebkeys));
@@ -429,29 +457,4 @@ function moodlereader_get_coursemodule_info($coursemodule) {
     }
 
     return $info;
-}
-
-/**
- * Add the course's Safe Exam Browser page to its More menu, for teachers who may set it.
- *
- * @param navigation_node $navigation The course settings node.
- * @param stdClass $course
- * @param context $context The course context.
- * @return void
- */
-function moodlereader_extend_navigation_course($navigation, $course, $context) {
-    if (!\mod_moodlereader\local\seb::teachers_decide() || !has_capability('mod/moodlereader:manageseb', $context)) {
-        return;
-    }
-    if (empty(get_fast_modinfo($course)->get_instances_of('moodlereader'))) {
-        return;
-    }
-    $navigation->add_node(navigation_node::create(
-        get_string('sebcourse', 'mod_moodlereader'),
-        new moodle_url('/mod/moodlereader/sebcourse.php', ['id' => $course->id]),
-        navigation_node::TYPE_SETTING,
-        null,
-        'moodlereaderseb',
-        new pix_icon('i/settings', '')
-    ));
 }

@@ -13,9 +13,8 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - `admin/connection.php`: request access, see the state, check now, sync books, rotate
   the credential; site admins are messaged when the state changes
   (`db/messages.php`, provider `siteconnection`).
-- `quiz/return.php`, `quiz/status.php` and the `mod_moodlereader/quizframe` AMD
-  module: the quiz frame is watched (mreader.org's `postMessage` and polling) and the
-  result is fetched server-to-server.
+- `quiz/return.php`: where a student lands after a quiz; the result is fetched
+  server-to-server.
 - `siteproof.php`: answers mreader.org's optional site-ownership check.
 - Scheduled tasks `reconcile_attempts` (every 15 min), `sync_books` (daily) and
   `refresh_connection` (daily); ad-hoc task `import_course`.
@@ -68,27 +67,38 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - `student.php`, `renderer::reading_page()` (shared with `view.php`) and
   `classes/local/eligibility.php` (the search gate's rules as reasons);
   `reader::search_catalogue()`/`catalogue_menus()`; `records.php?userid=` for teachers.
-- Moodle-drawn quizzes (API v2 31 §11, agreed with mreader.org as plan/32): `classes/local/quizsession.php`
-  (launch with `"delivery": "moodle"` and fallback to the frame on a `launch_url`; start, current,
-  answer, finish, survey; the Moodle-run clock: time counts from the page being served to the answer
-  or the last heartbeat, never while waiting for mreader.org), `quiz/render.php`, `quiz/heartbeat.php`,
-  templates `quiz_page` and `quiz_survey`, AMD `quizrender` (countdown, heartbeat, ordering by
-  buttons, submit at zero). Fields `moodlereader.quizdelivery` and, on attempts, `delivery`,
-  `timelimit`, `slots`, `currentslot`, `secondsused`, `timeserved`, `timeheartbeat` (version
-  2026102505). No question text is stored; pages are sent `no-store`. Behat runs against a fake
-  mreader.org (`tests/behat/fake_mreader.php`, Behat site only).
-- Safe Exam Browser (plan/50 §5, §9.4): `classes/local/seb.php` (site, course, activity
-  precedence; the configuration made with core's `quizaccess_seb\property_list` and its Config Key
-  from `config_key`; header and JS-API key checks as core's `seb_access_manager`, with access kept
-  per session and activity), checked on `startquiz.php`, `quiz/mreader.php` and every
-  `quiz/render.php` request (not the heartbeat, which serves nothing). `sebconfig.php` serves the
-  `.seb` file, `sebcheck.php` and AMD `sebcheck` check SEB's JS-API keys, template
-  `seb_required`, course page `sebcourse.php` (navigation via `moodlereader_extend_navigation_course`),
-  capability `mod/moodlereader:manageseb`, site settings `sebmode`, `sebmethod`, `sebkeys`,
+- Moodle-drawn quizzes (API v2 31 §11, agreed with mreader.org as plan/32), the only delivery:
+  `classes/local/quizsession.php` (launch with `"delivery": "moodle"`, the ref saved before it is
+  sent and an `attempt_open` naming it taken up from `/attempt/current`; a `launch_url` reply is
+  refused as `nomoodledrawing`; start, current, answer, finish, survey; the Moodle-run clock counts
+  wall time from the page being served to the answer, never while waiting for mreader.org),
+  `quiz/mreader.php` (launcher only), `quiz/render.php`, `quiz/heartbeat.php`, templates
+  `quiz_page` and `quiz_survey`, AMD `quizrender` (countdown, heartbeat, ordering by buttons, submit
+  at zero). Attempt fields `delivery`, `timelimit`, `slots`, `currentslot`, `secondsused`,
+  `timeserved`, `timeheartbeat` (version 2026102505). No question text is stored; pages are sent
+  `no-store`. Behat runs against a fake mreader.org (`tests/behat/fake_mreader.php`, Behat site only).
+- Safe Exam Browser (plan/50 §5, §9.4): `classes/local/seb.php` (site, then activity; the
+  configuration made with core's `quizaccess_seb\property_list`, or based on a `quizaccess_seb`
+  template or a quiz's `seb_quiz_settings::get_config()` copied at save, with the activity's
+  startURL, quit password and keys; its Config Key from `config_key`; header and JS-API key checks
+  as core's `seb_access_manager`, with access kept per session and activity; METHOD_CLIENT without
+  keys fails closed), checked on `startquiz.php`, `quiz/mreader.php` and every `quiz/render.php`
+  request (not the heartbeat, which serves nothing). `sebconfig.php` serves the `.seb` file,
+  `sebcheck.php` and AMD `sebcheck` check SEB's JS-API keys, template `seb_required`, capability
+  `mod/moodlereader:manageseb`, site settings `sebmode`, `sebmethod`, `sebtemplate`, `sebkeys`,
   `sebquitpassword`, `sebdownloadlink`. Fields `moodlereader.seb`, `sebmethod`, `sebkeys`,
-  `sebquitpassword` and table `moodlereader_sebcourse` (version 2026102600), deleted with the
-  course (hook `before_course_deleted`). Backup carries both; restore drops Browser Exam Keys from
-  another site and applies course settings only to a course restored whole.
+  `sebquitpassword` (version 2026102600), `sebtemplateid`, `sebconfigxml` (2026102601). Restore
+  drops Browser Exam Keys and templates from another site and keeps a copied configuration only if
+  it parses.
+- Books count once per student site-wide: `reader::available_where()` and `eligibility` read
+  finished attempts in every activity; `attempt::finish()` deletes a later duplicate result
+  (`already_finished()`); `reader::require_still_available()` re-checks before a launch and before
+  the first question; `award_book()` skips books counted anywhere.
+- Capability `mod/moodlereader:managecatalogue` (system, manager) replaces `managebooks` for
+  Manage books (version 2026102601).
+- `reader::require_quiz_taker()`: quiz pages need `attempt` (or `viewreports` for a teacher trying
+  a quiz), not only `viewbooks`. `quiz/render.php` finishes an open attempt once the activity has
+  closed, refuses deleted attempts, and takes the survey only after the quiz has finished.
 - Completion rules use `ignoredate`, count each book once and include credit.
 - `mod_form` validation refuses `wordsorpoints = 1` when no enabled book has points.
 - `moodlereader_books.language` is NOT NULL with no default (XMLDB rejects `''` as a
@@ -97,9 +107,25 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
   `cover.<type>`; `pluginfile` force-downloads any other cover file.
 - Restore cleans every restored field, skips attempts whose book or user it did not map
   (it no longer falls back to the backup's own ids), and does not restore attempt refs.
+- Restore matches catalogue books by `(remoteid, hasquiz)` before the title, never inserts a
+  second row for an mreader.org book, and inserts new books hidden.
+- Privacy `delete_data_for_users()`: the cheat-log delete used one set of named placeholders twice
+  and always threw; it now uses two (test added).
+- `messages.php`: in separate groups, only messages to visible students are listed and deletable;
+  a message to everyone only by a teacher who sees every student.
+- Importer: legacy `abandoned`/`overdue` attempts are imported as finished; a student's level row
+  is re-keyed instead of inserted twice when the newest legacy `reader_levels` row changes.
+- `attempt::finish()` takes mreader.org's `finished_at` (within the attempt's start and now).
+- `mod_form` validation: pass mark 0-100, goal 0-9,999,999, the activity must close after it opens.
 
 ### Removed
 
+- The quiz frame: `quiz/status.php`, AMD `quizframe`, `results::launch()`, the signed return link
+  in `quiz/return.php`, the activity setting `quizdelivery` (dropped, version 2026102601).
+- The course level of Safe Exam Browser: `sebcourse.php`, `sebcourse_form`, the course navigation
+  node, the hook `before_course_deleted` and table `moodlereader_sebcourse` (dropped, version
+  2026102601; activity value 2 "not required" becomes 0).
+- Capability `mod/moodlereader:managebooks`.
 - The legacy registration (`admin/register.php`, `register_form`) and md5 signing.
 - `cli/migrate.php` and `classes/local/migrator.php` (replaced by the importer).
 

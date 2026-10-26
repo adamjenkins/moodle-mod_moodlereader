@@ -60,7 +60,6 @@ if (!empty($reader->get_instance()->intro)) {
 // Teacher tools.
 $tools = [
     'viewreports' => ['report.php', 'report'],
-    'managebooks' => ['books.php', 'managebooks'],
     'manageusers' => ['messages.php', 'messages'],
 ];
 $links = [];
@@ -85,13 +84,20 @@ if ($reader->can('manageusers')) {
         ['class' => 'btn btn-secondary']
     );
 }
+if (has_capability('mod/moodlereader:managecatalogue', context_system::instance())) {
+    $links[] = html_writer::link(
+        new moodle_url('/mod/moodlereader/books.php', ['id' => $id]),
+        get_string('managebooks', 'mod_moodlereader'),
+        ['class' => 'btn btn-secondary']
+    );
+}
 if ($links) {
     echo html_writer::div(implode(' ', $links), 'mod-moodlereader-teachertools mb-3');
 }
 
 // Quizzes need an approved mreader.org connection; say so instead of failing at launch.
 if (!\mod_moodlereader\local\connection::allows_launch()) {
-    if ($reader->can('managebooks')) {
+    if ($reader->can('viewreports')) {
         $message = get_string('notconnectedteacher', 'mod_moodlereader');
         if (has_capability('mod/moodlereader:manageremotesites', context_system::instance())) {
             $message .= ' ' . html_writer::link(

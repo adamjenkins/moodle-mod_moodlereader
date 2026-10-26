@@ -171,7 +171,7 @@ class attempt_admin {
      * Give several students credit for a book, as if they had passed its quiz.
      *
      * The book may have no quiz, or a withdrawn one, but must not be disabled. A student
-     * who already has a counted attempt at the book is skipped.
+     * who already has a counted attempt at the book, in any reading activity on the site, is skipped.
      *
      * @param reader $reader
      * @param int[] $userids
@@ -189,8 +189,8 @@ class attempt_admin {
         foreach (array_keys(self::visible_userids($reader, $userids)) as $userid) {
             $counted = $DB->record_exists_select(
                 'moodlereader_attempts',
-                'readerid = ? AND userid = ? AND bookid = ? AND deleted = 0 AND cheated = 0 AND (passed = 1 OR credit = 1)',
-                [$readerid, $userid, $book->id]
+                'userid = ? AND bookid = ? AND deleted = 0 AND cheated = 0 AND (passed = 1 OR credit = 1)',
+                [$userid, $book->id]
             );
             if ($counted) {
                 continue;
@@ -205,7 +205,7 @@ class attempt_admin {
                 'timestart' => $now, 'timefinish' => $now, 'timemodified' => $now,
                 // Not a quiz: no address, so cheating detection never compares it.
                 'ip' => '', 'attemptref' => null, 'remotestate' => null, 'timeresultchecked' => 0,
-                'delivery' => 'iframe', 'timelimit' => 0, 'slots' => 0, 'currentslot' => 0, 'secondsused' => 0,
+                'delivery' => 'moodle', 'timelimit' => 0, 'slots' => 0, 'currentslot' => 0, 'secondsused' => 0,
                 'timeserved' => 0, 'timeheartbeat' => 0,
             ];
             $attempt->id = $DB->insert_record('moodlereader_attempts', $attempt);

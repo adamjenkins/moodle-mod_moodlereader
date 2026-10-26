@@ -38,7 +38,7 @@ require_login($reader->get_course(), false, $reader->get_cm());
 $reader->require_cap('viewbooks');
 
 $rule = seb::rule($reader->get_instance());
-if ($rule === null || $rule->method !== seb::METHOD_CONFIG) {
+if ($rule === null || !seb::has_config($rule)) {
     throw new moodle_exception('sebnoconfig', 'mod_moodlereader', $reader->view_url());
 }
 

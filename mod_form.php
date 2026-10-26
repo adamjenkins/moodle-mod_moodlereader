@@ -73,14 +73,6 @@ class mod_moodlereader_mod_form extends moodleform_mod {
         $mform->addElement('date_selector', 'ignoredate', get_string('ignoredate', 'mod_moodlereader'), ['optional' => true]);
         $mform->addHelpButton('ignoredate', 'ignoredate', 'mod_moodlereader');
 
-        // How quizzes are shown: drawn by Moodle (the questions and marking stay on mreader.org), or in a frame.
-        $mform->addElement('select', 'quizdelivery', get_string('quizdelivery', 'mod_moodlereader'), [
-            1 => get_string('quizdelivery_moodle', 'mod_moodlereader'),
-            0 => get_string('quizdelivery_iframe', 'mod_moodlereader'),
-        ]);
-        $mform->setDefault('quizdelivery', 1);
-        $mform->addHelpButton('quizdelivery', 'quizdelivery', 'mod_moodlereader');
-
         $mform->addElement('text', 'minpassgrade', get_string('minpassgrade', 'mod_moodlereader'), ['size' => 4]);
         $mform->setType('minpassgrade', PARAM_INT);
         $mform->setDefault('minpassgrade', 60);
@@ -154,7 +146,6 @@ class mod_moodlereader_mod_form extends moodleform_mod {
             return;
         }
         $mform->addElement('header', 'sebheader', get_string('seb', 'mod_moodlereader'));
-        $course = \mod_moodlereader\local\seb::course_settings((int) $this->get_course()->id);
         if ($mode === \mod_moodlereader\local\seb::SITE_REQUIRED) {
             $mform->addElement(
                 'static',
@@ -164,30 +155,49 @@ class mod_moodlereader_mod_form extends moodleform_mod {
             );
             return;
         }
-        if ($course && !empty($course->required)) {
-            $mform->addElement(
-                'static',
-                'sebforced',
-                get_string('sebactivity', 'mod_moodlereader'),
-                get_string('sebbycourse', 'mod_moodlereader')
-            );
-            return;
-        }
         if (!has_capability('mod/moodlereader:manageseb', $this->context)) {
             $current = (int) ($this->current->seb ?? 0) === \mod_moodlereader\local\seb::ACTIVITY_YES ? 'yes' : 'no';
             $mform->addElement('static', 'sebcurrent', get_string('sebactivity', 'mod_moodlereader'), get_string($current));
             return;
         }
         $mform->addElement('select', 'seb', get_string('sebactivity', 'mod_moodlereader'), [
-            \mod_moodlereader\local\seb::ACTIVITY_COURSE => get_string('sebactivity_course', 'mod_moodlereader'),
-            \mod_moodlereader\local\seb::ACTIVITY_YES => get_string('yes'),
             \mod_moodlereader\local\seb::ACTIVITY_NO => get_string('no'),
+            \mod_moodlereader\local\seb::ACTIVITY_YES => get_string('yes'),
         ]);
         $mform->addHelpButton('seb', 'sebactivity', 'mod_moodlereader');
-        \mod_moodlereader\form\sebcourse_form::add_rule_elements($mform);
-        foreach (['sebmethod', 'sebkeys', 'sebquitpassword'] as $name) {
+        $mform->addElement('select', 'sebsource', get_string('sebmethod', 'mod_moodlereader'), $this->seb_sources());
+        $mform->addHelpButton('sebsource', 'sebmethod', 'mod_moodlereader');
+        $mform->addElement('textarea', 'sebkeys', get_string('sebkeys', 'mod_moodlereader'), ['rows' => 3, 'cols' => 70]);
+        $mform->setType('sebkeys', PARAM_RAW_TRIMMED);
+        $mform->addHelpButton('sebkeys', 'sebkeys', 'mod_moodlereader');
+        $mform->addElement('passwordunmask', 'sebquitpassword', get_string('sebquitpassword', 'mod_moodlereader'));
+        $mform->setType('sebquitpassword', PARAM_RAW);
+        $mform->addHelpButton('sebquitpassword', 'sebquitpassword', 'mod_moodlereader');
+        $mform->hideIf('sebquitpassword', 'sebsource', 'eq', 'client');
+        foreach (['sebsource', 'sebkeys', 'sebquitpassword'] as $name) {
             $mform->hideIf($name, 'seb', 'neq', \mod_moodlereader\local\seb::ACTIVITY_YES);
         }
+    }
+
+    /**
+     * Where the SEB configuration comes from: Moodle, one of the site's SEB templates, a copy of a quiz's
+     * configuration in this course, or SEB's own.
+     *
+     * @return string[] Option value => label.
+     */
+    protected function seb_sources(): array {
+        $options = ['config' => get_string('sebmethod_config', 'mod_moodlereader')];
+        foreach (\mod_moodlereader\local\seb::templates() as $id => $name) {
+            $options['template:' . $id] = get_string('sebsource_template', 'mod_moodlereader', $name);
+        }
+        if ((int) ($this->current->sebmethod ?? 0) === \mod_moodlereader\local\seb::METHOD_QUIZ) {
+            $options['keep'] = get_string('sebsource_keep', 'mod_moodlereader');
+        }
+        foreach (\mod_moodlereader\local\seb::quizzes((int) $this->get_course()->id) as $cmid => $name) {
+            $options['quiz:' . $cmid] = get_string('sebsource_quiz', 'mod_moodlereader', $name);
+        }
+        $options['client'] = get_string('sebmethod_client', 'mod_moodlereader');
+        return $options;
     }
 
     /**
@@ -205,11 +215,22 @@ class mod_moodlereader_mod_form extends moodleform_mod {
                 $errors[$field] = get_string('levelcountrange', 'mod_moodlereader');
             }
         }
+        if (isset($data['minpassgrade']) && ((int) $data['minpassgrade'] < 0 || (int) $data['minpassgrade'] > 100)) {
+            $errors['minpassgrade'] = get_string('minpassgraderange', 'mod_moodlereader');
+        }
+        if (isset($data['goal']) && ((int) $data['goal'] < 0 || (int) $data['goal'] > 9999999)) {
+            $errors['goal'] = get_string('goalrange', 'mod_moodlereader');
+        }
+        $from = (int) ($data['availablefrom'] ?? 0);
+        $until = (int) ($data['availableuntil'] ?? 0);
+        if ($from > 0 && $until > 0 && $until <= $from) {
+            $errors['availableuntil'] = get_string('availableuntilbeforefrom', 'mod_moodlereader');
+        }
         if (isset($data['sebkeys']) && !\mod_moodlereader\local\seb::valid_keys($data['sebkeys'])) {
             $errors['sebkeys'] = get_string('sebkeysinvalid', 'mod_moodlereader');
         } else if (
             (int) ($data['seb'] ?? 0) === \mod_moodlereader\local\seb::ACTIVITY_YES
-                && (int) ($data['sebmethod'] ?? 0) === \mod_moodlereader\local\seb::METHOD_CLIENT
+                && ($data['sebsource'] ?? '') === 'client'
                 && trim($data['sebkeys'] ?? '') === ''
         ) {
             $errors['sebkeys'] = get_string('sebkeysneeded', 'mod_moodlereader');
@@ -281,6 +302,14 @@ class mod_moodlereader_mod_form extends moodleform_mod {
         if (!empty($defaultvalues['completiontotalwords'])) {
             $defaultvalues['completiontotalwordsenabled'] = 1;
         }
+        // The SEB configuration source, from what is stored.
+        $method = (int) ($defaultvalues['sebmethod'] ?? 0);
+        $defaultvalues['sebsource'] = match ($method) {
+            \mod_moodlereader\local\seb::METHOD_CLIENT => 'client',
+            \mod_moodlereader\local\seb::METHOD_TEMPLATE => 'template:' . (int) ($defaultvalues['sebtemplateid'] ?? 0),
+            \mod_moodlereader\local\seb::METHOD_QUIZ => 'keep',
+            default => 'config',
+        };
     }
 
     /**

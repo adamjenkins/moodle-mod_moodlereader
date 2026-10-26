@@ -47,10 +47,6 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
             'moodlereader_bookinstance',
             '/activity/moodlereader/bookinstancelinks/bookinstance'
         );
-        $paths[] = new restore_path_element(
-            'moodlereader_sebcourse',
-            '/activity/moodlereader/sebcourse'
-        );
         if ($userinfo) {
             $paths[] = new restore_path_element(
                 'moodlereader_attempt',
@@ -87,12 +83,12 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         $data->ignoredate = $this->apply_date_offset((int) ($data->ignoredate ?? 0));
         // A backup file is untrusted: on/off settings are 0 or 1, and only valid detection settings are kept.
         foreach (
-            ['levelcheck', 'bookinstances', 'showprogressbar', 'extraprogressbar', 'quizdelivery', 'showlevel', 'showbooksread',
+            ['levelcheck', 'bookinstances', 'showprogressbar', 'extraprogressbar', 'showlevel', 'showbooksread',
                 'showreport', 'showsearch', 'completionpass'] as $flag
         ) {
             $data->$flag = empty($data->$flag) ? 0 : 1;
         }
-        $this->clean_seb($data, 'seb', 'sebmethod', 'sebkeys', 'sebquitpassword');
+        $this->clean_seb($data);
         $settings = json_decode((string) ($data->cheatsettings ?? ''), true);
         $data->cheatsettings = is_array($settings)
             ? json_encode(\mod_moodlereader\local\cheatdetector::clean_settings($settings)) : null;
@@ -103,55 +99,46 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
     /**
      * Clean Safe Exam Browser settings from a backup.
      *
-     * Browser Exam Keys belong to the SEB set-up of the site that made the backup: from another site they
-     * are dropped, and the teacher enters this site's keys.
+     * Browser Exam Keys belong to the SEB set-up of the site that made the backup, and so does a SEB
+     * template: from another site the keys are dropped (the teacher enters this site's), and a template
+     * becomes the configuration Moodle makes. A copied quiz configuration is kept only if it reads as one.
      *
-     * @param \stdClass $data
-     * @param string|null $seb The on/off field, or null for the course settings.
-     * @param string $method
-     * @param string $keys
-     * @param string $password
+     * @param \stdClass $data The moodlereader record.
      * @return void
      */
-    protected function clean_seb(\stdClass $data, ?string $seb, string $method, string $keys, string $password): void {
-        if ($seb !== null) {
-            $data->$seb = in_array((int) ($data->$seb ?? 0), [1, 2], true) ? (int) $data->$seb : 0;
+    protected function clean_seb(\stdClass $data): void {
+        $seb = \mod_moodlereader\local\seb::class;
+        $data->seb = (int) ($data->seb ?? 0) === 1 ? 1 : 0;
+        $method = (int) ($data->sebmethod ?? 0);
+        $data->sebmethod = in_array($method, [$seb::METHOD_CLIENT, $seb::METHOD_TEMPLATE, $seb::METHOD_QUIZ], true)
+            ? $method : $seb::METHOD_CONFIG;
+        $samesite = $this->get_task()->is_samesite();
+        $data->sebkeys = $samesite ? implode("\n", $seb::split_keys((string) ($data->sebkeys ?? ''))) : '';
+        if (!$seb::valid_keys($data->sebkeys)) {
+            $data->sebkeys = '';
         }
-        $data->$method = (int) ($data->$method ?? 0) === 1 ? 1 : 0;
-        $data->$keys = $this->get_task()->is_samesite()
-            ? implode("\n", \mod_moodlereader\local\seb::split_keys((string) ($data->$keys ?? ''))) : '';
-        if (!\mod_moodlereader\local\seb::valid_keys($data->$keys)) {
-            $data->$keys = '';
+        $data->sebquitpassword = \core_text::substr((string) ($data->sebquitpassword ?? ''), 0, 255);
+        $data->sebtemplateid = (int) ($data->sebtemplateid ?? 0);
+        if (
+            $data->sebmethod === $seb::METHOD_TEMPLATE
+                && (!$samesite || !array_key_exists($data->sebtemplateid, $seb::templates()))
+        ) {
+            $data->sebmethod = $seb::METHOD_CONFIG;
         }
-        $data->$password = \core_text::substr((string) ($data->$password ?? ''), 0, 255);
-    }
-
-    /**
-     * Restore the course's Safe Exam Browser settings, only into a course being restored whole that has none.
-     *
-     * @param array $data
-     * @return void
-     */
-    protected function process_moodlereader_sebcourse($data) {
-        global $DB;
-        $whole = [backup::TARGET_NEW_COURSE, backup::TARGET_EXISTING_DELETING, backup::TARGET_CURRENT_DELETING];
-        $courseid = $this->get_courseid();
-        if (!in_array($this->get_task()->get_target(), $whole)) {
-            return;
+        if ($data->sebmethod !== $seb::METHOD_TEMPLATE) {
+            $data->sebtemplateid = 0;
         }
-        if ($DB->record_exists('moodlereader_sebcourse', ['courseid' => $courseid])) {
-            return;
+        $xml = (string) ($data->sebconfigxml ?? '');
+        $data->sebconfigxml = null;
+        if ($data->sebmethod === $seb::METHOD_QUIZ && trim($xml) === '') {
+            $data->sebmethod = $seb::METHOD_CONFIG;
+        } else if ($data->sebmethod === $seb::METHOD_QUIZ) {
+            try {
+                $data->sebconfigxml = (new \quizaccess_seb\property_list($xml))->to_xml();
+            } catch (\Throwable $e) {
+                $data->sebmethod = $seb::METHOD_CONFIG;
+            }
         }
-        $data = (object) $data;
-        $this->clean_seb($data, null, 'method', 'sebkeys', 'quitpassword');
-        $DB->insert_record('moodlereader_sebcourse', (object) [
-            'courseid' => $courseid,
-            'required' => empty($data->required) ? 0 : 1,
-            'method' => $data->method,
-            'sebkeys' => $data->sebkeys,
-            'quitpassword' => $data->quitpassword,
-            'timemodified' => time(),
-        ]);
     }
 
     /**
@@ -184,9 +171,20 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
             'hasquiz'    => isset($data->hasquiz) && empty($data->hasquiz) ? 0 : 1,
             'time'       => (int) ($data->time ?? 0),
         ];
-        $existing = $DB->get_record('moodlereader_books', [
-            'publisher' => $data->publisher, 'series' => $data->series, 'name' => $data->name,
-        ], 'id', IGNORE_MULTIPLE);
+        // The catalogue is the site's: a book that is already here is reused, found first by its mreader.org id
+        // (titles change on mreader.org), then by its title. A second row for the same quiz is never made.
+        $existing = $data->remoteid > 0 ? $DB->get_record('moodlereader_books', [
+            'remoteid' => $data->remoteid, 'hasquiz' => $data->hasquiz,
+        ], 'id', IGNORE_MULTIPLE) : false;
+        if (!$existing) {
+            $existing = $DB->get_record('moodlereader_books', [
+                'publisher' => $data->publisher, 'series' => $data->series, 'name' => $data->name,
+            ], 'id', IGNORE_MULTIPLE);
+        }
+        if (!$existing) {
+            // A book new to this site waits, disabled, for an administrator (or the next book sync) to check it.
+            $data->hidden = 1;
+        }
         $newid = $existing ? $existing->id : $DB->insert_record('moodlereader_books', $data);
         $this->set_mapping('moodlereader_book', $oldid, $newid);
     }

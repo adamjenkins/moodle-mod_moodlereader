@@ -64,7 +64,8 @@ $filterparams = [
 
 $reader = reader::from_cmid($id);
 require_login($reader->get_course(), true, $reader->get_cm());
-$reader->require_cap('managebooks');
+// The catalogue is the whole site's: only a site administrator enables or disables books.
+require_capability('mod/moodlereader:managecatalogue', context_system::instance());
 
 $pageurl = new moodle_url('/mod/moodlereader/books.php', ['id' => $id]);
 $viewurl = new moodle_url($pageurl, $filterparams + ['page' => $page]);

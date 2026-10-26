@@ -19,6 +19,7 @@ namespace mod_moodlereader;
 use mod_moodlereader\local\api\fake_client;
 use mod_moodlereader\local\attempt;
 use mod_moodlereader\local\mreader_site;
+use mod_moodlereader\local\quizsession;
 use mod_moodlereader\local\reader;
 use mod_moodlereader\local\results;
 
@@ -60,6 +61,18 @@ final class results_test extends \advanced_testcase {
     }
 
     /**
+     * Give an attempt the reference a launch gives it.
+     *
+     * @param \stdClass $attempt
+     * @return void
+     */
+    protected function give_ref(\stdClass $attempt): void {
+        global $DB;
+        $DB->update_record('moodlereader_attempts', (object) ['id' => $attempt->id,
+            'attemptref' => $attempt->id . '-' . random_string(16), 'delivery' => 'moodle']);
+    }
+
+    /**
      * A launch sends only the opaque identity, and gives the attempt a reference.
      *
      * @return void
@@ -67,17 +80,19 @@ final class results_test extends \advanced_testcase {
     public function test_launch_sends_only_pseudonyms(): void {
         global $DB;
         [, $user, $book, $attempt] = $this->setup_attempt();
-        $client = (new fake_client())->queue('POST', '/launches', 201, ['launch_url' => 'https://mreader.org/q/abc',
-            'expires_at' => time() + 120]);
+        $reader = reader::from_instanceid((int) $attempt->readerid);
+        $client = (new fake_client())->queue_callback('POST', '/launches', 201, fn($in) => [
+            'attempt_ref' => $in['attempt_ref'], 'time_limit' => 900, 'slots' => 5,
+        ]);
 
-        $this->assertSame('https://mreader.org/q/abc', results::launch($attempt, $book, $client));
+        quizsession::launch($reader, $attempt, $book, $client);
 
         $ref = $DB->get_field('moodlereader_attempts', 'attemptref', ['id' => $attempt->id]);
         $this->assertMatchesRegularExpression('/^' . $attempt->id . '-[A-Za-z0-9]{16}$/', $ref);
         $identity = $DB->get_record('moodlereader_users', ['userid' => $user->id]);
         $body = json_decode($client->requests[0]['body'], true);
         $this->assertSame(['uid' => $identity->uniqueid, 'display_name' => $identity->uniquename, 'book_id' => 1234,
-            'attempt_ref' => $ref, 'locale' => 'en'], $body);
+            'attempt_ref' => $ref, 'locale' => 'en', 'delivery' => 'moodle'], $body);
         // Nothing that identifies the student is in the request.
         foreach (['Hanako', 'Yamada', 'hanako@example.com', 'hyamada', '"' . $user->id . '"'] as $secret) {
             $this->assertStringNotContainsString($secret, $client->requests[0]['body']);
@@ -93,8 +108,7 @@ final class results_test extends \advanced_testcase {
     public function test_check_finishes_from_server_result(): void {
         global $DB;
         [, $user, $book, $attempt] = $this->setup_attempt();
-        $launch = (new fake_client())->queue('POST', '/launches', 201, ['launch_url' => 'https://mreader.org/q/abc']);
-        results::launch($attempt, $book, $launch);
+        $this->give_ref($attempt);
         $attempt = $DB->get_record('moodlereader_attempts', ['id' => $attempt->id]);
         $identity = (new mreader_site())->get_identity($user->id);
 
@@ -128,12 +142,7 @@ final class results_test extends \advanced_testcase {
     public function test_check_is_rate_limited(): void {
         global $DB;
         [, , $book, $attempt] = $this->setup_attempt();
-        results::launch($attempt, $book, (new fake_client())->queue(
-            'POST',
-            '/launches',
-            201,
-            ['launch_url' => 'https://mreader.org/q/abc']
-        ));
+        $this->give_ref($attempt);
         $attempt = $DB->get_record('moodlereader_attempts', ['id' => $attempt->id]);
         $attempt->timeresultchecked = time();
         $client = new fake_client();
@@ -149,12 +158,7 @@ final class results_test extends \advanced_testcase {
     public function test_reconcile(): void {
         global $DB;
         [, $user, $book, $attempt] = $this->setup_attempt();
-        results::launch($attempt, $book, (new fake_client())->queue(
-            'POST',
-            '/launches',
-            201,
-            ['launch_url' => 'https://mreader.org/q/abc']
-        ));
+        $this->give_ref($attempt);
         $attempt = $DB->get_record('moodlereader_attempts', ['id' => $attempt->id]);
         $identity = (new mreader_site())->get_identity($user->id);
         $finished = time() - 60;

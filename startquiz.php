@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Start (or resume) a book quiz, then hand off to the mreader.org iframe.
+ * Start (or resume) a book quiz, then hand off to the launcher (quiz/mreader.php).
  *
  * @package    mod_moodlereader
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -34,8 +34,8 @@ $bookid = required_param('book', PARAM_INT);  // Book id.
 $reader = reader::from_cmid($id);
 require_login($reader->get_course(), false, $reader->get_cm());
 require_sesskey();
-// Everyone who sees the books may take a quiz, teachers included; reports list students only.
-$reader->require_cap('viewbooks');
+// Students, and teachers trying a quiz; reports list students only.
+$reader->require_quiz_taker();
 $reader->require_available();
 // Safe Exam Browser, when the site, course or activity requires it: only the quizzes are locked.
 \mod_moodlereader\local\seb::require_access($reader);

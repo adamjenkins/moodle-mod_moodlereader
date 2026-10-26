@@ -139,6 +139,42 @@ class reader {
     }
 
     /**
+     * Require someone who may take book quizzes here: a student (mod/moodlereader:attempt), or a
+     * teacher trying a quiz (viewreports). Seeing the books alone is not enough, so a student whose
+     * attempt capability is prohibited cannot start, resume or answer a quiz.
+     *
+     * @return void
+     */
+    public function require_quiz_taker(): void {
+        $this->require_cap('viewbooks');
+        if (!$this->can('attempt') && !$this->can('viewreports')) {
+            require_capability('mod/moodlereader:attempt', $this->context);
+        }
+    }
+
+    /**
+     * Before an attempt is launched or its first question shown: the book must still be one the student
+     * may take. Otherwise (finished meanwhile in another course or as another edition, disabled, withdrawn,
+     * beyond the level quota now) the attempt is deleted and the student is sent back with a message.
+     *
+     * @param stdClass $attempt An in-progress attempt of the current user.
+     * @return void
+     */
+    public function require_still_available(stdClass $attempt): void {
+        global $DB;
+        if ($this->book_is_available((int) $attempt->bookid, (int) $attempt->userid)) {
+            return;
+        }
+        $DB->set_field('moodlereader_attempts', 'deleted', 1, ['id' => $attempt->id, 'state' => 'inprogress']);
+        redirect(
+            $this->view_url(),
+            get_string('quiznolongeravailable', 'mod_moodlereader'),
+            null,
+            \core\output\notification::NOTIFY_WARNING
+        );
+    }
+
+    /**
      * URL of the activity view page.
      *
      * @return moodle_url
@@ -198,8 +234,8 @@ class reader {
     /**
      * The FROM/WHERE that select the books a user may attempt right now.
      *
-     * Excludes hidden books, books the user has already *finished* an attempt on
-     * (by book id, and by shared title for title-groups), and books outside the
+     * Excludes hidden books, books the user has already *finished* an attempt on in any
+     * reading activity on the site (by book id, and by shared title for title-groups), and books outside the
      * user's reading level when level checking is enabled. Books with only an
      * in-progress attempt stay listed so the user can resume them. Shared by
      * {@see available_books()}, {@see search_books()} and {@see available_publishers()}.
@@ -211,21 +247,20 @@ class reader {
         global $DB;
 
         $params = [
-            'readerid'  => $this->instance->id,
             'userid'    => $userid,
-            'readerid2' => $this->instance->id,
             'userid2'   => $userid,
         ];
 
-        // Finished attempts by this user (the ones that "use up" a book).
+        // Finished attempts by this user in any reading activity on the site (the ones that "use up" a book):
+        // a quiz taken in one course is not taken again in another.
         $doneids = "SELECT a.bookid
                       FROM {moodlereader_attempts} a
-                     WHERE a.readerid = :readerid AND a.userid = :userid
+                     WHERE a.userid = :userid
                            AND a.deleted = 0 AND a.state = 'finished'";
         $donetitles = "SELECT b2.sametitle
                          FROM {moodlereader_attempts} a
                          JOIN {moodlereader_books} b2 ON b2.id = a.bookid
-                        WHERE a.readerid = :readerid2 AND a.userid = :userid2
+                        WHERE a.userid = :userid2
                               AND a.deleted = 0 AND a.state = 'finished' AND b2.sametitle <> ''";
 
         $from = '{moodlereader_books} b';

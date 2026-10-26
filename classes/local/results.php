@@ -20,7 +20,7 @@ use mod_moodlereader\local\api\api_exception;
 use mod_moodlereader\local\api\client;
 
 /**
- * Quiz launches and results through the mreader.org API v2.
+ * Quiz results through the mreader.org API v2.
  *
  * The grade is never taken from the student's browser: this site asks mreader.org
  * for the attempt's result with its own credential, so it cannot be forged and a
@@ -33,46 +33,6 @@ use mod_moodlereader\local\api\client;
 class results {
     /** @var int Minimum seconds between two result checks for one attempt. */
     const CHECK_INTERVAL = 8;
-
-    /**
-     * Get a single-use quiz URL for an attempt.
-     *
-     * @param \stdClass $attempt {moodlereader_attempts} record (updated with its reference).
-     * @param \stdClass $book {moodlereader_books} record.
-     * @param client|null $client
-     * @return string The launch URL to put in the iframe.
-     */
-    public static function launch(\stdClass $attempt, \stdClass $book, ?client $client = null): string {
-        global $DB;
-        if ((int) $book->remoteid <= 0) {
-            throw new \moodle_exception('booknotlinked', 'mod_moodlereader');
-        }
-        // A fresh reference for a new attempt, or when mreader.org gave up on the old one.
-        if (empty($attempt->attemptref) || $attempt->remotestate === 'abandoned') {
-            $attempt->attemptref = $attempt->id . '-' . random_string(16);
-            $attempt->remotestate = null;
-            $DB->update_record('moodlereader_attempts', (object) [
-                'id' => $attempt->id,
-                'attemptref' => $attempt->attemptref,
-                'remotestate' => null,
-            ]);
-        }
-        $identity = (new mreader_site())->get_identity((int) $attempt->userid);
-        $client = $client ?? new client();
-        // Only the opaque id and the random display name identify the student.
-        $data = $client->post('/launches', [
-            'uid'          => $identity->uniqueid,
-            'display_name' => $identity->uniquename,
-            'book_id'      => (int) $book->remoteid,
-            'attempt_ref'  => $attempt->attemptref,
-            'locale'       => current_language(),
-        ]);
-        $url = clean_param((string) ($data['launch_url'] ?? ''), PARAM_URL);
-        if ($url === '' || !preg_match('#^https?://#', $url)) {
-            throw new api_exception('badresponse', 'mreader.org did not return a launch URL.');
-        }
-        return $url;
-    }
 
     /**
      * Ask mreader.org for an attempt's result, and finish the attempt if it is ready.
@@ -129,7 +89,7 @@ class results {
             return $attempt->state;
         }
         $reader = reader::from_instanceid((int) $attempt->readerid);
-        attempt::finish($reader, $attempt, (float) $data['percent']);
+        attempt::finish($reader, $attempt, (float) $data['percent'], (int) ($data['finished_at'] ?? 0));
         return 'finished';
     }
 

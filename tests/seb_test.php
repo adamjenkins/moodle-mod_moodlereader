@@ -70,41 +70,117 @@ final class seb_test extends \advanced_testcase {
      * @param int $seb
      * @param int $method
      * @param string $keys
+     * @param int $templateid
+     * @param string|null $configxml
      * @return \stdClass The activity record.
      */
-    protected function set_activity(int $seb, int $method = seb::METHOD_CONFIG, string $keys = ''): \stdClass {
+    protected function set_activity(
+        int $seb,
+        int $method = seb::METHOD_CONFIG,
+        string $keys = '',
+        int $templateid = 0,
+        ?string $configxml = null
+    ): \stdClass {
         global $DB;
         $DB->update_record('moodlereader', (object) [
             'id' => $this->instance->id, 'seb' => $seb, 'sebmethod' => $method, 'sebkeys' => $keys, 'sebquitpassword' => '',
+            'sebtemplateid' => $templateid, 'sebconfigxml' => $configxml,
         ]);
         return $DB->get_record('moodlereader', ['id' => $this->instance->id]);
     }
 
     /**
-     * The site, then the course, then the activity decide.
+     * A SEB template as an administrator makes one (quizaccess_seb).
+     *
+     * @param bool $enabled
+     * @return int Its id.
+     */
+    protected function make_template(bool $enabled = true): int {
+        $xml = (new \quizaccess_seb\property_list())->to_xml();
+        $plist = new \quizaccess_seb\property_list($xml);
+        $plist->set_or_update_value('allowSpellCheck', new \CFPropertyList\CFBoolean(true));
+        $template = new \quizaccess_seb\template(0, (object) [
+            'name' => 'Exam room', 'description' => '', 'content' => $plist->to_xml(), 'enabled' => (int) $enabled,
+        ]);
+        $template->create();
+        return (int) $template->get('id');
+    }
+
+    /**
+     * The site decides first, then the activity; "No" is the activity's default.
      *
      * @return void
      */
     public function test_levels(): void {
-        global $DB;
-        $this->assertNull(seb::rule($this->set_activity(seb::ACTIVITY_COURSE)));
-        $this->assertSame('activity', seb::rule($this->set_activity(seb::ACTIVITY_YES))->level);
-
-        // The course's requirement wins over the activity's "No".
-        $DB->insert_record('moodlereader_sebcourse', (object) [
-            'courseid' => $this->course->id, 'required' => 1, 'method' => seb::METHOD_CLIENT, 'sebkeys' => self::BEK,
-        ]);
-        $rule = seb::rule($this->set_activity(seb::ACTIVITY_NO));
-        $this->assertSame('course', $rule->level);
+        $this->assertNull(seb::rule($this->set_activity(seb::ACTIVITY_NO)));
+        $rule = seb::rule($this->set_activity(seb::ACTIVITY_YES, seb::METHOD_CLIENT, self::BEK));
+        $this->assertSame('activity', $rule->level);
         $this->assertSame(seb::METHOD_CLIENT, $rule->method);
         $this->assertSame([self::BEK], $rule->keys);
 
-        // The site's "Required everywhere" brings its own keys; "Never" turns it all off.
+        // The site's "Required everywhere" brings its own settings; "Never" turns it all off.
         set_config('sebmode', seb::SITE_REQUIRED, 'mod_moodlereader');
         $this->assertSame('site', seb::rule($this->set_activity(seb::ACTIVITY_NO))->level);
         set_config('sebmode', seb::SITE_NEVER, 'mod_moodlereader');
         $this->assertNull(seb::rule($this->set_activity(seb::ACTIVITY_YES)));
         $this->assertFalse(seb::teachers_decide());
+    }
+
+    /**
+     * A site template, or a quiz's configuration copied into the activity, is the base of the configuration;
+     * the activity's start page, keys and quit password are set on it. A template that is gone falls back to
+     * the configuration Moodle makes, so SEB stays required.
+     *
+     * @return void
+     */
+    public function test_template_and_copied_quiz_configuration(): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/mod/moodlereader/lib.php');
+        $cm = get_coursemodule_from_instance('moodlereader', $this->instance->id);
+        $templateid = $this->make_template();
+        $this->assertSame([$templateid => 'Exam room'], seb::templates());
+        $this->make_template(false);
+        $this->assertCount(1, seb::templates());
+
+        $rule = seb::rule($this->set_activity(seb::ACTIVITY_YES, seb::METHOD_TEMPLATE, '', $templateid));
+        $this->assertSame(seb::METHOD_TEMPLATE, $rule->method);
+        $this->assertTrue(seb::has_config($rule));
+        $xml = seb::config_xml((int) $cm->id, $rule);
+        $this->assertStringContainsString('allowSpellCheck', $xml);
+        $this->assertStringContainsString(seb::start_url((int) $cm->id)->out(false), $xml);
+        $this->assertNotSame(
+            seb::config_key((int) $cm->id, seb::rule($this->set_activity(seb::ACTIVITY_YES))),
+            seb::config_key((int) $cm->id, $rule)
+        );
+
+        // A quiz in the course with its own SEB configuration (from the template) can be copied.
+        $quiz = $this->getDataGenerator()->create_module('quiz', ['course' => $this->course->id, 'name' => 'Unit test']);
+        (new \quizaccess_seb\seb_quiz_settings(0, (object) [
+            'quizid' => $quiz->id, 'cmid' => $quiz->cmid, 'templateid' => $templateid, 'requiresafeexambrowser' => 2,
+            'showsebtaskbar' => 1, 'showwificontrol' => 0, 'showreloadbutton' => 1, 'showtime' => 0,
+            'showkeyboardlayout' => 1, 'allowuserquitseb' => 1, 'quitpassword' => '', 'linkquitseb' => '',
+            'userconfirmquit' => 1, 'enableaudiocontrol' => 0, 'muteonstartup' => 0, 'allowspellchecking' => 0,
+            'allowreloadinexam' => 1, 'activateurlfiltering' => 0, 'filterembeddedcontent' => 0,
+            'expressionsallowed' => '', 'regexallowed' => '', 'expressionsblocked' => '', 'regexblocked' => '',
+            'allowedbrowserexamkeys' => '', 'showsebdownloadlink' => 1,
+        ]))->create();
+        $this->assertSame([(int) $quiz->cmid => 'Unit test'], seb::quizzes((int) $this->course->id));
+        $this->assertNull(seb::quiz_config((int) $quiz->cmid, (int) $this->getDataGenerator()->create_course()->id));
+
+        $data = (object) ['course' => $this->course->id, 'seb' => 1, 'sebsource' => 'quiz:' . $quiz->cmid, 'sebkeys' => ''];
+        moodlereader_clean_seb($data, \context_module::instance($cm->id));
+        $this->assertSame(seb::METHOD_QUIZ, $data->sebmethod);
+        $this->assertStringContainsString('allowSpellCheck', $data->sebconfigxml);
+        $rule = seb::rule($this->set_activity(seb::ACTIVITY_YES, seb::METHOD_QUIZ, '', 0, $data->sebconfigxml));
+        $this->assertStringContainsString(seb::start_url((int) $cm->id)->out(false), seb::config_xml((int) $cm->id, $rule));
+        $this->assertStringNotContainsString('/mod/quiz/view.php', seb::config_xml((int) $cm->id, $rule));
+
+        // A template that is not offered is refused when saving, and one that has gone falls back.
+        $data = (object) ['course' => $this->course->id, 'seb' => 1, 'sebsource' => 'template:99999', 'sebkeys' => ''];
+        moodlereader_clean_seb($data, \context_module::instance($cm->id));
+        $this->assertSame(seb::METHOD_CONFIG, $data->sebmethod);
+        $gone = $this->set_activity(seb::ACTIVITY_YES, seb::METHOD_TEMPLATE, '', 99999);
+        $this->assertSame(seb::METHOD_CONFIG, seb::rule($gone)->method);
     }
 
     /**
@@ -154,6 +230,10 @@ final class seb_test extends \advanced_testcase {
         $this->assertTrue(seb::check_keys($cmid, $rule, $url, null, $bekhash, true));
         $this->assertFalse(seb::check_keys($cmid, $rule, $url, null, hash('sha256', $url . 'other'), true));
 
+        // Without any Browser Exam Key, SEB's own configuration lets nothing through, whatever the user agent says.
+        $rule = seb::rule($this->set_activity(seb::ACTIVITY_YES, seb::METHOD_CLIENT));
+        $this->assertFalse(seb::check_keys($cmid, $rule, $url, null, null, true));
+
         $this->assertTrue(seb::valid_keys(strtoupper(self::BEK) . ", \n" . self::BEK));
         $this->assertFalse(seb::valid_keys('not-a-key'));
     }
@@ -194,14 +274,17 @@ final class seb_test extends \advanced_testcase {
         $teacher = $this->getDataGenerator()->create_and_enrol($this->course, 'teacher');
         $this->setUser($teacher);
         $cm = get_coursemodule_from_instance('moodlereader', $this->instance->id);
-        $data = (object) ['seb' => 1, 'sebmethod' => 1, 'sebkeys' => self::BEK];
+        $data = (object) ['seb' => 1, 'sebsource' => 'client', 'sebmethod' => 1, 'sebkeys' => self::BEK];
         moodlereader_clean_seb($data, \context_module::instance($cm->id));
         $this->assertSame([], (array) $data);
 
+        // An unknown source becomes the configuration Moodle makes; a method sent on its own is ignored.
         $this->setAdminUser();
-        $data = (object) ['seb' => 7, 'sebmethod' => 5, 'sebkeys' => strtoupper(self::BEK) . ',' . self::BEK];
+        $data = (object) ['course' => $this->course->id, 'seb' => 7, 'sebsource' => 'other', 'sebmethod' => 5,
+            'sebkeys' => strtoupper(self::BEK) . ',' . self::BEK];
         moodlereader_clean_seb($data, \context_module::instance($cm->id));
-        $this->assertSame(['seb' => 0, 'sebmethod' => 0, 'sebkeys' => self::BEK], (array) $data);
+        $this->assertSame(['course' => $this->course->id, 'seb' => 0, 'sebmethod' => seb::METHOD_CONFIG,
+            'sebkeys' => self::BEK, 'sebtemplateid' => 0, 'sebconfigxml' => null], (array) $data);
         $this->assertSame('0', (string) $DB->get_field('moodlereader', 'seb', ['id' => $this->instance->id]));
     }
 }

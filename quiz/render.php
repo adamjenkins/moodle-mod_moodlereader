@@ -38,7 +38,7 @@ $attemptid = required_param('attempt', PARAM_INT);
 $attempt = $DB->get_record('moodlereader_attempts', ['id' => $attemptid], '*', MUST_EXIST);
 $reader = reader::from_instanceid((int) $attempt->readerid);
 require_login($reader->get_course(), false, $reader->get_cm());
-$reader->require_cap('viewbooks');
+$reader->require_quiz_taker();
 if ((int) $attempt->userid !== (int) $USER->id) {
     throw new moodle_exception('notyourattempt', 'mod_moodlereader', $reader->view_url());
 }
@@ -47,6 +47,13 @@ if ((int) $attempt->userid !== (int) $USER->id) {
 if ($attempt->delivery !== quizsession::DELIVERY_MOODLE || empty($attempt->attemptref)) {
     redirect(new moodle_url('/mod/moodlereader/quiz/mreader.php', ['attempt' => $attempt->id]));
 }
+
+// A deleted attempt (taken elsewhere, or removed by a teacher) is not shown or answered.
+if (!empty($attempt->deleted)) {
+    redirect($reader->view_url());
+}
+// Closed for students, as for starting a quiz (require_available()).
+$closed = !$reader->within_availability_window() && !$reader->can('manageusers');
 
 $pageurl = new moodle_url('/mod/moodlereader/quiz/render.php', ['attempt' => $attempt->id]);
 $returnurl = new moodle_url('/mod/moodlereader/quiz/return.php', ['attempt' => $attempt->id]);
@@ -78,11 +85,18 @@ try {
     // An answer, the time limit, or the survey.
     if (data_submitted() && confirm_sesskey()) {
         if (optional_param('survey', 0, PARAM_BOOL)) {
+            // Only once the quiz is finished, and only once: mreader.org refuses a second survey.
+            if ($DB->get_field('moodlereader_attempts', 'state', ['id' => $attempt->id]) !== 'finished') {
+                redirect($pageurl);
+            }
             $answers = optional_param('decline', 0, PARAM_BOOL) ? [] : optional_param_array('answers', [], PARAM_INT);
             quizsession::survey($attempt, array_filter($answers));
             redirect($returnurl);
         }
-        if ($attempt->state === 'inprogress') {
+        if ($attempt->state === 'inprogress' && $closed) {
+            // The activity has closed: the attempt ends here, with the answers already sent.
+            quizsession::finish($attempt);
+        } else if ($attempt->state === 'inprogress') {
             $response = quizsession::response(
                 optional_param('type', '', PARAM_ALPHA),
                 optional_param('option', '', PARAM_ALPHANUMEXT),
@@ -109,7 +123,16 @@ try {
         redirect($pageurl);
     }
 
-    $state = quizsession::show($attempt);
+    if ($attempt->state === 'inprogress' && $closed) {
+        // The activity has closed while the quiz was open: it is finished with the answers already sent.
+        $state = quizsession::finish($attempt);
+    } else {
+        if ($attempt->state === 'inprogress' && (int) $attempt->currentslot === 0) {
+            // About to show the first question: the book must still be one the student may take.
+            $reader->require_still_available($attempt);
+        }
+        $state = quizsession::show($attempt);
+    }
     if ($state['state'] === 'relaunch') {
         redirect(new moodle_url('/mod/moodlereader/quiz/mreader.php', ['attempt' => $attempt->id]));
     }

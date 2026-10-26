@@ -316,5 +316,34 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026102600, 'moodlereader');
     }
 
+    if ($oldversion < 2026102601) {
+        // Quizzes are drawn by Moodle only: the choice of mreader.org's pages in a frame is gone.
+        $table = new xmldb_table('moodlereader');
+        $field = new xmldb_field('quizdelivery');
+        if ($dbman->field_exists($table, $field)) {
+            $dbman->drop_field($table, $field);
+        }
+
+        // Safe Exam Browser is set by the site or the activity only: the course level goes, and "as the course
+        // says" (0) and "not required" (2) both become "not required" (0).
+        $DB->set_field('moodlereader', 'seb', 0, ['seb' => 2]);
+        $sebcourse = new xmldb_table('moodlereader_sebcourse');
+        if ($dbman->table_exists($sebcourse)) {
+            $dbman->drop_table($sebcourse);
+        }
+        // A SEB template, or a configuration copied from a quiz.
+        $fields = [
+            new xmldb_field('sebtemplateid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'sebquitpassword'),
+            new xmldb_field('sebconfigxml', XMLDB_TYPE_TEXT, null, null, null, null, null, 'sebtemplateid'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+
+        upgrade_mod_savepoint(true, 2026102601, 'moodlereader');
+    }
+
     return true;
 }

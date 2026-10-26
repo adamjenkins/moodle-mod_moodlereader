@@ -38,6 +38,7 @@ $attempt = $DB->get_record('moodlereader_attempts', ['id' => $attemptid], '*', M
 $reader = reader::from_instanceid((int) $attempt->readerid);
 require_login($reader->get_course(), false, $reader->get_cm(), false, true);
 require_sesskey();
+$reader->require_quiz_taker();
 if ((int) $attempt->userid !== (int) $USER->id || $attempt->delivery !== quizsession::DELIVERY_MOODLE) {
     throw new moodle_exception('notyourattempt', 'mod_moodlereader');
 }

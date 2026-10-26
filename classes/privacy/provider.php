@@ -322,10 +322,12 @@ class provider implements
             ) {
                 $DB->delete_records_select($table, "readerid = :readerid AND userid $insql", $params);
             }
+            // Each placeholder set can appear once only: a second set for the other student of the pair.
+            [$insql2, $inparams2] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'other');
             $DB->delete_records_select(
                 'moodlereader_cheatlog',
-                "readerid = :readerid AND (userid $insql OR otheruserid $insql)",
-                $params
+                "readerid = :readerid AND (userid $insql OR otheruserid $insql2)",
+                $params + $inparams2
             );
         } else if ($context instanceof context_user) {
             if (in_array($context->instanceid, $userids)) {

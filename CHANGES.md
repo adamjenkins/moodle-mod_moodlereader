@@ -65,19 +65,34 @@ The plugin is in pre-release development. The version stays at `0.0.z` until a
 - New activity setting "Term start date": "This term" in the grade, progress bar, levels
   and reports counts from it (the reports show the date). It existed but could not be
   set, so "this term" silently meant every quiz ever taken.
-- Book quizzes can be taken in Moodle's own pages, in its look and language (new activity
-  setting "Show quizzes", on by default). mreader.org still chooses the questions and marks
-  the answers, and Moodle never stores the questions. The countdown runs only while a
-  question is on screen, and stops while the next one loads or the page is closed. At the end
-  students can answer mreader.org's short book survey. This needs mreader.org's next release;
-  until then quizzes are shown in mreader.org's frame as before.
-- Book quizzes can require Safe Exam Browser (SEB). A site administrator chooses
-  "Teachers decide", "Required everywhere" or "Never". Teachers can require it for every
-  reading activity in a course (new "Safe Exam Browser for reading quizzes" page in the
-  course's More menu) or per activity. Moodle makes the SEB configuration and checks its
-  Config Key, or checks the Browser Exam Keys of SEB's own configuration. Only the quizzes
-  are locked: progress, the book search and records stay open in any browser. Students
-  outside SEB see a "Launch Safe Exam Browser" link instead of the quiz.
+- Book quizzes are taken in Moodle's own pages, in its look and language: the only way they are
+  shown. mreader.org still chooses the questions and marks the answers, and Moodle never stores
+  the questions. The countdown runs by the clock while a question is on screen (closing or
+  reloading the page does not stop it) and pauses only while the next question loads. At the end
+  students can answer mreader.org's short book survey. This needs mreader.org v3.8; with an older
+  mreader.org, students are told that quizzes are not available yet. The quiz frame (mreader.org's
+  own pages inside Moodle) is gone.
+- Book quizzes can require Safe Exam Browser (SEB). A site administrator chooses "Each activity
+  decides", "Required everywhere" or "Never"; teachers can require it in an activity's settings.
+  The configuration can be made by Moodle, be one of the site's SEB templates (the ones quizzes
+  use), be copied from a quiz in the same course, or be SEB's own configuration, checked by its
+  Browser Exam Keys (at least one is needed). Only the quizzes are locked: progress, the book
+  search and records stay open in any browser. Students outside SEB see a "Launch Safe Exam
+  Browser" link instead of the quiz.
+- A book counts once for a student on the whole site: a quiz taken in one course, or another
+  edition of the same title, is not offered again in any other course, and awarding credit skips
+  students who already have the book counted anywhere. A quiz opened in two courses before either
+  was finished counts only once.
+- Only site administrators (and managers) enable or disable books in "Manage books", which applies
+  to the whole site; teachers no longer see it.
+- A quiz still open when the activity closes is finished with the answers already given.
+- A student whose "take book quizzes" permission is removed can no longer start or answer a quiz.
+- In separate groups, the Messages page shows a teacher only the messages to students they can see.
+- Restoring a backup reuses the site's catalogue books by their mreader.org id and adds new books
+  disabled, so a backup cannot add a second copy of a book.
+- Fixed: deleting several users' data for privacy (GDPR) failed on the cheating log.
+- Import from mod_reader: abandoned mod_reader attempts are imported as finished, and a re-sync no
+  longer fails when a student's newest mod_reader level row has changed.
 - Books without a quiz are kept in the catalogue (from mod_reader, and from mreader.org
   once it offers them) so credit can be awarded for them; students never see them as quizzes.
 - The "read N words" completion rule now counts what the progress bar and the grade

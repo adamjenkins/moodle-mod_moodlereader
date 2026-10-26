@@ -374,7 +374,7 @@ class renderer extends \plugin_renderer_base {
         }
 
         $out = $this->output->heading(get_string('readingreportfor', 'mod_moodlereader', $fullname), 4);
-        $out .= html_writer::table($table);
+        $out .= html_writer::div(html_writer::table($table), 'table-responsive');
         return $out;
     }
 
@@ -429,7 +429,7 @@ class renderer extends \plugin_renderer_base {
             $label = html_writer::tag('label', get_string($labelkey, 'mod_moodlereader'), [
                 'class' => 'col-sm-3 col-form-label', 'for' => $for,
             ]);
-            return html_writer::div($label . html_writer::div($control, 'col-sm-9'), 'row mb-2');
+            return html_writer::div($label . html_writer::div($control, 'col-sm-9'), 'row mb-2 mx-0');
         };
         $select = fn(array $options, string $name, string $selected) => html_writer::select(
             $options,
@@ -546,7 +546,7 @@ class renderer extends \plugin_renderer_base {
             ];
         }
 
-        return $out . html_writer::table($table);
+        return $out . html_writer::div(html_writer::table($table), 'table-responsive');
     }
 
     /**

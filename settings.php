@@ -53,7 +53,7 @@ if ($ADMIN->fulltree) {
         5
     ));
 
-    // Safe Exam Browser: teachers decide, or required for every quiz, or never.
+    // Safe Exam Browser: each activity decides, or required for every quiz, or never.
     $settings->add(new admin_setting_heading(
         'mod_moodlereader/sebheading',
         get_string('seb', 'mod_moodlereader'),
@@ -78,8 +78,17 @@ if ($ADMIN->fulltree) {
         \mod_moodlereader\local\seb::METHOD_CONFIG,
         [
             \mod_moodlereader\local\seb::METHOD_CONFIG => get_string('sebmethod_config', 'mod_moodlereader'),
+            \mod_moodlereader\local\seb::METHOD_TEMPLATE => get_string('sebmethod_template', 'mod_moodlereader'),
             \mod_moodlereader\local\seb::METHOD_CLIENT => get_string('sebmethod_client', 'mod_moodlereader'),
         ]
+    ));
+    // The site's SEB templates (the ones quizzes use); without one chosen, Moodle makes the configuration.
+    $settings->add(new admin_setting_configselect(
+        'mod_moodlereader/sebtemplate',
+        get_string('sebtemplate', 'mod_moodlereader'),
+        get_string('sebtemplate_desc', 'mod_moodlereader'),
+        0,
+        [0 => get_string('none')] + \mod_moodlereader\local\seb::templates()
     ));
     $settings->add(new \mod_moodlereader\local\admin_setting_sebkeys(
         'mod_moodlereader/sebkeys',
@@ -100,9 +109,15 @@ if ($ADMIN->fulltree) {
         'https://safeexambrowser.org/download_en.html',
         PARAM_URL
     ));
-    foreach (['sebmethod', 'sebkeys', 'sebquitpassword'] as $name) {
+    foreach (['sebmethod', 'sebtemplate', 'sebkeys', 'sebquitpassword'] as $name) {
         $settings->hide_if("mod_moodlereader/$name", 'mod_moodlereader/sebmode', 'neq', \mod_moodlereader\local\seb::SITE_REQUIRED);
     }
+    $settings->hide_if(
+        'mod_moodlereader/sebtemplate',
+        'mod_moodlereader/sebmethod',
+        'neq',
+        \mod_moodlereader\local\seb::METHOD_TEMPLATE
+    );
 
     // Connection state and link; the connection itself is managed on its own page.
     $state = \mod_moodlereader\local\connection::state();

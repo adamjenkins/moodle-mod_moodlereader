@@ -156,4 +156,35 @@ final class privacy_provider_test extends \advanced_testcase {
             $this->assertEquals(0, $DB->count_records($table, ['readerid' => $readerid]));
         }
     }
+
+    /**
+     * Deleting a list of users in a context removes their rows, cheat-log pairs included.
+     *
+     * @return void
+     */
+    public function test_delete_data_for_users(): void {
+        global $DB;
+        [$reader, $user, $modcontext] = $this->seed();
+        $readerid = $reader->get_instance()->id;
+        // The user is also the other student of someone else's cheat-log pair.
+        $DB->insert_record('moodlereader_cheatlog', (object) [
+            'readerid' => $readerid, 'attemptid' => 0, 'userid' => 0,
+            'otherattemptid' => 0, 'otheruserid' => $user->id, 'reason' => 'sameip', 'timecreated' => time(),
+        ]);
+
+        provider::delete_data_for_users(new \core_privacy\local\request\approved_userlist(
+            $modcontext,
+            'mod_moodlereader',
+            [$user->id]
+        ));
+
+        foreach (['moodlereader_attempts', 'moodlereader_grades', 'moodlereader_levels', 'moodlereader_messages'] as $table) {
+            $this->assertEquals(0, $DB->count_records($table, ['readerid' => $readerid, 'userid' => $user->id]), $table);
+        }
+        $this->assertEquals(0, $DB->count_records_select(
+            'moodlereader_cheatlog',
+            'readerid = ? AND (userid = ? OR otheruserid = ?)',
+            [$readerid, $user->id, $user->id]
+        ));
+    }
 }
