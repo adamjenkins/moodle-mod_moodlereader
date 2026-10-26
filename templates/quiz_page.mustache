@@ -84,12 +84,12 @@
                     {{#choices}}
                     <li class="list-group-item d-flex align-items-center" data-id="{{id}}">
                         <input type="hidden" name="order[]" value="{{id}}">
-                        <span class="flex-grow-1 ms-2 ml-2">{{{texthtml}}}</span>
-                        <button type="button" class="btn btn-sm btn-outline-secondary ms-1 ml-1" data-action="mr-up">
+                        <span class="flex-grow-1 ms-2">{{{texthtml}}}</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-action="mr-up">
                             <span aria-hidden="true">&uarr;</span>
                             <span class="visually-hidden accesshide">{{#str}} moveup, mod_moodlereader {{/str}}</span>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary ms-1 ml-1" data-action="mr-down">
+                        <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-action="mr-down">
                             <span aria-hidden="true">&darr;</span>
                             <span class="visually-hidden accesshide">{{#str}} movedown, mod_moodlereader {{/str}}</span>
                         </button>
@@ -104,7 +104,7 @@
                 {{#islast}}{{#str}} quizfinish, mod_moodlereader {{/str}}{{/islast}}
                 {{^islast}}{{#str}} quiznext, mod_moodlereader {{/str}}{{/islast}}
             </button>
-            <span class="ms-3 ml-3 text-muted d-none" data-region="mr-loading" aria-live="polite">
+            <span class="ms-3 text-muted d-none" data-region="mr-loading" aria-live="polite">
                 {{#str}} quizloading, mod_moodlereader {{/str}}
             </span>
         </div>

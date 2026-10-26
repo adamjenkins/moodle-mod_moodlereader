@@ -169,7 +169,7 @@ if ($cansync) {
     $syncurl = new moodle_url($pageurl, $filterparams + ['sync' => 1, 'sesskey' => sesskey()]);
     echo html_writer::div(
         $OUTPUT->single_button($syncurl, get_string('syncbooks', 'mod_moodlereader'), 'post') .
-        html_writer::span(get_string('syncbooks_help', 'mod_moodlereader'), 'text-muted ml-2 align-self-center'),
+        html_writer::span(get_string('syncbooks_help', 'mod_moodlereader'), 'text-muted ms-2 align-self-center'),
         'd-flex mb-3'
     );
 }
@@ -194,8 +194,8 @@ $statuses = [
 
 $filterrow = function (string $label, string $control, string $for): string {
     return html_writer::div(
-        html_writer::tag('label', $label, ['class' => 'mr-1 align-self-start', 'for' => $for]) . $control,
-        'mr-3 mb-2 d-inline-flex'
+        html_writer::tag('label', $label, ['class' => 'me-1 align-self-start', 'for' => $for]) . $control,
+        'me-3 mb-2 d-inline-flex'
     );
 };
 $multi = function (array $options, string $name, array $selected): string {
@@ -272,12 +272,12 @@ $confirm = fn(string $key) => ['onclick' => 'return confirm(' . json_encode(
     get_string($key, 'mod_moodlereader', $totalbooks)
 ) . ');'];
 echo html_writer::div(
-    $button('enable', get_string('bulkenable', 'mod_moodlereader'), 'btn-outline-success mr-1') .
-    $button('disable', get_string('bulkdisable', 'mod_moodlereader'), 'btn-outline-secondary mr-3') .
+    $button('enable', get_string('bulkenable', 'mod_moodlereader'), 'btn-outline-success me-1') .
+    $button('disable', get_string('bulkdisable', 'mod_moodlereader'), 'btn-outline-secondary me-3') .
     $button(
         'enableall',
         get_string('bulkenableall', 'mod_moodlereader', $totalbooks),
-        'btn-success mr-1',
+        'btn-success me-1',
         $confirm('bulkenableall_confirm')
     ) .
     $button(

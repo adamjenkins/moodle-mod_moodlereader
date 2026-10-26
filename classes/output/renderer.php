@@ -429,7 +429,7 @@ class renderer extends \plugin_renderer_base {
             $label = html_writer::tag('label', get_string($labelkey, 'mod_moodlereader'), [
                 'class' => 'col-sm-3 col-form-label', 'for' => $for,
             ]);
-            return html_writer::div($label . html_writer::div($control, 'col-sm-9'), 'form-group row mb-2');
+            return html_writer::div($label . html_writer::div($control, 'col-sm-9'), 'row mb-2');
         };
         $select = fn(array $options, string $name, string $selected) => html_writer::select(
             $options,
@@ -473,7 +473,7 @@ class renderer extends \plugin_renderer_base {
         $inner .= html_writer::div(
             html_writer::tag('button', get_string('search'), ['type' => 'submit', 'class' => 'btn btn-primary']) . ' ' .
             html_writer::link($action, get_string('reset'), ['class' => 'btn btn-link']),
-            'form-group'
+            'mb-3'
         );
 
         $form = html_writer::tag('form', $inner, [

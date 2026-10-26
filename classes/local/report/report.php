@@ -178,7 +178,7 @@ class report {
             $term,
             null
         );
-        $select->set_label(get_string('termshown', 'mod_moodlereader'), ['class' => 'mr-1']);
+        $select->set_label(get_string('termshown', 'mod_moodlereader'), ['class' => 'me-1']);
         return $OUTPUT->render($select);
     }
 
@@ -197,12 +197,12 @@ class report {
         $button = fn(string $action, string $class = 'btn-secondary') => html_writer::tag(
             'button',
             $str('reportaction_' . $action),
-            ['type' => 'submit', 'name' => 'reportaction', 'value' => $action, 'class' => "btn $class mr-1 mb-1"]
+            ['type' => 'submit', 'name' => 'reportaction', 'value' => $action, 'class' => "btn $class me-1 mb-1"]
         );
         $line = fn(string $content) => html_writer::div($content, 'd-flex flex-wrap align-items-center mb-3');
-        $number = fn(string $name, string $label) => html_writer::label($label, 'mr-' . $name, true, ['class' => 'mr-2']) .
+        $number = fn(string $name, string $label) => html_writer::label($label, 'mr-' . $name, true, ['class' => 'me-2']) .
             html_writer::empty_tag('input', [
-                'type' => 'number', 'min' => 0, 'name' => $name, 'id' => 'mr-' . $name, 'class' => 'form-control w-auto mr-2',
+                'type' => 'number', 'min' => 0, 'name' => $name, 'id' => 'mr-' . $name, 'class' => 'form-control w-auto me-2',
             ]);
 
         $inner = html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
@@ -235,7 +235,7 @@ class report {
             // Awarding credit opens a book search for the ticked students.
             $awardurl = new \moodle_url('/mod/moodlereader/award.php', ['id' => $pageurl->get_param('id')]);
             $inner .= $line(html_writer::tag('button', $str('reportaction_awardbook'), [
-                'type' => 'submit', 'class' => 'btn btn-secondary mr-1 mb-1',
+                'type' => 'submit', 'class' => 'btn btn-secondary me-1 mb-1',
                 'formaction' => $awardurl->out(false), 'formmethod' => 'post',
             ]));
         }

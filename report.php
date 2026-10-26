@@ -178,7 +178,7 @@ if ($mode === 'userdetailed') {
             html_writer::link(
                 new moodle_url('/mod/moodlereader/student.php', ['id' => $id, 'userid' => $userid]),
                 get_string('readingpagefor', 'mod_moodlereader', fullname($student)),
-                ['class' => 'btn btn-secondary btn-sm ml-2']
+                ['class' => 'btn btn-secondary btn-sm ms-2']
             );
     }
 }

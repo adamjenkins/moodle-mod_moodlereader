@@ -122,7 +122,7 @@ $row = function (string $labelkey, string $control, string $for): string {
             'class' => 'col-sm-3 col-form-label', 'for' => $for,
         ]) .
         html_writer::div($control, 'col-sm-9'),
-        'form-group row mb-2'
+        'row mb-2'
     );
 };
 $select = fn(array $options, string $name, string $selected) => html_writer::select(
@@ -146,7 +146,7 @@ $inner .= $row('readinglevel', $select($levels, 'searchdifficulty', (string) $fi
 $inner .= html_writer::div(
     html_writer::tag('button', get_string('search'), ['type' => 'submit', 'class' => 'btn btn-primary']) . ' ' .
     html_writer::link($summaryurl, get_string('cancel'), ['class' => 'btn btn-link']),
-    'form-group'
+    'mb-3'
 );
 echo html_writer::tag('form', $inner, ['method' => 'post', 'action' => $pageurl, 'class' => 'mb-3']);
 
