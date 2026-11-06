@@ -215,6 +215,19 @@ Feature: Moodle Reader activity
     And I follow "Reading report"
     Then I should see "This term (since 1 January 2026)"
 
+  Scenario: A plain link cannot launch or start a student's quiz
+    Given mreader.org draws quizzes for Moodle
+    When I am on the "Reader 1" "moodlereader activity" page logged in as student1
+    And I follow a plain link to the "first question" of "student1" on "Blue Hills" in "reader1"
+    Then I should see "Start this quiz now?"
+    And I should not see "Question 1 of 3"
+    When I press "Cancel"
+    And I follow a plain link to the "launch" of "student1" on "The Red Kite" in "reader1"
+    Then I should see "Start this quiz now?"
+    And I should not see "Question 1 of 3"
+    When I press "Start the quiz"
+    Then I should see "Question 1 of 3"
+
   Scenario: A student takes a quiz drawn by Moodle, answers the survey, and the result is recorded
     Given mreader.org draws quizzes for Moodle
     When I am on the "Reader 1" "moodlereader activity" page logged in as student1

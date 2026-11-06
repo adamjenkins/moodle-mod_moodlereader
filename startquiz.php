@@ -53,4 +53,5 @@ $attempt = attempt::start($reader, $USER->id, $bookid);
 redirect(new moodle_url('/mod/moodlereader/quiz/mreader.php', [
     'id'      => $reader->get_cm()->id,
     'attempt' => $attempt->id,
+    'sesskey' => sesskey(),
 ]));

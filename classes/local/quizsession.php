@@ -53,6 +53,40 @@ class quizsession {
     public static $now = null;
 
     /**
+     * Whether this request carries the session key: launching and starting a quiz need it.
+     *
+     * @return bool
+     */
+    public static function has_start_key(): bool {
+        $key = optional_param('sesskey', '', PARAM_RAW);
+        return $key !== '' && confirm_sesskey($key);
+    }
+
+    /**
+     * Ask the student to confirm starting a quiz, then stop. The button repeats the request with the session key.
+     *
+     * @param reader $reader
+     * @param \moodle_url $url The page to repeat, without the session key.
+     * @return void
+     */
+    public static function confirm_start(reader $reader, \moodle_url $url): void {
+        global $OUTPUT, $PAGE;
+        $PAGE->set_url($url);
+        $PAGE->set_title(get_string('quizstart', 'mod_moodlereader'));
+        $PAGE->set_heading(format_string($reader->get_course()->fullname));
+        $PAGE->set_cacheable(false);
+        $continue = new \single_button(
+            new \moodle_url($url, ['sesskey' => sesskey()]),
+            get_string('quizstart', 'mod_moodlereader'),
+            'get'
+        );
+        echo $OUTPUT->header();
+        echo $OUTPUT->confirm(get_string('quizstartconfirm', 'mod_moodlereader'), $continue, $reader->view_url());
+        echo $OUTPUT->footer();
+        exit;
+    }
+
+    /**
      * The current time.
      *
      * @return int

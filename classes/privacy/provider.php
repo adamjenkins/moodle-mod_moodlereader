@@ -91,6 +91,10 @@ class provider implements
             'book_id'      => 'privacy:metadata:mreader.org:book_id',
             'attempt_ref'  => 'privacy:metadata:mreader.org:attempt_ref',
             'percent'      => 'privacy:metadata:mreader.org:percent',
+            'responses'    => 'privacy:metadata:mreader.org:responses',
+            'seconds_used' => 'privacy:metadata:mreader.org:seconds_used',
+            'survey'       => 'privacy:metadata:mreader.org:survey',
+            'locale'       => 'privacy:metadata:mreader.org:locale',
         ], 'privacy:metadata:mreader.org');
 
         $collection->link_subsystem('core_grades', 'privacy:metadata:core_grades');

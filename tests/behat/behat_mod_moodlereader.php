@@ -79,6 +79,33 @@ class behat_mod_moodlereader extends behat_base {
     }
 
     /**
+     * Follow a plain link to a student's unstarted quiz, as a link in a forum post would.
+     *
+     * @When /^I follow a plain link to the "(launch|first question)" of "([^"]+)" on "([^"]+)" in "([^"]+)"$/
+     * @param string $state Which step of the quiz the link points at.
+     * @param string $user Username.
+     * @param string $book Book title.
+     * @param string $activity Activity idnumber.
+     * @return void
+     */
+    public function i_follow_a_plain_link_to_quiz($state, $user, $book, $activity) {
+        global $DB;
+        $launched = $state === 'first question';
+        $now = time();
+        $id = $DB->insert_record('moodlereader_attempts', (object) [
+            'readerid' => $DB->get_field('course_modules', 'instance', ['idnumber' => $activity], MUST_EXIST),
+            'userid' => $DB->get_field('user', 'id', ['username' => $user], MUST_EXIST),
+            'bookid' => $DB->get_field('moodlereader_books', 'id', ['name' => $book], MUST_EXIST),
+            'attempt' => 1, 'state' => 'inprogress', 'percentgrade' => 0, 'passed' => 0, 'credit' => 0, 'cheated' => 0,
+            'deleted' => 0, 'bookrating' => 0, 'timestart' => $now, 'timefinish' => 0, 'timemodified' => $now,
+            'ip' => '203.0.113.9', 'delivery' => 'moodle', 'attemptref' => $launched ? 'plainlink' : null,
+            'timelimit' => $launched ? 600 : 0, 'slots' => $launched ? 3 : 0, 'currentslot' => 0,
+        ]);
+        $page = $launched ? 'render' : 'mreader';
+        $this->getSession()->visit($this->locate_path('/mod/moodlereader/quiz/' . $page . '.php?attempt=' . $id));
+    }
+
+    /**
      * Answer API v2 from a fake mreader.org that draws one three-question quiz for Moodle (31 §11).
      *
      * @Given /^mreader\.org draws quizzes for Moodle$/

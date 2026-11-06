@@ -1,9 +1,16 @@
 # Changelog — mod_moodlereader
 
-The plugin is in pre-release development. The version stays at `0.0.z` until a
-`1.0.0` release is explicitly cut; `x`/`y` are not bumped without sign-off.
+## [0.1.0] - 2026-11-06
 
-## [0.1.0] - 2026-10-25
+### Security
+
+- `quiz/mreader.php` and `quiz/render.php` need the session key to launch an attempt or show its first
+  question (`quizsession::has_start_key()`), and otherwise ask for confirmation.
+- Restore clamps level counts, pass mark, goal, maximum grade and total words
+  (`clean_ranges()`), and marks a restored finished attempt deleted when the book already counts.
+- `cheating.php` hides the other student's name outside the teacher's groups in separate-groups mode.
+- Privacy metadata declares `responses`, `seconds_used`, `survey` and `locale` sent to mreader.org.
+- `mod/moodlereader:manageremotesites` has `RISK_CONFIG | RISK_PERSONAL` (version 2026110600).
 
 ### Added
 

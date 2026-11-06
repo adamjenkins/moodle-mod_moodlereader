@@ -33,20 +33,22 @@ screenshots:
   - path: .camp/screenshots/01-reading-page.png
     caption: 'A student''s reading page: progress toward the goal, reading level, books read and the reading report'
   - path: .camp/screenshots/02-book-search.png
-    caption: The book search, showing only books the student may still take a quiz on
-  - path: .camp/screenshots/03-student-summary.png
-    caption: 'The student summary report: levels, goals, books passed and words read, with teacher actions'
-  - path: .camp/screenshots/04-student-details.png
+    caption: 'The book search, showing only books the student may still take a quiz on'
+  - path: .camp/screenshots/03-book-quiz.png
+    caption: 'A book quiz in Moodle: one question at a time, with a countdown'
+  - path: .camp/screenshots/04-student-summary.png
+    caption: 'The student summary report: levels, goals, progress, words read and teacher actions'
+  - path: .camp/screenshots/05-student-details.png
     caption: 'The student details report: every attempt, its result and the running total'
-  - path: .camp/screenshots/05-award-credit.png
-    caption: Award credit for a book, found with the same search students use
-  - path: .camp/screenshots/06-cheating-detection.png
-    caption: Cheating detection, with the markers it looks for and the school's allowed addresses
-  - path: .camp/screenshots/07-safe-exam-browser-settings.png
-    caption: Safe Exam Browser in the activity settings, with a configuration copied from a quiz in the course
-  - path: .camp/screenshots/08-safe-exam-browser-needed.png
-    caption: What a student sees when starting a quiz outside Safe Exam Browser
-  - path: .camp/screenshots/09-manage-books.png
+  - path: .camp/screenshots/06-award-credit.png
+    caption: 'Award credit for a book, found with a search like the one students use'
+  - path: .camp/screenshots/07-cheating-detection.png
+    caption: 'Cheating detection: the markers it looks for, and flags for the teacher to review'
+  - path: .camp/screenshots/08-safe-exam-browser-settings.png
+    caption: 'Safe Exam Browser in the activity settings'
+  - path: .camp/screenshots/09-safe-exam-browser-needed.png
+    caption: 'What a student sees when the quizzes need Safe Exam Browser'
+  - path: .camp/screenshots/10-manage-books.png
     caption: 'Manage books (administrators): filter the site''s catalogue and enable or disable books in bulk'
 # links:
 #   docs: https://…

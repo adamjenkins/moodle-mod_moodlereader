@@ -94,6 +94,7 @@ $capabilities = [
 
     // A site administrator registers this site with, and downloads books from, mreader.org.
     'mod/moodlereader:manageremotesites' => [
+        'riskbitmask'  => RISK_CONFIG | RISK_PERSONAL,
         'captype'      => 'write',
         'contextlevel' => CONTEXT_SYSTEM,
         'archetypes'   => [

@@ -104,6 +104,12 @@ $sql = "SELECT c.id, c.attemptid, c.reason, c.detail, a.cheated, a.userid, c.oth
       ORDER BY a.timefinish DESC, c.id";
 $rows = $DB->get_records_sql($sql, ['readerid' => $reader->get_instance()->id] + $eparams);
 
+// A teacher limited to their own groups does not get the name of a student outside them.
+$groupslimited = groups_get_activity_groupmode($reader->get_cm()) == SEPARATEGROUPS
+    && !has_capability('moodle/site:accessallgroups', $reader->get_context());
+$visibleothers = $groupslimited
+    ? \mod_moodlereader\local\attempt_admin::visible_userids($reader, array_column($rows, 'otheruserid')) : [];
+
 if ($rows) {
     $table = new html_table();
     $table->head = [
@@ -119,7 +125,9 @@ if ($rows) {
             $other = (object) ['id' => $r->otheruserid];
             username_load_fields_from_object($other, $r, 'other', \core_user\fields::get_name_fields());
             $reason = get_string('flag_sameip', 'mod_moodlereader', [
-                'other' => fullname($other), 'gap' => format_time(max(1, (int) $r->detail)),
+                'other' => !$groupslimited || isset($visibleothers[(int) $r->otheruserid])
+                    ? fullname($other) : get_string('anotherstudent', 'mod_moodlereader'),
+                'gap' => format_time(max(1, (int) $r->detail)),
             ]);
         } else if ($r->reason === 'quickfinish') {
             $reason = get_string('flag_quickfinish', 'mod_moodlereader', format_time(max(1, (int) $r->detail)));

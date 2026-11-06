@@ -51,7 +51,12 @@ if (!connection::allows_launch()) {
     throw new moodle_exception('notconnected', 'mod_moodlereader', $reader->view_url());
 }
 
+// The next step may start the clock, so the session key passes on only when this request carried it.
+$haskey = quizsession::has_start_key();
 $renderurl = new moodle_url('/mod/moodlereader/quiz/render.php', ['attempt' => $attempt->id]);
+if ($haskey) {
+    $renderurl->param('sesskey', sesskey());
+}
 // An attempt that has started resumes where it is.
 if ($attempt->delivery === quizsession::DELIVERY_MOODLE && !empty($attempt->attemptref) && (int) $attempt->timelimit > 0) {
     redirect($renderurl);
@@ -59,6 +64,11 @@ if ($attempt->delivery === quizsession::DELIVERY_MOODLE && !empty($attempt->atte
 // Not launched yet: the book must still be one the student may take (it may have been finished
 // meanwhile in another course, disabled, or be beyond the level quota now).
 $reader->require_still_available($attempt);
+
+// Launching changes the attempt: a plain link (from anywhere) only gets the question.
+if (!$haskey) {
+    quizsession::confirm_start($reader, new moodle_url('/mod/moodlereader/quiz/mreader.php', ['attempt' => $attempt->id]));
+}
 
 $book = $DB->get_record('moodlereader_books', ['id' => $attempt->bookid], '*', MUST_EXIST);
 try {

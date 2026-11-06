@@ -88,12 +88,40 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         ) {
             $data->$flag = empty($data->$flag) ? 0 : 1;
         }
+        self::clean_ranges($data);
         $this->clean_seb($data);
         $settings = json_decode((string) ($data->cheatsettings ?? ''), true);
         $data->cheatsettings = is_array($settings)
             ? json_encode(\mod_moodlereader\local\cheatdetector::clean_settings($settings)) : null;
         $newid = $DB->insert_record('moodlereader', $data);
         $this->apply_activity_instance($newid);
+    }
+
+    /**
+     * Hold numeric settings from a backup to the ranges the activity form allows.
+     *
+     * @param stdClass $data The activity record.
+     * @return void
+     */
+    public static function clean_ranges(stdClass $data): void {
+        foreach (['thislevel', 'prevlevel', 'nextlevel'] as $field) {
+            if (isset($data->$field)) {
+                $data->$field = max(0, min(99, (int) $data->$field));
+            }
+        }
+        if (isset($data->minpassgrade)) {
+            $data->minpassgrade = max(0, min(100, (int) $data->minpassgrade));
+        }
+        if (isset($data->goal)) {
+            $data->goal = max(0, min(9999999, (int) $data->goal));
+        }
+        if (isset($data->maxgrade)) {
+            $data->maxgrade = max(0.0, (float) $data->maxgrade);
+        }
+        if (isset($data->completiontotalwords)) {
+            $data->completiontotalwords = max(0, (int) $data->completiontotalwords);
+        }
+        $data->wordsorpoints = empty($data->wordsorpoints) ? 0 : 1;
     }
 
     /**
@@ -252,6 +280,13 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
             'remotestate'  => null,
             'timeresultchecked' => 0,
         ];
+        // A book counts once per student across the site: a copy of a finished attempt is kept but does not count.
+        if ($attempt->state === 'finished' && !$attempt->deleted) {
+            $check = (object) ['id' => 0, 'bookid' => $attempt->bookid, 'userid' => $attempt->userid];
+            if (\mod_moodlereader\local\attempt::already_finished($check)) {
+                $attempt->deleted = 1;
+            }
+        }
         $DB->insert_record('moodlereader_attempts', $attempt);
     }
 

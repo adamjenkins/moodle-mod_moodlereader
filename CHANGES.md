@@ -1,10 +1,17 @@
 # Changelog — mod_moodlereader
 
-The plugin is in pre-release development. The version stays at `0.0.z` until a
-`1.0.0` release is explicitly cut; `x`/`y` are not bumped without sign-off.
+## [0.1.0] - 2026-11-06
 
-## [0.1.0] - 2026-10-25
-
+- A link cannot start a student's quiz: starting one asks the student to confirm first,
+  unless they pressed the quiz button.
+- Restoring a backup holds levels, pass mark and goal to the activity form's ranges, and a
+  restored copy of a finished book does not count a second time.
+- A teacher limited to their own groups sees "another student" instead of the name of a
+  student outside those groups on the cheating page.
+- The privacy declaration now lists the quiz answers, time used, survey answers and language
+  sent to mreader.org.
+- The capability to manage the mreader.org connection carries configuration and personal-data
+  risk flags.
 - The site now connects to mreader.org through its new API v2. A site administrator
   requests access on the new "mreader.org connection" page, and an mreader.org
   administrator approves, declines or revokes it. The old registration with a

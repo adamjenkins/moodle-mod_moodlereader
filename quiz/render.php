@@ -128,6 +128,10 @@ try {
         $state = quizsession::finish($attempt);
     } else {
         if ($attempt->state === 'inprogress' && (int) $attempt->currentslot === 0) {
+            // Showing the first question starts the clock, which a plain link must not do.
+            if (!quizsession::has_start_key()) {
+                quizsession::confirm_start($reader, $pageurl);
+            }
             // About to show the first question: the book must still be one the student may take.
             $reader->require_still_available($attempt);
         }
