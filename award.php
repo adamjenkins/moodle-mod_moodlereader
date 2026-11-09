@@ -54,13 +54,16 @@ if (!$userids) {
     );
 }
 
+$booklanguages = $DB->get_fieldset_sql(
+    "SELECT DISTINCT language FROM {moodlereader_books} WHERE hidden = 0 AND language <> '' ORDER BY language"
+);
 $filters = [
     'name'       => optional_param('searchname', '', PARAM_TEXT),
     'publisher'  => optional_param('searchpublisher', '', PARAM_TEXT),
     'series'     => optional_param('searchseries', '', PARAM_TEXT),
     'difficulty' => optional_param('searchdifficulty', -1, PARAM_INT),
-    // English is selected until the teacher chooses another language (or any).
-    'language'   => $searched ? booklanguage::clean(optional_param('searchlanguage', '', PARAM_ALPHA)) : booklanguage::DEFAULT,
+    // No language filter when the books are all in one language; otherwise English until another (or any) is chosen.
+    'language'   => booklanguage::filter_value(optional_param('searchlanguage', '', PARAM_ALPHA), $searched, $booklanguages),
     // Books with or without a quiz (a book without one can only be given as credit).
     'quiz'       => optional_param('searchquiz', 'all', PARAM_ALPHA),
 ];
@@ -118,9 +121,7 @@ $levels = ['-1' => get_string('anylevel', 'mod_moodlereader')];
 foreach ($DB->get_fieldset_sql('SELECT DISTINCT difficulty FROM {moodlereader_books} WHERE hidden = 0 ORDER BY difficulty') as $d) {
     $levels[(string) $d] = (string) (int) $d;
 }
-$languages = ['' => get_string('anylanguage', 'mod_moodlereader')] + array_map('s', booklanguage::options(
-    $DB->get_fieldset_sql("SELECT DISTINCT language FROM {moodlereader_books} WHERE hidden = 0 AND language <> ''")
-));
+$languages = ['' => get_string('anylanguage', 'mod_moodlereader')] + array_map('s', booklanguage::present_options($booklanguages));
 $row = function (string $labelkey, string $control, string $for): string {
     return html_writer::div(
         html_writer::tag('label', get_string($labelkey, 'mod_moodlereader'), [
@@ -142,7 +143,9 @@ $inner = html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'id', 'v
 $inner .= $row('booktitle', html_writer::empty_tag('input', [
     'type' => 'text', 'name' => 'searchname', 'value' => $filters['name'], 'id' => 'mr-searchname', 'class' => 'form-control',
 ]), 'mr-searchname');
-$inner .= $row('booklanguage', $select($languages, 'searchlanguage', $filters['language']), 'mr-searchlanguage');
+if (booklanguage::filter_needed($booklanguages)) {
+    $inner .= $row('booklanguage', $select($languages, 'searchlanguage', $filters['language']), 'mr-searchlanguage');
+}
 $inner .= $row('publisher', $select($publishers, 'searchpublisher', $filters['publisher']), 'mr-searchpublisher');
 $inner .= $row('series', html_writer::empty_tag('input', [
     'type' => 'text', 'name' => 'searchseries', 'value' => $filters['series'], 'id' => 'mr-searchseries', 'class' => 'form-control',

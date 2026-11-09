@@ -128,6 +128,21 @@ Feature: Moodle Reader activity
     Then I should see "El Gato Negro"
     And I should not see "Green Fields"
 
+  Scenario: With books in only one language, no language filter is offered anywhere
+    Given the following moodlereader books exist:
+      | name         | publisher | series  | difficulty | words | language |
+      | Green Fields | Acme      | Level 1 | 1          | 2500  | en       |
+    When I am on the "Reader 1" "moodlereader activity" page logged in as student1
+    Then "Language" "field" should not exist
+    And I press "Search"
+    And I should see "Green Fields"
+    And I should see "The Red Kite"
+    And I log out
+    When I log in as "admin"
+    And I navigate to "Plugins > Activity modules > Moodle Reader > Manage books" in site administration
+    Then "Language" "field" should not exist
+    And I should see "Green Fields"
+
   Scenario: An administrator disables every book matching a multi-select filter, and students no longer see them
     Given the following moodlereader books exist:
       | name         | publisher | series  | difficulty | words |

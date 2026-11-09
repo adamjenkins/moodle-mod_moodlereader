@@ -46,9 +46,17 @@ $fdifficulties = array_values(array_unique(array_filter(
     optional_param_array('fdifficulty', [], PARAM_INT),
     fn($d) => $d >= 0
 )));
-// English is selected until the filter is changed.
+// The languages the catalogue holds. With only one there is no language filter; otherwise English is
+// selected (when present) until the filter is changed.
+$cataloguelanguages = $DB->get_fieldset_sql(
+    "SELECT DISTINCT language FROM {moodlereader_books} WHERE language <> '' ORDER BY language"
+);
+$languagefilter = booklanguage::filter_needed($cataloguelanguages);
 $flanguages = $filtered ? optional_param_array('flanguage', [], PARAM_ALPHA) : [booklanguage::DEFAULT];
-$flanguages = array_values(array_unique(array_filter(array_map([booklanguage::class, 'clean'], $flanguages))));
+$flanguages = !$languagefilter ? [] : array_values(array_intersect(
+    array_unique(array_filter(array_map([booklanguage::class, 'clean'], $flanguages))),
+    $cataloguelanguages
+));
 $fstatus = optional_param('fstatus', 'all', PARAM_ALPHA);
 if (!in_array($fstatus, ['all', 'enabled', 'disabled'], true)) {
     $fstatus = 'all';
@@ -204,9 +212,7 @@ $difficulties = [];
 foreach ($DB->get_fieldset_sql('SELECT DISTINCT difficulty FROM {moodlereader_books} ORDER BY difficulty') as $difficulty) {
     $difficulties[(string) $difficulty] = (string) (int) $difficulty;
 }
-$languages = array_map('s', booklanguage::options(
-    $DB->get_fieldset_sql("SELECT DISTINCT language FROM {moodlereader_books} WHERE language <> ''")
-));
+$languages = array_map('s', booklanguage::present_options($cataloguelanguages));
 $quizoptions = [
     'all'      => get_string('quizfilter_all', 'mod_moodlereader'),
     'withquiz' => get_string('quizfilter_withquiz', 'mod_moodlereader'),
@@ -241,11 +247,13 @@ $filterinner .= $filterrow(
     $multi($difficulties, 'fdifficulty', $fdifficulties),
     'mr-fdifficulty'
 );
-$filterinner .= $filterrow(
-    get_string('booklanguage', 'mod_moodlereader'),
-    $multi($languages, 'flanguage', $flanguages),
-    'mr-flanguage'
-);
+if ($languagefilter) {
+    $filterinner .= $filterrow(
+        get_string('booklanguage', 'mod_moodlereader'),
+        $multi($languages, 'flanguage', $flanguages),
+        'mr-flanguage'
+    );
+}
 $filterinner .= $filterrow(
     get_string('series', 'mod_moodlereader'),
     html_writer::empty_tag('input', [

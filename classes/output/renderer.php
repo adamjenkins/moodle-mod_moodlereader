@@ -146,7 +146,9 @@ class renderer extends \plugin_renderer_base {
         // The book search. A student only ever sees books they may take; a teacher sees every
         // book of the activity with whether this student may take it, and why not.
         if (!empty($instance->showsearch)) {
-            [$filters, $searched, $hasfilter] = reader::request_search_filters();
+            [$filters, $searched, $hasfilter] = reader::request_search_filters(
+                $reader->search_languages($userid, $teacherview)
+            );
             $action = $teacherview
                 ? new moodle_url('/mod/moodlereader/student.php', ['id' => $cmid, 'userid' => $userid])
                 : new moodle_url('/mod/moodlereader/view.php', ['id' => $cmid]);
@@ -457,8 +459,9 @@ class renderer extends \plugin_renderer_base {
             $levels[(string) $difficulty] = (string) $difficulty;
         }
 
+        // Only the languages the books are in, and no language menu at all when there is just one.
         $languages = ['' => get_string('anylanguage', 'mod_moodlereader')]
-            + array_map('s', booklanguage::options($menus['languages']));
+            + array_map('s', booklanguage::present_options($menus['languages']));
 
         $row = function (string $labelkey, string $control, string $for): string {
             $label = html_writer::tag('label', get_string($labelkey, 'mod_moodlereader'), [
@@ -485,11 +488,13 @@ class renderer extends \plugin_renderer_base {
             'type' => 'text', 'name' => 'searchname', 'value' => $filters['name'] ?? '', 'id' => 'mr-searchname',
             'class' => 'form-control', 'placeholder' => get_string('booktitleplaceholder', 'mod_moodlereader'),
         ]), 'mr-searchname');
-        $inner .= $row(
-            'booklanguage',
-            $select($languages, 'searchlanguage', (string) ($filters['language'] ?? '')),
-            'mr-searchlanguage'
-        );
+        if (booklanguage::filter_needed($menus['languages'])) {
+            $inner .= $row(
+                'booklanguage',
+                $select($languages, 'searchlanguage', (string) ($filters['language'] ?? '')),
+                'mr-searchlanguage'
+            );
+        }
         $inner .= $row(
             'publisher',
             $select($publishers, 'searchpublisher', (string) ($filters['publisher'] ?? '')),

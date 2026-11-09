@@ -14,6 +14,10 @@
 
 ### Added
 
+- `booklanguage::present_options()`, `filter_needed()` and `filter_value()`: the language filter is
+  shown only when the books on offer have two or more languages and lists only those; without it no
+  language is filtered by (`reader::request_search_filters(array $languages)`, `reader::search_languages()`,
+  `award.php`, `admin/books.php`).
 - `admin/books.php` (admin external page `mod_moodlereader_books`, capability
   `mod/moodlereader:managecatalogue`) replaces the activity-level `books.php`; tab "Manage books" in
   `admin_nav`; the link on `view.php` is gone.

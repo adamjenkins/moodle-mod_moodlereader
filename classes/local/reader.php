@@ -385,9 +385,11 @@ class reader {
     /**
      * The book search's filters as submitted in this request.
      *
+     * @param string[] $languages The languages of the books on offer: with fewer than two, the search has no
+     *     language filter; otherwise English is chosen (when present) until another language, or any, is.
      * @return array [array $filters, bool $searched, bool $hasfilter]
      */
-    public static function request_search_filters(): array {
+    public static function request_search_filters(array $languages = []): array {
         $searched = (bool) optional_param('searchsubmit', 0, PARAM_INT);
         $difficulty = optional_param('searchdifficulty', -1, PARAM_INT);
         $filters = [
@@ -396,14 +398,23 @@ class reader {
             'series'     => optional_param('searchseries', '', PARAM_TEXT),
             'genre'      => optional_param('searchgenre', '', PARAM_ALPHA),
             'difficulty' => $difficulty,
-            // English is selected until another language (or any) is chosen.
-            'language'   => $searched
-                ? booklanguage::clean(optional_param('searchlanguage', '', PARAM_ALPHA))
-                : booklanguage::DEFAULT,
+            'language'   => booklanguage::filter_value(optional_param('searchlanguage', '', PARAM_ALPHA), $searched, $languages),
         ];
         $hasfilter = trim($filters['name']) !== '' || $filters['publisher'] !== '' || trim($filters['series']) !== ''
             || $filters['genre'] !== '' || $difficulty >= 0;
         return [$filters, $searched, $hasfilter];
+    }
+
+    /**
+     * The languages a book search offers: of the whole activity catalogue (a teacher's view of a student's
+     * page), or of the books this user may take.
+     *
+     * @param int $userid
+     * @param bool $catalogue
+     * @return string[]
+     */
+    public function search_languages(int $userid, bool $catalogue): array {
+        return $catalogue ? $this->catalogue_menus()['languages'] : $this->available_languages($userid);
     }
 
     /**

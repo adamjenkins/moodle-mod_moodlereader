@@ -2,6 +2,8 @@
 
 ## [0.1.0] - 2026-11-06
 
+- The language filter (student book search, Award credit, Manage books) appears only when the books
+  are in more than one language, and lists only those languages.
 - Manage books is now in Site administration only (Plugins → Activity modules → Moodle Reader →
   Manage books); activities no longer link to it.
 - The book sync brings in only the languages an administrator chooses ("Languages to sync"). Books

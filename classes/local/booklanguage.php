@@ -58,6 +58,49 @@ class booklanguage {
     }
 
     /**
+     * The language filter's options: only the languages the books on offer are in, known ones first.
+     * A filter with fewer than two of them is not shown (see {@see self::filter_needed()}).
+     *
+     * @param string[] $present Codes found among the books on offer.
+     * @return array code => label
+     */
+    public static function present_options(array $present): array {
+        $present = array_values(array_unique(array_filter(array_map('strval', $present))));
+        $known = array_values(array_intersect(self::CODES, $present));
+        $options = [];
+        foreach (array_merge($known, array_diff($present, $known)) as $code) {
+            $options[$code] = self::label($code);
+        }
+        return $options;
+    }
+
+    /**
+     * Whether a language filter means anything: only when the books on offer are in more than one language.
+     *
+     * @param string[] $present Codes found among the books on offer ('' left out).
+     * @return bool
+     */
+    public static function filter_needed(array $present): bool {
+        return count(array_unique(array_filter(array_map('strval', $present)))) > 1;
+    }
+
+    /**
+     * The language a search filters by.
+     *
+     * @param string $chosen The submitted value ('' = any language).
+     * @param bool $searched Whether the form was submitted (before that, English is chosen, when there is any).
+     * @param string[] $present Codes found among the books on offer.
+     * @return string A code, or '' for every language (always, when the filter is not shown).
+     */
+    public static function filter_value(string $chosen, bool $searched, array $present): string {
+        if (!self::filter_needed($present)) {
+            return '';
+        }
+        $code = $searched ? self::clean($chosen) : self::DEFAULT;
+        return in_array($code, $present, true) ? $code : '';
+    }
+
+    /**
      * Language menu options: the known languages plus any other code present in the given list.
      *
      * @param string[] $present Codes found in the catalogue.
