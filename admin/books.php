@@ -15,22 +15,23 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Book catalogue management for the whole site: filter the catalogue (several publishers, levels
- * and languages at once) and enable or disable books one at a time, the selected ones, or every
- * book matching the filter. A disabled book is offered to no student in any activity.
+ * Book catalogue management for the whole site, in Site administration: filter the catalogue (several
+ * publishers, levels and languages at once) and enable or disable books one at a time, the selected ones,
+ * or every book matching the filter. A disabled book is offered to no student in any activity. The
+ * catalogue is synced from mreader.org here too, in the languages chosen in the plugin's settings.
  *
  * @package    mod_moodlereader
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-require(__DIR__ . '/../../config.php');
+require(__DIR__ . '/../../../config.php');
+require_once($CFG->libdir . '/adminlib.php');
 
+use mod_moodlereader\local\admin_nav;
 use mod_moodlereader\local\booklanguage;
 use mod_moodlereader\local\downloader;
-use mod_moodlereader\local\reader;
 
-$id = required_param('id', PARAM_INT);
 $sync = optional_param('sync', 0, PARAM_BOOL);
 $hidebook = optional_param('hide', 0, PARAM_INT);
 $showbook = optional_param('show', 0, PARAM_INT);
@@ -68,17 +69,12 @@ $filterparams = [
     'fquiz'       => $fquiz,
 ];
 
-$reader = reader::from_cmid($id);
-require_login($reader->get_course(), true, $reader->get_cm());
-// The catalogue is the whole site's: only a site administrator enables or disables books.
+// The catalogue is the whole site's: it is managed in Site administration only, never from an activity.
+admin_externalpage_setup('mod_moodlereader_books');
 require_capability('mod/moodlereader:managecatalogue', context_system::instance());
 
-$pageurl = new moodle_url('/mod/moodlereader/books.php', ['id' => $id]);
+$pageurl = new moodle_url('/mod/moodlereader/admin/books.php');
 $viewurl = new moodle_url($pageurl, $filterparams + ['page' => $page]);
-$PAGE->set_url($pageurl);
-$PAGE->set_context($reader->get_context());
-$PAGE->set_title(get_string('managebooks', 'mod_moodlereader'));
-$PAGE->set_heading(format_string($reader->get_course()->fullname));
 $PAGE->requires->js_call_amd('core/checkbox-toggleall', 'init');
 
 $cansync = has_capability('mod/moodlereader:manageremotesites', context_system::instance());
@@ -175,16 +171,29 @@ $books = $DB->get_records_select(
 
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('managebooks', 'mod_moodlereader'));
+echo $OUTPUT->render(admin_nav::tabs('books'));
 echo html_writer::tag('p', get_string('managebooks_intro', 'mod_moodlereader'));
 
+// The languages the sync brings in, chosen in the plugin's settings.
+$synclanguages = downloader::sync_languages();
+$languagenames = $synclanguages === null ? get_string('synclanguages_all', 'mod_moodlereader')
+    : implode(', ', array_map([booklanguage::class, 'label'], $synclanguages));
+$languagenote = get_string('synclanguages_current', 'mod_moodlereader', s($languagenames));
+if (has_capability('moodle/site:config', context_system::instance())) {
+    $languagenote .= ' ' . html_writer::link(
+        new moodle_url('/admin/settings.php', ['section' => 'modsettingmoodlereader'], 'admin-synclanguages'),
+        get_string('synclanguages_change', 'mod_moodlereader')
+    );
+}
 if ($cansync) {
     $syncurl = new moodle_url($pageurl, $filterparams + ['sync' => 1, 'sesskey' => sesskey()]);
     echo html_writer::div(
         $OUTPUT->single_button($syncurl, get_string('syncbooks', 'mod_moodlereader'), 'post') .
         html_writer::span(get_string('syncbooks_help', 'mod_moodlereader'), 'text-muted ms-2 align-self-center'),
-        'd-flex mb-3'
+        'd-flex mb-1'
     );
 }
+echo html_writer::div($languagenote, 'text-muted small mb-3');
 
 // Filter form (GET). Option labels are not escaped by html_writer::select(), so stored values get s().
 $publishers = [];
@@ -221,8 +230,7 @@ $multi = function (array $options, string $name, array $selected): string {
         'size' => max(2, min(8, count($options))),
     ]);
 };
-$filterinner = html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'id', 'value' => $id]);
-$filterinner .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'filtered', 'value' => 1]);
+$filterinner = html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'filtered', 'value' => 1]);
 $filterinner .= $filterrow(
     get_string('publisher', 'mod_moodlereader'),
     $multi($publishers, 'fpublisher', $fpublishers),
@@ -274,7 +282,6 @@ if (!$books) {
 
 // Bulk form (POST) wrapping the table; the filter travels with it so "all matching" means what is shown.
 echo html_writer::start_tag('form', ['method' => 'post', 'action' => $pageurl]);
-echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'id', 'value' => $id]);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'page', 'value' => $page]);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
 foreach ($filterparams as $fname => $fvalue) {

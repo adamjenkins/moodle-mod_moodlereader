@@ -133,7 +133,9 @@ Feature: Moodle Reader activity
       | name         | publisher | series  | difficulty | words |
       | Night Train  | Orbit     | Level 2 | 2          | 3500  |
     When I am on the "Reader 1" "moodlereader activity" page logged in as admin
-    And I follow "Manage books"
+    # The catalogue is managed in Site administration only, never from an activity.
+    Then I should not see "Manage books"
+    When I navigate to "Plugins > Activity modules > Moodle Reader > Manage books" in site administration
     And I set the field "Publisher" to "Acme,Orbit"
     And I press "Filter"
     Then I should see "Night Train"

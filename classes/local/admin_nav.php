@@ -27,7 +27,7 @@ class admin_nav {
     /**
      * The tab row, with one tab selected.
      *
-     * @param string $current 'settings', 'connection' or 'import'.
+     * @param string $current 'settings', 'connection', 'books' or 'import'.
      * @return \tabtree
      */
     public static function tabs(string $current): \tabtree {
@@ -43,6 +43,13 @@ class admin_nav {
                 get_string('connection', 'mod_moodlereader')
             ),
         ];
+        if (has_capability('mod/moodlereader:managecatalogue', \context_system::instance())) {
+            $tabs[] = new \tabobject(
+                'books',
+                new \moodle_url('/mod/moodlereader/admin/books.php'),
+                get_string('managebooks', 'mod_moodlereader')
+            );
+        }
         if (\mod_moodlereader\local\import\importer::source_available()) {
             $tabs[] = new \tabobject(
                 'import',

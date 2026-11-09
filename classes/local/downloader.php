@@ -41,6 +41,10 @@ class downloader {
      * (/books-noquiz), each asking only for what changed since its own last complete
      * walk. The second is skipped while mreader.org does not offer it (404).
      *
+     * Only the books in the languages chosen in the settings are synced (a book with no language, as every
+     * book without a quiz is, always is); books already here in a language no longer chosen are removed, or
+     * hidden when an attempt or a book list uses them.
+     *
      * @param bool $full Fetch the whole catalogue rather than the changes.
      * @param client|null $client
      * @return int Number of books inserted or updated.
@@ -51,6 +55,7 @@ class downloader {
         }
         $client = $client ?? new client();
         $count = 0;
+        $languages = self::sync_languages();
         // Each list remembers its own date (31 §10 amendment 5): the next walk asks for the books changed
         // since mreader.org's clock at the first page of the last COMPLETE walk; a walk that fails part-way
         // keeps the old date, so nothing is skipped.
@@ -62,7 +67,7 @@ class downloader {
             $since = $full ? 0 : (int) get_config('mod_moodlereader', $setting);
             $servertime = 0;
             try {
-                $count += self::walk($client, $path, $since, $hasquiz, $servertime);
+                $count += self::walk($client, $path, $since, $hasquiz, $servertime, $languages);
             } catch (api\api_exception $e) {
                 // A server without the no-quiz list yet answers 404: there is nothing to sync from it.
                 if ($path === '/books-noquiz' && (int) $e->httpstatus === 404) {
@@ -74,7 +79,101 @@ class downloader {
                 set_config($setting, $servertime, 'mod_moodlereader');
             }
         }
+        self::remove_other_languages($languages);
         return $count;
+    }
+
+    /**
+     * The languages whose books are synced.
+     *
+     * @return string[]|null The chosen language codes, or null for every language (nothing chosen yet, nothing
+     *     ticked, or every known language ticked, so a language mreader.org adds later is synced too).
+     */
+    public static function sync_languages(): ?array {
+        $value = get_config('mod_moodlereader', 'synclanguages');
+        if ($value === false || trim((string) $value) === '') {
+            return null;
+        }
+        $codes = array_values(array_unique(array_filter(array_map(
+            [booklanguage::class, 'clean'],
+            explode(',', (string) $value)
+        ))));
+        if (!$codes || !array_diff(booklanguage::CODES, $codes)) {
+            return null;
+        }
+        return $codes;
+    }
+
+    /**
+     * Whether a book in this language is synced.
+     *
+     * @param string $language A cleaned language code ('' when mreader.org sent none).
+     * @param string[]|null $languages From {@see self::sync_languages()}.
+     * @return bool
+     */
+    public static function language_wanted(string $language, ?array $languages): bool {
+        return $languages === null || $language === '' || in_array($language, $languages, true);
+    }
+
+    /**
+     * Called when the language choice is saved: the next sync of each list is a full one, so the books of a
+     * newly ticked language arrive even if they have not changed on mreader.org.
+     *
+     * @return void
+     */
+    public static function languages_changed(): void {
+        unset_config('v2lastbooksync', 'mod_moodlereader');
+        unset_config('v2lastnoquizsync', 'mod_moodlereader');
+    }
+
+    /**
+     * Take out the synced books in languages no longer chosen: removed, or hidden when an attempt, a book
+     * list or a student's used-books record refers to them (their history stays).
+     *
+     * @param string[]|null $languages From {@see self::sync_languages()}.
+     * @return int Books removed or hidden.
+     */
+    public static function remove_other_languages(?array $languages): int {
+        global $DB;
+        if ($languages === null) {
+            return 0;
+        }
+        [$insql, $params] = $DB->get_in_or_equal($languages, SQL_PARAMS_NAMED, 'lang', false);
+        $rs = $DB->get_recordset_select(
+            'moodlereader_books',
+            "remoteid > 0 AND language <> '' AND language $insql",
+            $params,
+            '',
+            'id, hidden'
+        );
+        $count = 0;
+        foreach ($rs as $book) {
+            if (self::book_in_use((int) $book->id)) {
+                if (!$book->hidden) {
+                    $DB->set_field('moodlereader_books', 'hidden', 1, ['id' => $book->id]);
+                    $count++;
+                }
+            } else {
+                self::delete_cached_covers((int) $book->id);
+                $DB->delete_records('moodlereader_books', ['id' => $book->id]);
+                $count++;
+            }
+        }
+        $rs->close();
+        return $count;
+    }
+
+    /**
+     * Whether anything refers to a book, so that it must be kept.
+     *
+     * @param int $bookid
+     * @return bool
+     */
+    public static function book_in_use(int $bookid): bool {
+        global $DB;
+        return $DB->record_exists('moodlereader_attempts', ['bookid' => $bookid])
+            || $DB->record_exists('moodlereader_bookinstances', ['bookid' => $bookid])
+            || $DB->record_exists('moodlereader_booksused', ['bookid' => $bookid]);
     }
 
     /**
@@ -85,9 +184,17 @@ class downloader {
      * @param int $since
      * @param bool $hasquiz Whether the list's books have quizzes.
      * @param int $servertime Set from the first page when still 0.
+     * @param string[]|null $languages The languages synced (null: every language).
      * @return int Books inserted or updated.
      */
-    protected static function walk(client $client, string $path, int $since, bool $hasquiz, int &$servertime): int {
+    protected static function walk(
+        client $client,
+        string $path,
+        int $since,
+        bool $hasquiz,
+        int &$servertime,
+        ?array $languages = null
+    ): int {
         $cursor = null;
         $count = 0;
         $pages = 0;
@@ -100,7 +207,8 @@ class downloader {
             $servertime = $servertime ?: (int) ($data['server_time'] ?? 0);
             foreach ((array) ($data['books'] ?? []) as $row) {
                 // The list decides whether a book has a quiz, whatever the row says.
-                if (is_array($row) && ($book = self::clean_book(['has_quiz' => $hasquiz] + $row))) {
+                $book = is_array($row) ? self::clean_book(['has_quiz' => $hasquiz] + $row) : null;
+                if ($book && self::language_wanted($book->language, $languages)) {
                     $book->hasquiz = $hasquiz ? 1 : 0;
                     self::upsert($book);
                     $count++;

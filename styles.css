@@ -49,6 +49,45 @@
     font-size: 0.8rem;
 }
 
+/* Moving up a level: the old and new level side by side, shown once. */
+.path-mod-moodlereader .mr-promo {
+    gap: 1rem;
+}
+
+.path-mod-moodlereader .mr-promo-graphic {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.path-mod-moodlereader .mr-promo-level {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 3.5rem;
+    padding: 0.25rem 0.5rem;
+    border: 2px solid #3d8b3d;
+    border-radius: 0.4rem;
+    background-color: #fff;
+    color: #1d4d1d;
+}
+
+.path-mod-moodlereader .mr-promo-from {
+    opacity: 0.7;
+}
+
+.path-mod-moodlereader .mr-promo-to {
+    background-color: #3d8b3d;
+    color: #fff;
+}
+
+.path-mod-moodlereader .mr-promo-number {
+    font-size: 1.6rem;
+    font-weight: bold;
+    line-height: 1.1;
+}
+
 /* Reading-level grid: a column per level, a square per book allowed, filled when passed. */
 .path-mod-moodlereader .mr-level-grid {
     display: flex;

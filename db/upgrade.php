@@ -409,5 +409,22 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026102605, 'moodlereader');
     }
 
+    if ($oldversion < 2026110900) {
+        // An activity can open every level below the student's, each up to prevlevel books (GitHub issue #1).
+        $table = new xmldb_table('moodlereader');
+        $field = new xmldb_field('lowerlevels', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'prevlevel');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        // A student who moves up is told so once, on their reading page.
+        $table = new xmldb_table('moodlereader_levels');
+        $field = new xmldb_field('promoted', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '0', 'time');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_mod_savepoint(true, 2026110900, 'moodlereader');
+    }
+
     return true;
 }

@@ -63,10 +63,13 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
   the same title) is not offered again in any other course, and resetting the course or deleting
   the activity or course does not free it. Which books are "the same" comes from mreader.org's own
   grouping, synced with the book list (from the mreader.org release after v3.8).
-- **Site administrators manage the site's catalogue** (Manage books: filter by several
+- **Site administrators manage the site's catalogue** in Site administration → Plugins →
+  Activity modules → Moodle Reader → **Manage books** (not from an activity): filter by several
   publishers, levels and languages at once, plus series and status, and enable or disable
   single books, the ticked books, or every book matching the filter; a disabled book is offered
-  to no student) and **sync** it from mreader.org. Teachers **message** students and set
+  to no student. They **sync** it from mreader.org, in the **languages they choose** (settings:
+  "Languages to sync"; books with no language, such as those without a quiz, always come; books in a
+  language no longer chosen are removed, or hidden once used). Teachers **message** students and set
   **per-student reading goals**.
 - **Reports** (modelled on mod_reader's): the *student summary* (levels, goal, passed,
   failed and cheated counts, average time and score, words this term and in all terms)
@@ -93,6 +96,11 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
   students share one public address. Flags are advisory until a teacher marks an attempt.
 - **Appearance** settings let a teacher choose which sections of the activity page
   students see.
+- **Reading levels**: when an activity restricts books to the level, students pass a set number of
+  books at their level to move up, plus a few above and a few below: at the level just below
+  (mod_reader's rule) or at **every level below**, each up to the same number (mreader.org's rule).
+  The activity page draws a column per level with a square per book, and tells the student, with
+  their old and new level side by side, when they move up.
 - Per-user reading levels, a reading goal (default for everyone, overridable per
   student), availability window, and activity completion rules (pass a book /
   read N words).

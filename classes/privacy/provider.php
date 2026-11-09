@@ -71,6 +71,7 @@ class provider implements
 
         $collection->add_database_table('moodlereader_levels', [
             'currentlevel' => 'privacy:metadata:moodlereader_levels:currentlevel',
+            'promoted'     => 'privacy:metadata:moodlereader_levels:promoted',
         ], 'privacy:metadata:moodlereader_levels');
 
         $collection->add_database_table('moodlereader_booksused', [
@@ -224,6 +225,10 @@ class provider implements
 
                 if ($level = $DB->get_record('moodlereader_levels', ['readerid' => $cm->instance, 'userid' => $userid])) {
                     $data->currentlevel = $level->currentlevel;
+                    // A move up not yet shown to them: the level they moved up from (stored plus one).
+                    if ((int) $level->promoted > 0) {
+                        $data->promotedfrom = (int) $level->promoted - 1;
+                    }
                 }
                 if ($grade = $DB->get_record('moodlereader_grades', ['readerid' => $cm->instance, 'userid' => $userid])) {
                     $data->grade = $grade->rawgrade;

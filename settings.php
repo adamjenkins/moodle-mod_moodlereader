@@ -119,6 +119,18 @@ if ($ADMIN->fulltree) {
         \mod_moodlereader\local\seb::METHOD_TEMPLATE
     );
 
+    // The books the sync brings in from mreader.org: only those in the ticked languages (and those with no
+    // language, such as the books without a quiz). Changing the choice makes the next sync a full one.
+    $setting = new admin_setting_configmulticheckbox(
+        'mod_moodlereader/synclanguages',
+        get_string('synclanguages', 'mod_moodlereader'),
+        get_string('synclanguages_desc', 'mod_moodlereader'),
+        array_fill_keys(\mod_moodlereader\local\booklanguage::CODES, 1),
+        \mod_moodlereader\local\booklanguage::options()
+    );
+    $setting->set_updatedcallback([\mod_moodlereader\local\downloader::class, 'languages_changed']);
+    $settings->add($setting);
+
     // Connection state and link; the connection itself is managed on its own page.
     $state = \mod_moodlereader\local\connection::state();
     $settings->add(new admin_setting_description(
@@ -138,6 +150,13 @@ $ADMIN->add('modmoodlereaderfolder', new admin_externalpage(
     new lang_string('connection', 'mod_moodlereader'),
     new moodle_url('/mod/moodlereader/admin/connection.php'),
     'mod/moodlereader:manageremotesites',
+    $module->is_enabled() === false
+));
+$ADMIN->add('modmoodlereaderfolder', new admin_externalpage(
+    'mod_moodlereader_books',
+    new lang_string('managebooks', 'mod_moodlereader'),
+    new moodle_url('/mod/moodlereader/admin/books.php'),
+    'mod/moodlereader:managecatalogue',
     $module->is_enabled() === false
 ));
 $ADMIN->add('modmoodlereaderfolder', new admin_externalpage(

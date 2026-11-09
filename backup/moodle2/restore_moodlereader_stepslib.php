@@ -122,6 +122,7 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
             $data->completiontotalwords = max(0, (int) $data->completiontotalwords);
         }
         $data->wordsorpoints = empty($data->wordsorpoints) ? 0 : 1;
+        $data->lowerlevels = empty($data->lowerlevels) ? 0 : 1;
     }
 
     /**

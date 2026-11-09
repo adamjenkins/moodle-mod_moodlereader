@@ -23,7 +23,8 @@ namespace mod_moodlereader\local;
  *
  * - thislevel: books to pass at the student's own level to move up a level (0 = no
  *   limit at the own level, and no promotion);
- * - prevlevel: books the student may read one level below (0 = none);
+ * - prevlevel: books the student may read one level below (0 = none), or, when lowerlevels is set, at
+ *   each of the levels below theirs, down to level 0 (mreader.org's rule);
  * - nextlevel: books the student may read one level above (0 = none).
  *
  * Only passed quizzes use up a level's allowance (a failed one does not), counted from
@@ -105,7 +106,11 @@ class levels {
         };
         $columns = [];
         if ($prevlevel > 0 && $level > 0) {
-            $columns[] = $column($level - 1, $prevlevel, -1);
+            // Every level below, lowest first, or only the one just below.
+            $lowest = empty($instance->lowerlevels) ? $level - 1 : 0;
+            for ($at = $lowest; $at < $level; $at++) {
+                $columns[] = $column($at, $prevlevel, -1);
+            }
         }
         // Without promotion (none set, switched off, or the stop level reached) the own level has no limit.
         $columns[] = $column($level, $promotion ? $thislevel : self::UNLIMITED, 0);
@@ -166,6 +171,8 @@ class levels {
         $record = $reader->get_level($userid);
         $record->currentlevel = $status->level + 1;
         $record->time = time();
+        // Told to the student once, on their reading page (stored plus one, so a move from level 0 is 1).
+        $record->promoted = $status->level + 1;
         if (empty($record->id)) {
             $record->goal = 0;
             $DB->insert_record('moodlereader_levels', $record);
@@ -173,5 +180,32 @@ class levels {
             $DB->update_record('moodlereader_levels', $record);
         }
         return true;
+    }
+
+    /**
+     * The move up a student has not been told about yet, cleared as it is read.
+     *
+     * @param reader $reader
+     * @param int $userid
+     * @return \stdClass|null from and to levels, or null when there is nothing to tell.
+     */
+    public static function take_promotion_notice(reader $reader, int $userid): ?\stdClass {
+        global $DB;
+        $record = $DB->get_record(
+            'moodlereader_levels',
+            ['readerid' => $reader->get_instance()->id, 'userid' => $userid],
+            'id, currentlevel, promoted',
+            IGNORE_MULTIPLE
+        );
+        if (!$record || (int) $record->promoted <= 0) {
+            return null;
+        }
+        $DB->set_field('moodlereader_levels', 'promoted', 0, ['id' => $record->id]);
+        $from = (int) $record->promoted - 1;
+        // A teacher may have changed the level since: tell only a move that still stands.
+        if ((int) $record->currentlevel <= $from) {
+            return null;
+        }
+        return (object) ['from' => $from, 'to' => (int) $record->currentlevel];
     }
 }

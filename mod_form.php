@@ -106,6 +106,16 @@ class mod_moodlereader_mod_form extends moodleform_mod {
             $mform->addHelpButton($field, $field, 'mod_moodlereader');
             $mform->disabledIf($field, 'levelcheck');
         }
+        // The books below the level: at one level only (mod_reader's rule), or at every level below, each up to
+        // the same number (mreader.org's rule; GitHub issue #1).
+        $mform->addElement('select', 'lowerlevels', get_string('lowerlevels', 'mod_moodlereader'), [
+            0 => get_string('lowerlevels_one', 'mod_moodlereader'),
+            1 => get_string('lowerlevels_all', 'mod_moodlereader'),
+        ]);
+        $mform->setDefault('lowerlevels', 0);
+        $mform->addHelpButton('lowerlevels', 'lowerlevels', 'mod_moodlereader');
+        $mform->disabledIf('lowerlevels', 'levelcheck');
+        $mform->hideIf('lowerlevels', 'prevlevel', 'eq', 0);
 
         $this->add_seb_elements();
 

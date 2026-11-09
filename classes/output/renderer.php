@@ -118,6 +118,11 @@ class renderer extends \plugin_renderer_base {
         if (!empty($instance->showprogressbar)) {
             $out .= $this->progress($reader, $userid);
         }
+        // A move up is told once, to the student themself (a teacher's look leaves it for them).
+        $promotion = $teacherview ? null : \mod_moodlereader\local\levels::take_promotion_notice($reader, $userid);
+        if ($promotion && !empty($instance->levelcheck)) {
+            $out .= $this->promotion_notice($promotion);
+        }
         if (!empty($instance->showlevel)) {
             $out .= $this->level_panel($reader, $userid);
         }
@@ -182,6 +187,36 @@ class renderer extends \plugin_renderer_base {
             !empty($instance->wordsorpoints),
             !empty($instance->extraprogressbar)
         );
+    }
+
+    /**
+     * The student has moved up a level: their old and new level side by side, once.
+     *
+     * @param stdClass $promotion from and to, from {@see \mod_moodlereader\local\levels::take_promotion_notice()}.
+     * @return string HTML.
+     */
+    public function promotion_notice(stdClass $promotion): string {
+        $str = fn(string $key, $a = null) => get_string($key, 'mod_moodlereader', $a);
+        $box = fn(int $level, string $class) => html_writer::div(
+            html_writer::div(s($str('levelword')), 'mr-promo-word small') .
+                html_writer::div(s((string) $level), 'mr-promo-number'),
+            'mr-promo-level ' . $class
+        );
+        $graphic = html_writer::div(
+            $box($promotion->from, 'mr-promo-from') .
+                html_writer::div($this->output->pix_icon('t/right', ''), 'mr-promo-arrow') .
+                $box($promotion->to, 'mr-promo-to'),
+            'mr-promo-graphic',
+            ['aria-hidden' => 'true']
+        );
+        $text = html_writer::div(
+            html_writer::tag('strong', s($str('promotedtitle'))) .
+                html_writer::div(s($str('promotedtext', $promotion))),
+            'mr-promo-text'
+        );
+        return html_writer::div($graphic . $text, 'alert alert-success mr-promo d-flex flex-wrap align-items-center mb-3', [
+            'role' => 'status',
+        ]);
     }
 
     /**

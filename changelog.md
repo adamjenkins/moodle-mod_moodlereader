@@ -14,6 +14,18 @@
 
 ### Added
 
+- `admin/books.php` (admin external page `mod_moodlereader_books`, capability
+  `mod/moodlereader:managecatalogue`) replaces the activity-level `books.php`; tab "Manage books" in
+  `admin_nav`; the link on `view.php` is gone.
+- Setting `synclanguages` (multi-checkbox): `downloader::sync_languages()`, `language_wanted()`,
+  `remove_other_languages()` (delete, or hide when `book_in_use()`), `languages_changed()` (unsets
+  `v2lastbooksync`/`v2lastnoquizsync`, so the next sync is full).
+- Field `moodlereader.lowerlevels` (0 one level below, 1 every level below; `levels::status()` adds a
+  column per level 0..n-1 with quota `prevlevel`), in the form, backup and restore (version 2026110900).
+- Field `moodlereader_levels.promoted` (level moved up from, plus one), set by `levels::maybe_promote()`,
+  read and cleared by `levels::take_promotion_notice()`; `renderer::promotion_notice()`; privacy metadata
+  and export (version 2026110900).
+
 - mreader.org API v2 client: HMAC-SHA256 request signing (timestamp + nonce), the
   authorization request, status, credential rotation and legacy-registration claim
   (`classes/local/api/`, `classes/local/connection.php`).

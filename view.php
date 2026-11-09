@@ -80,13 +80,6 @@ if ($reader->can('manageusers')) {
         ['class' => 'btn btn-secondary']
     );
 }
-if (has_capability('mod/moodlereader:managecatalogue', context_system::instance())) {
-    $links[] = html_writer::link(
-        new moodle_url('/mod/moodlereader/books.php', ['id' => $id]),
-        get_string('managebooks', 'mod_moodlereader'),
-        ['class' => 'btn btn-secondary']
-    );
-}
 if ($links) {
     echo html_writer::div(implode(' ', $links), 'mod-moodlereader-teachertools mb-3');
 }

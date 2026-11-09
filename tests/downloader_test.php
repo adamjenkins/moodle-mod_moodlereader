@@ -17,6 +17,7 @@
 namespace mod_moodlereader;
 
 use mod_moodlereader\local\api\fake_client;
+use mod_moodlereader\local\booklanguage;
 use mod_moodlereader\local\downloader;
 
 defined('MOODLE_INTERNAL') || die();
@@ -203,5 +204,53 @@ final class downloader_test extends \advanced_testcase {
         downloader::sync_books(true, $client);
         $this->assertSame('the red kite', $key(1));
         $this->assertSame('', $key(2));
+    }
+
+    /**
+     * Only the books in the chosen languages are synced (and those with none); books already here in another
+     * language are removed, or hidden when a student or an activity uses them; a new choice forces a full sync.
+     *
+     * @return void
+     */
+    public function test_sync_chosen_languages(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->approve();
+        /** @var \mod_moodlereader_generator $gen */
+        $gen = $this->getDataGenerator()->get_plugin_generator('mod_moodlereader');
+        // Synced earlier, before the choice: a Spanish book nobody used and one a student finished.
+        $unused = $gen->create_book(['remoteid' => 90, 'language' => 'es']);
+        $used = $gen->create_book(['remoteid' => 91, 'language' => 'es']);
+        $DB->insert_record('moodlereader_booksused', (object) ['userid' => 2, 'bookid' => $used->id, 'passed' => 1,
+            'credit' => 0, 'cheated' => 0, 'timefinish' => time(), 'timecreated' => time()]);
+
+        // Every language ticked, or none: the whole catalogue.
+        set_config('synclanguages', implode(',', booklanguage::CODES), 'mod_moodlereader');
+        $this->assertNull(downloader::sync_languages());
+        set_config('synclanguages', '', 'mod_moodlereader');
+        $this->assertNull(downloader::sync_languages());
+
+        set_config('synclanguages', 'en,ja', 'mod_moodlereader');
+        set_config('v2lastbooksync', 123, 'mod_moodlereader');
+        downloader::languages_changed();
+        $this->assertFalse(get_config('mod_moodlereader', 'v2lastbooksync'));
+        $this->assertSame(['en', 'ja'], downloader::sync_languages());
+
+        $client = (new fake_client())
+            ->queue('GET', '/books', 200, ['books' => [
+                $this->book(1, ['language' => 'en']),
+                $this->book(2, ['language' => 'es']),
+                $this->book(3, ['language' => 'ja']),
+                $this->book(4, ['language' => '']),
+            ], 'next_cursor' => null])
+            ->queue('GET', '/books-noquiz', 200, ['books' => [$this->book(5, ['language' => ''])], 'next_cursor' => null]);
+        $this->assertSame(4, downloader::sync_books(false, $client));
+        $this->assertSame('0', $client->requests[0]['query']['changed_since']);
+        $this->assertFalse($DB->record_exists('moodlereader_books', ['remoteid' => 2]));
+        foreach ([1, 3, 4, 5] as $remoteid) {
+            $this->assertTrue($DB->record_exists('moodlereader_books', ['remoteid' => $remoteid]));
+        }
+        $this->assertFalse($DB->record_exists('moodlereader_books', ['id' => $unused->id]));
+        $this->assertEquals(1, $DB->get_field('moodlereader_books', 'hidden', ['id' => $used->id]));
     }
 }

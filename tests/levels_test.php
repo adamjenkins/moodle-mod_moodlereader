@@ -162,4 +162,69 @@ final class levels_test extends \advanced_testcase {
         $this->assertSame(1, substr_count(progressbar::render(4500, 3000, false, false), 'role="progressbar"'));
         $this->assertStringContainsString('51%', progressbar::mini(1530, 3000, false));
     }
+
+    /**
+     * With every level below open, each lower level gets the books allowed below (GitHub issue #1).
+     *
+     * @return void
+     */
+    public function test_every_level_below(): void {
+        global $DB;
+        [$reader, $student, $books] = $this->setup_levels();
+        $DB->set_field('moodlereader', 'lowerlevels', 1, ['id' => $reader->get_instance()->id]);
+        $reader = reader::from_instanceid($reader->get_instance()->id);
+        $DB->insert_record('moodlereader_levels', (object) ['readerid' => $reader->get_instance()->id,
+            'userid' => $student->id, 'goal' => 0, 'startlevel' => 3, 'currentlevel' => 3, 'stoplevel' => 0,
+            'allowpromotion' => 1, 'time' => time() - DAYSECS]);
+
+        $status = levels::status($reader, $student->id);
+        $this->assertSame([0, 1, 2, 3, 4], array_column($status->columns, 'level'));
+        $this->assertSame([2, 2, 2, 3, 1], array_column($status->columns, 'quota'));
+        $this->assertSame([-1, -1, -1, 0, 1], array_column($status->columns, 'relation'));
+
+        // Two passes at level 0 use up level 0 only.
+        $this->attempt($reader, $student->id, $books[0][0], 1);
+        $this->attempt($reader, $student->id, $books[0][1], 1);
+        $this->assertSame([1, 2, 3, 4], levels::allowed($reader, $student->id));
+
+        // With no books allowed below, no level below is open, whichever rule is set.
+        $DB->set_field('moodlereader', 'prevlevel', 0, ['id' => $reader->get_instance()->id]);
+        $reader = reader::from_instanceid($reader->get_instance()->id);
+        $this->assertSame([3, 4], levels::allowed($reader, $student->id));
+    }
+
+    /**
+     * A move up is told to the student once; a teacher lowering the level since cancels it.
+     *
+     * @return void
+     */
+    public function test_promotion_notice(): void {
+        global $DB, $PAGE;
+        [$reader, $student, $books] = $this->setup_levels();
+        $DB->insert_record('moodlereader_levels', (object) ['readerid' => $reader->get_instance()->id,
+            'userid' => $student->id, 'goal' => 0, 'startlevel' => 0, 'currentlevel' => 0, 'stoplevel' => 0,
+            'allowpromotion' => 1, 'time' => time() - DAYSECS]);
+        $this->assertNull(levels::take_promotion_notice($reader, $student->id));
+        foreach ([0, 1, 2] as $i) {
+            $this->attempt($reader, $student->id, $books[0][$i], 1);
+        }
+        $this->assertTrue(levels::maybe_promote($reader, $student->id));
+        $notice = levels::take_promotion_notice($reader, $student->id);
+        $this->assertEquals((object) ['from' => 0, 'to' => 1], $notice);
+        $this->assertNull(levels::take_promotion_notice($reader, $student->id));
+
+        // The page shows the old and the new level.
+        $DB->set_field('moodlereader_levels', 'promoted', 1, ['userid' => $student->id]);
+        $PAGE->set_url('/mod/moodlereader/view.php', ['id' => $reader->get_cm()->id]);
+        $PAGE->set_context($reader->get_context());
+        $html = $PAGE->get_renderer('mod_moodlereader')->reading_page($reader, $student, false);
+        $this->assertStringContainsString('You moved up a level!', $html);
+        $this->assertStringContainsString('you are now at level 1', $html);
+        $this->assertSame(0, (int) $DB->get_field('moodlereader_levels', 'promoted', ['userid' => $student->id]));
+
+        // Lowered by a teacher before the student saw it: nothing to tell.
+        $DB->set_field('moodlereader_levels', 'promoted', 1, ['userid' => $student->id]);
+        $DB->set_field('moodlereader_levels', 'currentlevel', 0, ['userid' => $student->id]);
+        $this->assertNull(levels::take_promotion_notice($reader, $student->id));
+    }
 }

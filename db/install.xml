@@ -21,6 +21,7 @@
         <FIELD NAME="levelcheck" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 = restrict the books a student may attempt to their reading level."/>
         <FIELD NAME="thislevel" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="6" SEQUENCE="false"/>
         <FIELD NAME="prevlevel" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="3" SEQUENCE="false"/>
+        <FIELD NAME="lowerlevels" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1: prevlevel books may be read at every level below the student's, not only one level below."/>
         <FIELD NAME="nextlevel" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
         <FIELD NAME="bookinstances" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 = only books linked to this instance are available."/>
         <FIELD NAME="showprogressbar" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
@@ -210,6 +211,7 @@
         <FIELD NAME="stoplevel" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="allowpromotion" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
         <FIELD NAME="time" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="promoted" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The level the student last moved up from, until their reading page has told them; 0 when there is nothing to tell. Stored plus one, so a move from level 0 is 1."/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>

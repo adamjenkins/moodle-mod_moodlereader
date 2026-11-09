@@ -509,6 +509,8 @@ class importer {
             'levelcheck'     => (int) ($legacy->levelcheck ?? 0),
             'thislevel'      => (int) ($legacy->thislevel ?? 6),
             'prevlevel'      => (int) ($legacy->prevlevel ?? 0),
+            // The mod_reader rule: one level below only.
+            'lowerlevels'    => 0,
             'nextlevel'      => (int) ($legacy->nextlevel ?? 1),
             'bookinstances'  => (int) ($legacy->bookinstances ?? 0),
             // The mod_reader bar was none (0), fixed (1) or expanding (2, the second bar past the goal).

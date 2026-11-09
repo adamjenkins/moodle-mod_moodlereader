@@ -39,7 +39,7 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
 
         $reader = new backup_nested_element('moodlereader', ['id'], [
             'name', 'intro', 'introformat', 'availablefrom', 'availableuntil', 'maxgrade', 'goal',
-            'wordsorpoints', 'minpassgrade', 'ignoredate', 'levelcheck', 'thislevel', 'prevlevel',
+            'wordsorpoints', 'minpassgrade', 'ignoredate', 'levelcheck', 'thislevel', 'prevlevel', 'lowerlevels',
             'nextlevel', 'bookinstances', 'showprogressbar', 'extraprogressbar', 'seb', 'sebmethod',
             'sebkeys', 'sebquitpassword', 'sebtemplateid', 'sebconfigxml', 'showlevel', 'showbooksread',
             'showreport', 'showsearch', 'completionpass', 'completiontotalwords', 'cheatsettings',
