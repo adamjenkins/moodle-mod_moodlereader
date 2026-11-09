@@ -1,5 +1,12 @@
 # Changelog — mod_moodlereader
 
+## [Unreleased]
+
+### Changed
+
+- `composer.json` requires `moodle/moodle` `>=5.2 <5.4`, matching `$plugin->supported` (was `^5.2`).
+- `.github/workflows/camp-release.yml`: `v*` tags publish to camp once the listing is claimed.
+
 ## [0.1.1] - 2026-11-09
 
 ### Added
