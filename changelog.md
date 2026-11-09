@@ -1,16 +1,6 @@
 # Changelog — mod_moodlereader
 
-## [0.1.0] - 2026-11-06
-
-### Security
-
-- `quiz/mreader.php` and `quiz/render.php` need the session key to launch an attempt or show its first
-  question (`quizsession::has_start_key()`), and otherwise ask for confirmation.
-- Restore clamps level counts, pass mark, goal, maximum grade and total words
-  (`clean_ranges()`), and marks a restored finished attempt deleted when the book already counts.
-- `cheating.php` hides the other student's name outside the teacher's groups in separate-groups mode.
-- Privacy metadata declares `responses`, `seconds_used`, `survey` and `locale` sent to mreader.org.
-- `mod/moodlereader:manageremotesites` has `RISK_CONFIG | RISK_PERSONAL` (version 2026110600).
+## [0.1.1] - 2026-11-09
 
 ### Added
 
@@ -29,6 +19,24 @@
 - Field `moodlereader_levels.promoted` (level moved up from, plus one), set by `levels::maybe_promote()`,
   read and cleared by `levels::take_promotion_notice()`; `renderer::promotion_notice()`; privacy metadata
   and export (version 2026110900).
+
+### Changed
+
+- Version 2026110901, release 0.1.1.
+
+## [0.1.0] - 2026-11-06
+
+### Security
+
+- `quiz/mreader.php` and `quiz/render.php` need the session key to launch an attempt or show its first
+  question (`quizsession::has_start_key()`), and otherwise ask for confirmation.
+- Restore clamps level counts, pass mark, goal, maximum grade and total words
+  (`clean_ranges()`), and marks a restored finished attempt deleted when the book already counts.
+- `cheating.php` hides the other student's name outside the teacher's groups in separate-groups mode.
+- Privacy metadata declares `responses`, `seconds_used`, `survey` and `locale` sent to mreader.org.
+- `mod/moodlereader:manageremotesites` has `RISK_CONFIG | RISK_PERSONAL` (version 2026110600).
+
+### Added
 
 - mreader.org API v2 client: HMAC-SHA256 request signing (timestamp + nonce), the
   authorization request, status, credential rotation and legacy-registration claim
