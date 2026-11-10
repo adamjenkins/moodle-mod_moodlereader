@@ -28,6 +28,7 @@ use mod_moodlereader\local\reader;
 use mod_moodlereader\local\api\api_exception;
 use mod_moodlereader\local\api\client;
 use mod_moodlereader\local\connection;
+use mod_moodlereader\local\covermiss;
 
 $id = required_param('id', PARAM_INT);        // Course-module id.
 $bookid = required_param('book', PARAM_INT);  // Book id.
@@ -37,6 +38,10 @@ require_login($reader->get_course(), false, $reader->get_cm());
 $reader->require_cap('viewbooks');
 
 $book = $DB->get_record('moodlereader_books', ['id' => $bookid], '*', MUST_EXIST);
+// Only the covers of books this activity offers, or that someone has an attempt on here.
+if (!$reader->shows_cover($book)) {
+    throw new moodle_exception('booknotavailable', 'mod_moodlereader');
+}
 $context = $reader->get_context();
 
 // Only raster images are served inline: never SVG or anything else that can carry script.
@@ -51,9 +56,12 @@ foreach ($fs->get_area_files($context->id, 'mod_moodlereader', 'bookcover', $boo
 }
 
 if (!$file) {
-    // Not cached yet: fetch it from mreader.org and store it for next time.
+    // Not cached yet: fetch it from mreader.org and store it for next time. A cover that
+    // mreader.org did not supply in the last day is not asked for again (covermiss).
     $bytes = null;
-    if (connection::allows_launch() && (int) $book->remoteid > 0) {
+    $fetched = false;
+    if (connection::allows_launch() && (int) $book->remoteid > 0 && !covermiss::is_known($book)) {
+        $fetched = true;
         try {
             $response = (new client())->get_raw('/book-cover', ['id' => (int) $book->remoteid]);
             if ($response['status'] === 200 && strpos($response['headers']['content-type'] ?? '', 'image/') === 0) {
@@ -75,6 +83,9 @@ if (!$file) {
             'filepath'  => '/',
             'filename'  => 'cover.' . $types[$info[2]],
         ], $bytes);
+        covermiss::forget((int) $book->id);
+    } else if ($fetched) {
+        covermiss::remember($book);
     }
 }
 

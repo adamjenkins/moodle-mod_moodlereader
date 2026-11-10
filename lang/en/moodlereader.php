@@ -82,6 +82,7 @@ $string['bulkenableall_confirm'] = 'Enable all {$a} books that match the filter,
 $string['burst_count'] = 'Number of quizzes';
 $string['burst_count_help'] = 'A student who passes at least this many quizzes within the time below is flagged.';
 $string['burst_window'] = 'Within';
+$string['cachedef_covermiss'] = 'Book covers that mreader.org did not supply';
 $string['cannot_alreadytaken'] = 'Already taken: {$a->result} on {$a->date}.';
 $string['cannot_closed'] = 'The activity is not open for quizzes now.';
 $string['cannot_level'] = 'Level {$a->level} is not one they may read at (their level is {$a->own}).';

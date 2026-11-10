@@ -540,6 +540,27 @@ class reader {
     }
 
     /**
+     * Whether this activity shows the cover of a book: a book it offers (not disabled in
+     * Manage books; on the activity's book list, if it has one), or a book someone has an
+     * attempt on in this activity (its cover appears among the books they have read).
+     *
+     * @param stdClass $book A moodlereader_books row (id, hidden).
+     * @return bool
+     */
+    public function shows_cover(stdClass $book): bool {
+        global $DB;
+        if (empty($book->hidden)) {
+            if (empty($this->instance->bookinstances)) {
+                return true;
+            }
+            if ($DB->record_exists('moodlereader_bookinstances', ['readerid' => $this->instance->id, 'bookid' => $book->id])) {
+                return true;
+            }
+        }
+        return $DB->record_exists('moodlereader_attempts', ['readerid' => $this->instance->id, 'bookid' => $book->id]);
+    }
+
+    /**
      * Whether the current time is inside the activity's availability window.
      *
      * @return bool
