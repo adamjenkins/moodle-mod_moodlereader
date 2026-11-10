@@ -1,16 +1,12 @@
 # Changelog — mod_moodlereader
 
-## [0.1.1] - 2026-11-09
+## [0.1.2] - 2026-11-10
 
-- The language filter (student book search, Award credit, Manage books) appears only when the books
-  are in more than one language, and lists only those languages.
-- Manage books is now in Site administration only (Plugins → Activity modules → Moodle Reader →
-  Manage books); activities no longer link to it.
-- The book sync brings in only the languages an administrator chooses ("Languages to sync"). Books
-  with no language (such as those without a quiz) always come; books in a language no longer chosen
-  are removed, or hidden if a student or an activity has used them.
-- Reading levels: an activity can open every level below the student's, each up to the number of books
-  allowed below, as mreader.org does (GitHub issue #1, suggested by Martin Meadows). "One level below"
-  stays the default.
-- A student who moves up a level is told so, once, on their reading page, with the old and new level
-  side by side.
+- Book covers are shown only for books the activity offers (books not disabled in Manage books and,
+  when the activity has a book list, on that list) and for books someone has already taken a quiz on
+  in the activity. Asking for the cover of any other book now gives "That book is not available to
+  you."
+- When mreader.org has no cover for a book, the activity remembers that for a day instead of asking
+  mreader.org again every time the book is shown. When a book sync reports a changed cover, it is
+  fetched the next time the book is shown.
+- The plugin's Composer metadata now names the Moodle versions it supports (5.2 and 5.3).

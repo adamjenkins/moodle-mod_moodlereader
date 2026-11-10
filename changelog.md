@@ -1,11 +1,28 @@
 # Changelog — mod_moodlereader
 
-## [Unreleased]
+## [0.1.2] - 2026-11-10
+
+### Added
+
+- Cache definition `covermiss` (`db/caches.php`: application mode, simple keys and data, TTL one
+  day) and `\mod_moodlereader\local\covermiss` (`is_known()`, `remember()`, `forget()`): a book
+  whose cover mreader.org did not supply is remembered by book id with its cover ETag, so
+  `cover.php` does not call `/book-cover` again for a day; a different ETag from a later book sync
+  voids the entry, and storing a cover forgets it. String `cachedef_covermiss`.
+- `.github/workflows/camp-release.yml`: `v*` tags publish to camp once the listing is claimed.
 
 ### Changed
 
 - `composer.json` requires `moodle/moodle` `>=5.2 <5.4`, matching `$plugin->supported` (was `^5.2`).
-- `.github/workflows/camp-release.yml`: `v*` tags publish to camp once the listing is claimed.
+- Version 2026111001 (registers the new cache definition), release 0.1.2.
+
+### Security
+
+- `cover.php` serves a cover only when the new `reader::shows_cover()` allows it: the book is not
+  hidden and the activity has no book list or the book is on it (`moodlereader_bookinstances`), or
+  there is an attempt on the book in this activity (`moodlereader_attempts`). Any other book id
+  throws `booknotavailable`. Previously any book id in the catalogue was served, and fetched from
+  mreader.org if not yet stored. New PHPUnit tests in `tests/cover_test.php`.
 
 ## [0.1.1] - 2026-11-09
 

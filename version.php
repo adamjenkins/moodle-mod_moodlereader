@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'mod_moodlereader';
-$plugin->version   = 2026111000;
-$plugin->release   = '0.1.1';
+$plugin->version   = 2026111001;
+$plugin->release   = '0.1.2';
 $plugin->requires  = 2026042000;        // Moodle 5.2.0.
 $plugin->supported = [502, 503];        // Moodle 5.2 - 5.3.
 $plugin->maturity  = MATURITY_BETA;
