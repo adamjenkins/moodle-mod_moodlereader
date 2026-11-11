@@ -164,6 +164,20 @@ Feature: Moodle Reader activity
     And I should not see "Night Train"
     And I should not see "Blue Hills"
 
+  @javascript
+  Scenario: An administrator searches the publisher filter and picks a publisher from the suggestions
+    Given the following moodlereader books exist:
+      | name         | publisher                     | series  | difficulty | words |
+      | Night Train  | Orbit Graded Readers Worldwide | Level 2 | 2          | 3500  |
+    When I log in as "admin"
+    And I navigate to "Plugins > Activity modules > Moodle Reader > Manage books" in site administration
+    And I set the field "Publisher" to "Orbit"
+    Then I should see "Orbit Graded Readers Worldwide" in the ".mr-filter-multi .form-autocomplete-selection" "css_element"
+    When I press "Filter"
+    Then I should see "Night Train"
+    And I should not see "The Red Kite"
+    And I should see "Orbit Graded Readers Worldwide" in the ".mr-filter-multi .form-autocomplete-selection" "css_element"
+
   Scenario: A teacher awards credit for a book without a quiz, and the student's totals change
     Given the following moodlereader books exist:
       | name          | publisher | series  | difficulty | words | hasquiz | hidden |

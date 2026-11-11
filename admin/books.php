@@ -230,25 +230,37 @@ $filterrow = function (string $label, string $control, string $for): string {
         'me-3 mb-2 d-inline-flex'
     );
 };
-$multi = function (array $options, string $name, array $selected): string {
+// A multi-value filter gets a row of its own and core's searchable picker: type to narrow the list, and
+// each choice shows as a removable tag. Without JavaScript it stays a plain multi-select list.
+$multirow = function (string $label, string $control, string $for): string {
+    return html_writer::div(
+        html_writer::tag('label', $label, ['class' => 'd-block mb-1', 'for' => $for]) . $control,
+        'mb-2 mr-filter-multi'
+    );
+};
+$multi = function (array $options, string $name, array $selected) use ($PAGE): string {
+    $id = 'mr-' . $name;
+    $PAGE->requires->js_call_amd('core/form-autocomplete', 'enhance', [
+        '#' . $id, false, '', get_string('search'), false, true, get_string('all'),
+    ]);
     return html_writer::select($options, $name . '[]', array_map('strval', $selected), false, [
-        'class' => 'form-control', 'multiple' => 'multiple', 'id' => 'mr-' . $name,
+        'class' => 'form-control', 'multiple' => 'multiple', 'id' => $id,
         'size' => max(2, min(8, count($options))),
     ]);
 };
 $filterinner = html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'filtered', 'value' => 1]);
-$filterinner .= $filterrow(
+$filterinner .= $multirow(
     get_string('publisher', 'mod_moodlereader'),
     $multi($publishers, 'fpublisher', $fpublishers),
     'mr-fpublisher'
 );
-$filterinner .= $filterrow(
+$filterinner .= $multirow(
     get_string('readinglevel', 'mod_moodlereader'),
     $multi($difficulties, 'fdifficulty', $fdifficulties),
     'mr-fdifficulty'
 );
 if ($languagefilter) {
-    $filterinner .= $filterrow(
+    $filterinner .= $multirow(
         get_string('booklanguage', 'mod_moodlereader'),
         $multi($languages, 'flanguage', $flanguages),
         'mr-flanguage'
@@ -271,7 +283,7 @@ $filterinner .= $filterrow(
     html_writer::select($quizoptions, 'fquiz', $fquiz, false, ['class' => 'form-control', 'id' => 'mr-fquiz']),
     'mr-fquiz'
 );
-$filterinner .= html_writer::div(get_string('multiselecthint', 'mod_moodlereader'), 'form-text text-muted small mb-2');
+$filterinner .= html_writer::div(get_string('filterhint', 'mod_moodlereader'), 'form-text text-muted small mb-2');
 $filterinner .= html_writer::tag('button', get_string('filter'), ['type' => 'submit', 'class' => 'btn btn-secondary mb-2']);
 $filterinner .= ' ' . html_writer::link(
     new moodle_url($pageurl, ['filtered' => 1]),

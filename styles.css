@@ -138,3 +138,12 @@
     margin-top: 0.4rem;
     font-weight: bold;
 }
+
+/* Manage books: a multi-value filter (publisher, level, language) takes a row of its own, wide enough for long names. */
+.mr-filter-multi {
+    max-width: 48rem;
+}
+
+.mr-filter-multi .form-autocomplete-input {
+    width: 100%;
+}
