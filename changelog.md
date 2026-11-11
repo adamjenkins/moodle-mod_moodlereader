@@ -1,14 +1,13 @@
 # Changelog — mod_moodlereader
 
-## [Unreleased]
+## [0.1.3] - 2026-11-11
 
 ### Changed
 
 - `admin/books.php`: the multi-value filters (`fpublisher[]`, `fdifficulty[]`, `flanguage[]`) are
   enhanced with `core/form-autocomplete` (placeholder `search`, no-selection text `all`, both core
-  strings) and placed on full-width rows (`.mr-filter-multi`, max 48rem, search box
-  spanning the row). Form parameters are
-  unchanged; without JavaScript they remain plain multi-select lists.
+  strings) and placed on full-width rows (`.mr-filter-multi`, max 48rem, search box spanning the row).
+  Form parameters are unchanged; without JavaScript they remain plain multi-select lists.
 - Lang string `multiselecthint` replaced by `filterhint` (the Ctrl/Cmd advice no longer applies).
 
 ## [0.1.2] - 2026-11-10
