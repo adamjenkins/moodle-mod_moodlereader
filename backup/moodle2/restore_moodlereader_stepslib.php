@@ -47,6 +47,7 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
             'moodlereader_bookinstance',
             '/activity/moodlereader/bookinstancelinks/bookinstance'
         );
+        $paths[] = new restore_path_element('moodlereader_wait', '/activity/moodlereader/waits/wait');
         if ($userinfo) {
             $paths[] = new restore_path_element(
                 'moodlereader_attempt',
@@ -123,6 +124,7 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
         }
         $data->wordsorpoints = empty($data->wordsorpoints) ? 0 : 1;
         $data->lowerlevels = empty($data->lowerlevels) ? 0 : 1;
+        $data->waitlevel = empty($data->waitlevel) ? 0 : 1;
     }
 
     /**
@@ -238,6 +240,34 @@ class restore_moodlereader_activity_structure_step extends restore_activity_stru
                 'points'     => (float) ($data->points ?? 0),
             ]);
         }
+    }
+
+    /**
+     * Restore a wait-time rule, held to the ranges the wait-times page allows.
+     *
+     * @param array $data
+     * @return void
+     */
+    protected function process_moodlereader_wait($data) {
+        global $DB;
+        $data = (object) $data;
+        $readerid = $this->get_new_parentid('moodlereader');
+        $level = (int) ($data->level ?? \mod_moodlereader\local\waits::DEFAULT_LEVEL);
+        $attempts = (int) ($data->attempts ?? 0);
+        $duration = (int) ($data->duration ?? 0);
+        if (
+            $level < \mod_moodlereader\local\waits::DEFAULT_LEVEL || $level > 99 || $attempts < 1 || $duration < 1
+                || $DB->record_exists('moodlereader_waits', ['readerid' => $readerid, 'level' => $level])
+        ) {
+            return;
+        }
+        $DB->insert_record('moodlereader_waits', (object) [
+            'readerid' => $readerid,
+            'level' => $level,
+            'attempts' => min(\mod_moodlereader\local\waits::MAX_ATTEMPTS, $attempts),
+            'duration' => min(\mod_moodlereader\local\waits::MAX_DURATION, $duration),
+            'timemodified' => (int) ($data->timemodified ?? 0),
+        ]);
     }
 
     /**

@@ -17,6 +17,7 @@
 namespace mod_moodlereader;
 
 use mod_moodlereader\local\api\fake_client;
+use mod_moodlereader\local\bookedits;
 use mod_moodlereader\local\booklanguage;
 use mod_moodlereader\local\downloader;
 
@@ -252,5 +253,46 @@ final class downloader_test extends \advanced_testcase {
         }
         $this->assertFalse($DB->record_exists('moodlereader_books', ['id' => $unused->id]));
         $this->assertEquals(1, $DB->get_field('moodlereader_books', 'hidden', ['id' => $used->id]));
+    }
+
+    /**
+     * A book's details changed on this site survive a sync, record mreader.org's new values, and can be
+     * undone (GitHub issue #3).
+     *
+     * @return void
+     */
+    public function test_local_edits_kept_through_sync(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->approve();
+        $client = (new fake_client())
+            ->queue('GET', '/books', 200, ['books' => [$this->book(1, ['title' => 'The Red Kyte'])], 'next_cursor' => null])
+            ->queue('GET', '/books-noquiz', 200, ['books' => [], 'next_cursor' => null]);
+        downloader::sync_books(true, $client);
+        $book = $DB->get_record('moodlereader_books', ['remoteid' => 1, 'hasquiz' => 1]);
+
+        // Lower the level and correct the title; a field set to its own value is not a change.
+        $book = bookedits::save($book->id, ['difficulty' => 4, 'name' => 'The Red Kite', 'words' => 7500]);
+        $this->assertSame(['name', 'difficulty'], bookedits::fields($book));
+        $this->assertEquals(4, $book->difficulty);
+
+        // The word count and the level change on mreader.org: the local level stays, its new value is recorded.
+        $client = (new fake_client())
+            ->queue('GET', '/books', 200, ['books' => [$this->book(1, ['title' => 'The Red Kyte', 'difficulty' => 6,
+                'words' => 8000])], 'next_cursor' => null])
+            ->queue('GET', '/books-noquiz', 200, ['books' => [], 'next_cursor' => null]);
+        downloader::sync_books(true, $client);
+        $book = $DB->get_record('moodlereader_books', ['id' => $book->id]);
+        $this->assertEquals(4, $book->difficulty);
+        $this->assertSame('The Red Kite', $book->name);
+        $this->assertEquals(8000, $book->words);
+        $this->assertSame(6, bookedits::decode($book)['difficulty']['remote']);
+
+        // Undo: mreader.org's details again.
+        bookedits::revert($book->id);
+        $book = $DB->get_record('moodlereader_books', ['id' => $book->id]);
+        $this->assertEquals(6, $book->difficulty);
+        $this->assertSame('The Red Kyte', $book->name);
+        $this->assertNull($book->localedits);
     }
 }

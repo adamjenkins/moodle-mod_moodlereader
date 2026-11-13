@@ -42,6 +42,20 @@ $page = optional_param('page', 0, PARAM_INT);
 $filtered = optional_param('filtered', 0, PARAM_BOOL);
 $fpublishers = array_values(array_unique(optional_param_array('fpublisher', [], PARAM_TEXT)));
 $fseries = optional_param('fseries', '', PARAM_TEXT);
+$ftitle = optional_param('ftitle', '', PARAM_TEXT);
+// Sorting by a column heading; the other columns break ties.
+$sortcolumns = [
+    'name'       => 'name %1$s, publisher, series',
+    'publisher'  => 'publisher %1$s, series, name',
+    'series'     => 'series %1$s, publisher, name',
+    'difficulty' => 'difficulty %1$s, publisher, series, name',
+    'language'   => 'language %1$s, publisher, series, name',
+    'words'      => 'words %1$s, publisher, series, name',
+    'hidden'     => 'hidden %1$s, publisher, series, name',
+];
+$sort = optional_param('sort', '', PARAM_ALPHA);
+$sort = array_key_exists($sort, $sortcolumns) ? $sort : '';
+$dir = optional_param('dir', 'asc', PARAM_ALPHA) === 'desc' ? 'desc' : 'asc';
 $fdifficulties = array_values(array_unique(array_filter(
     optional_param_array('fdifficulty', [], PARAM_INT),
     fn($d) => $d >= 0
@@ -71,10 +85,13 @@ $filterparams = [
     'filtered'    => 1,
     'fpublisher'  => $fpublishers,
     'fseries'     => $fseries,
+    'ftitle'      => $ftitle,
     'fdifficulty' => $fdifficulties,
     'flanguage'   => $flanguages,
     'fstatus'     => $fstatus,
     'fquiz'       => $fquiz,
+    'sort'        => $sort,
+    'dir'         => $dir,
 ];
 
 // The catalogue is the whole site's: it is managed in Site administration only, never from an activity.
@@ -105,6 +122,10 @@ if ($fpublishers) {
     [$insql, $inparams] = $DB->get_in_or_equal($fpublishers, SQL_PARAMS_NAMED, 'fp');
     $where[] = "publisher $insql";
     $params += $inparams;
+}
+if (trim($ftitle) !== '') {
+    $where[] = $DB->sql_like('name', ':ft', false, false);
+    $params['ft'] = '%' . $DB->sql_like_escape(trim($ftitle)) . '%';
 }
 if (trim($fseries) !== '') {
     $where[] = $DB->sql_like('series', ':fs', false, false);
@@ -171,7 +192,7 @@ $books = $DB->get_records_select(
     'moodlereader_books',
     $wheresql,
     $params,
-    'publisher, series, name',
+    $sort !== '' ? sprintf($sortcolumns[$sort], strtoupper($dir)) : 'publisher, series, name',
     '*',
     $page * $perpage,
     $perpage
@@ -267,6 +288,13 @@ if ($languagefilter) {
     );
 }
 $filterinner .= $filterrow(
+    get_string('booktitle', 'mod_moodlereader'),
+    html_writer::empty_tag('input', [
+        'type' => 'text', 'name' => 'ftitle', 'value' => $ftitle, 'class' => 'form-control', 'id' => 'mr-ftitle',
+    ]),
+    'mr-ftitle'
+);
+$filterinner .= $filterrow(
     get_string('series', 'mod_moodlereader'),
     html_writer::empty_tag('input', [
         'type' => 'text', 'name' => 'fseries', 'value' => $fseries, 'class' => 'form-control', 'id' => 'mr-fseries',
@@ -347,15 +375,32 @@ $master = html_writer::empty_tag('input', [
 
 $table = new html_table();
 $table->attributes['class'] = 'generaltable';
+// Column headings sort the list: a first click sorts up, the next one down.
+$heading = function (string $column, string $label) use ($pageurl, $filterparams, $sort, $dir, $OUTPUT): string {
+    $current = $sort === $column;
+    $next = $current && $dir === 'asc' ? 'desc' : 'asc';
+    $icon = '';
+    if ($current) {
+        $icon = ' ' . $OUTPUT->pix_icon(
+            $dir === 'asc' ? 't/sort_asc' : 't/sort_desc',
+            get_string($dir === 'asc' ? 'sortedasc' : 'sorteddesc', 'mod_moodlereader')
+        );
+    }
+    return html_writer::link(
+        new moodle_url($pageurl, ['sort' => $column, 'dir' => $next] + $filterparams),
+        s($label),
+        ['title' => get_string('sortby', 'mod_moodlereader', $label)]
+    ) . $icon;
+};
 $table->head = [
     $master,
-    get_string('book', 'mod_moodlereader'),
-    get_string('publisher', 'mod_moodlereader'),
-    get_string('series', 'mod_moodlereader'),
-    get_string('readinglevel', 'mod_moodlereader'),
-    get_string('booklanguage', 'mod_moodlereader'),
-    get_string('words', 'mod_moodlereader'),
-    get_string('status', 'mod_moodlereader'),
+    $heading('name', get_string('book', 'mod_moodlereader')),
+    $heading('publisher', get_string('publisher', 'mod_moodlereader')),
+    $heading('series', get_string('series', 'mod_moodlereader')),
+    $heading('difficulty', get_string('readinglevel', 'mod_moodlereader')),
+    $heading('language', get_string('booklanguage', 'mod_moodlereader')),
+    $heading('words', get_string('words', 'mod_moodlereader')),
+    $heading('hidden', get_string('status', 'mod_moodlereader')),
     '',
 ];
 $table->align = ['center', 'left', 'left', 'left', 'center', 'center', 'right', 'center', 'center'];
@@ -382,9 +427,28 @@ foreach ($books as $book) {
             ['class' => 'btn btn-outline-secondary btn-sm']
         );
     }
+    // Details changed on this site, and the way to change them.
+    $edited = \mod_moodlereader\local\bookedits::fields($book);
+    $name = s($book->name);
+    if ($edited) {
+        $name .= ' ' . html_writer::span(get_string('editedlocally', 'mod_moodlereader'), 'badge bg-info text-dark', [
+            'title' => get_string('editedlocally_fields', 'mod_moodlereader', implode(', ', array_map(
+                fn($field) => get_string(\mod_moodlereader\local\bookedits::FIELDS[$field], 'mod_moodlereader'),
+                $edited
+            ))),
+        ]);
+    }
+    $toggle .= ' ' . html_writer::link(
+        new moodle_url('/mod/moodlereader/admin/bookedit.php', [
+            'book' => $book->id,
+            'returnto' => (new moodle_url($pageurl, $filterparams + ['page' => $page]))->out_as_local_url(false),
+        ]),
+        get_string('editbook', 'mod_moodlereader'),
+        ['class' => 'btn btn-outline-primary btn-sm mt-1']
+    );
     $row = new html_table_row([
         $checkbox,
-        s($book->name),
+        $name,
         s($book->publisher),
         s($book->series),
         s((int) $book->difficulty),

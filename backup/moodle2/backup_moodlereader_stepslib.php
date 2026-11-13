@@ -39,7 +39,7 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
 
         $reader = new backup_nested_element('moodlereader', ['id'], [
             'name', 'intro', 'introformat', 'availablefrom', 'availableuntil', 'maxgrade', 'goal',
-            'wordsorpoints', 'minpassgrade', 'ignoredate', 'levelcheck', 'thislevel', 'prevlevel', 'lowerlevels',
+            'wordsorpoints', 'minpassgrade', 'ignoredate', 'levelcheck', 'thislevel', 'prevlevel', 'lowerlevels', 'waitlevel',
             'nextlevel', 'bookinstances', 'showprogressbar', 'extraprogressbar', 'seb', 'sebmethod',
             'sebkeys', 'sebquitpassword', 'sebtemplateid', 'sebconfigxml', 'showlevel', 'showbooksread',
             'showreport', 'showsearch', 'completionpass', 'completiontotalwords', 'cheatsettings',
@@ -84,6 +84,10 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
             ['userid', 'goal', 'startlevel', 'currentlevel', 'stoplevel', 'allowpromotion', 'time']
         );
 
+        // Wait times between quizzes (settings, not user data).
+        $waits = new backup_nested_element('waits');
+        $wait = new backup_nested_element('wait', ['id'], ['level', 'attempts', 'duration', 'timemodified']);
+
         $messages = new backup_nested_element('messages');
         $message = new backup_nested_element(
             'message',
@@ -95,6 +99,8 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
         $books->add_child($book);
         $reader->add_child($bookinstances);
         $bookinstances->add_child($bookinstance);
+        $reader->add_child($waits);
+        $waits->add_child($wait);
         $reader->add_child($attempts);
         $attempts->add_child($attempt);
         $reader->add_child($grades);
@@ -106,6 +112,7 @@ class backup_moodlereader_activity_structure_step extends backup_activity_struct
 
         $reader->set_source_table('moodlereader', ['id' => backup::VAR_ACTIVITYID]);
         $bookinstance->set_source_table('moodlereader_bookinstances', ['readerid' => backup::VAR_PARENTID]);
+        $wait->set_source_table('moodlereader_waits', ['readerid' => backup::VAR_PARENTID]);
 
         // Books referenced by this activity's bookinstances or (when included) attempts.
         $book->set_source_sql(

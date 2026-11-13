@@ -22,6 +22,7 @@
         <FIELD NAME="thislevel" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="6" SEQUENCE="false"/>
         <FIELD NAME="prevlevel" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="3" SEQUENCE="false"/>
         <FIELD NAME="lowerlevels" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1: prevlevel books may be read at every level below the student's, not only one level below."/>
+        <FIELD NAME="waitlevel" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Which level picks a wait-time rule: 0 the student's reading level, 1 the book's level."/>
         <FIELD NAME="nextlevel" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
         <FIELD NAME="bookinstances" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 = only books linked to this instance are available."/>
         <FIELD NAME="showprogressbar" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
@@ -63,6 +64,7 @@
         <FIELD NAME="sametitle" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="language" TYPE="char" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="The book's language code from mreader.org; empty when unknown."/>
         <FIELD NAME="hidden" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="localedits" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Details changed on this site, as JSON: field => {local, remote}. The sync keeps the local value and records mreader.org's."/>
         <FIELD NAME="time" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="withdrawn" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 when mreader.org no longer offers this book's quiz."/>
         <FIELD NAME="hasquiz" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="0 for a book mreader.org has no quiz for (credit can still be awarded); its remoteid is then in mreader.org's no-quiz id space."/>
@@ -279,6 +281,23 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="userid_bookid" UNIQUE="true" FIELDS="userid, bookid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="moodlereader_waits" COMMENT="Wait times between quizzes in an activity: no more than a number of quizzes within a time, for one reading level or by default.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="readerid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="level" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="-1" SEQUENCE="false" COMMENT="The reading level the rule is for; -1 for every level without its own rule."/>
+        <FIELD NAME="attempts" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="Quizzes a student may start within duration."/>
+        <FIELD NAME="duration" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Seconds."/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="readerid" TYPE="foreign" FIELDS="readerid" REFTABLE="moodlereader" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="readerid_level" UNIQUE="true" FIELDS="readerid, level"/>
       </INDEXES>
     </TABLE>
   </TABLES>

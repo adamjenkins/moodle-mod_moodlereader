@@ -65,12 +65,16 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
   grouping, synced with the book list (from the mreader.org release after v3.8).
 - **Site administrators manage the site's catalogue** in Site administration → Plugins →
   Activity modules → Moodle Reader → **Manage books** (not from an activity): filter by several
-  publishers, levels and languages at once, plus series and status, and enable or disable
-  single books, the ticked books, or every book matching the filter; a disabled book is offered
-  to no student. They **sync** it from mreader.org, in the **languages they choose** (settings:
+  publishers, levels and languages at once, plus title, series and status, **sort by any column**,
+  and enable or disable single books, the ticked books, or every book matching the filter; a
+  disabled book is offered to no student. They can **edit a book's title, publisher, series, reading
+  level and words for the site**; the change is kept through every sync, mreader.org's own value is
+  shown beside it, and one button takes mreader.org's details again. They **sync** it from mreader.org, in the **languages they choose** (settings:
   "Languages to sync"; books with no language, such as those without a quiz, always come; books in a
-  language no longer chosen are removed, or hidden once used). Teachers **message** students and set
-  **per-student reading goals**.
+  language no longer chosen are removed, or hidden once used). Teachers **message** students, set
+  **per-student reading goals** and set **wait times between quizzes** (as mod_reader's quiz
+  attempt rates): no more than a number of quizzes within a time, by default and for single reading
+  levels, picked by the student's reading level or by the book's level.
 - **Reports** (modelled on mod_reader's): the *student summary* (levels, goal, passed,
   failed and cheated counts, average time and score, words this term and in all terms)
   and *student details* (every attempt with its result and running total), both
@@ -106,8 +110,7 @@ mreader.org can revoke a site's access at any time; the page then shows the reas
   read N words).
 - Full privacy provider, backup/restore, and events.
 
-Not yet ported from the legacy plugin: student import/export, reading rates, and
-view-as-student.
+Not yet ported from the legacy plugin: student import/export and view-as-student.
 
 ## Moving from mod_reader
 

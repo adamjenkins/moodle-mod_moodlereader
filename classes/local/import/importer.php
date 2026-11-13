@@ -16,6 +16,8 @@
 
 namespace mod_moodlereader\local\import;
 
+use mod_moodlereader\local\waits;
+
 /**
  * Imports mod_reader activities into mod_moodlereader, repeatably.
  *
@@ -50,7 +52,7 @@ class importer {
     const STATUS_CUTOVER = 'cutover';
 
     /** @var string[] The per-activity item types, in the order they are synced. */
-    const ITEMTYPES = ['bookinst', 'attempt', 'level', 'cheat', 'message'];
+    const ITEMTYPES = ['bookinst', 'attempt', 'level', 'wait', 'cheat', 'message'];
 
     /** @var bool Import the cheating log. */
     protected $importcheatlog;
@@ -694,6 +696,37 @@ class importer {
                 }
                 break;
 
+            case 'wait':
+                // The "quiz attempt rate" rules of mod_reader that delay quizzes (type 0, action bit 1), for the whole
+                // activity (group 0). Its level 0 is its default. One rule per level: the one mod_reader applies
+                // first (the shortest time, then the fewest quizzes).
+                $rules = [];
+                if ($DB->get_manager()->table_exists('reader_rates')) {
+                    $rates = $DB->get_records(
+                        'reader_rates',
+                        ['readerid' => $legacy->id, 'groupid' => 0, 'type' => 0],
+                        'level, duration, attempts, id'
+                    );
+                    foreach ($rates as $old) {
+                        $level = (int) $old->level > 0 ? (int) $old->level : waits::DEFAULT_LEVEL;
+                        if (
+                            ((int) $old->action & 1) && (int) $old->duration > 0 && (int) $old->attempts > 0
+                                && $level <= 99 && !isset($rules[$level])
+                        ) {
+                            $rules[$level] = $old;
+                        }
+                    }
+                }
+                foreach ($rules as $level => $old) {
+                    $add((int) $old->id, 0, [
+                        'level'        => $level,
+                        'attempts'     => min(waits::MAX_ATTEMPTS, (int) $old->attempts),
+                        'duration'     => min(waits::MAX_DURATION, (int) $old->duration),
+                        'timemodified' => (int) $old->timemodified,
+                    ]);
+                }
+                break;
+
             case 'cheat':
                 // Only confirmed cheating; "cleared" entries need no row (the attempts' flags carry it).
                 $attempts = $this->load_maps($importid, 'attempt');
@@ -797,6 +830,17 @@ class importer {
             $map = $maps[$key] ?? null;
             unset($maps[$key]);
             $exists = $map && $DB->record_exists($table, ['id' => $map->newid]);
+            if (!$exists && $type === 'wait') {
+                // One rule per level: take over the copy's rule rather than add a second one.
+                $current = $DB->get_field($table, 'id', ['readerid' => $newreaderid, 'level' => $row['values']['level']]);
+                if ($current) {
+                    $map = $map ?? (object) ['id' => 0];
+                    $map->newid = (int) $current;
+                    $map->hash = '';
+                    $exists = true;
+                    $reused[(int) $current] = true;
+                }
+            }
             if (!$exists && $type === 'level') {
                 // One level row per student: take over the copy's row rather than add a second one.
                 $current = $DB->get_field($table, 'id', ['readerid' => $newreaderid, 'userid' => $row['values']['userid']]);
@@ -860,6 +904,7 @@ class importer {
             'bookinst' => 'moodlereader_bookinstances',
             'attempt'  => 'moodlereader_attempts',
             'level'    => 'moodlereader_levels',
+            'wait'     => 'moodlereader_waits',
             'cheat'    => 'moodlereader_cheatlog',
             'message'  => 'moodlereader_messages',
         ][$type];

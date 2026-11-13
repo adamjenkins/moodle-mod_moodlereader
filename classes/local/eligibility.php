@@ -43,6 +43,12 @@ class eligibility {
     /** @var \stdClass|null Level status, when the activity restricts books to the level. */
     protected $levels = null;
 
+    /** @var int The student. */
+    protected $userid;
+
+    /** @var int[] Wait times between quizzes: level => when the next quiz may start (0 = now). */
+    protected $waits = [];
+
     /** @var bool */
     protected $connected;
 
@@ -58,6 +64,7 @@ class eligibility {
     public function __construct(reader $reader, int $userid) {
         global $DB;
         $this->reader = $reader;
+        $this->userid = $userid;
         $attempts = $DB->get_records_sql(
             "SELECT a.id, a.bookid, a.state, a.passed, a.credit, a.cheated, a.timefinish, b.sametitle
                FROM {moodlereader_attempts} a
@@ -128,14 +135,24 @@ class eligibility {
         }
         if ($this->levels !== null) {
             $level = (int) $book->difficulty;
-            foreach ($this->levels->columns as $column) {
-                if ($column->level === $level) {
-                    return $column->remaining === 0
-                        ? $str('levelused', ['level' => $level, 'quota' => $column->quota])
-                        : null;
+            $column = null;
+            foreach ($this->levels->columns as $each) {
+                if ($each->level === $level) {
+                    $column = $each;
                 }
             }
-            return $str('level', ['level' => $level, 'own' => $this->levels->level]);
+            if ($column === null) {
+                return $str('level', ['level' => $level, 'own' => $this->levels->level]);
+            }
+            if ($column->remaining === 0) {
+                return $str('levelused', ['level' => $level, 'quota' => $column->quota]);
+            }
+        }
+        // Wait times between quizzes (computed once per level); a quiz already started can be resumed.
+        $booklevel = (int) $book->difficulty;
+        $this->waits[$booklevel] ??= waits::until($this->reader, $this->userid, $booklevel);
+        if ($this->waits[$booklevel] > 0 && !$this->in_progress((int) $book->id)) {
+            return waits::message($this->waits[$booklevel]);
         }
         return null;
     }

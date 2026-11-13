@@ -313,3 +313,39 @@ Feature: Moodle Reader activity
     Then I should see "This quiz needs Safe Exam Browser"
     And "Launch Safe Exam Browser" "link" should exist
     And I should not see "Question 1 of 3"
+
+  Scenario: A teacher sets a wait time between quizzes, and a student who just took one must wait
+    Given the site is connected to mreader.org
+    And the following moodlereader attempts exist:
+      | user     | activity | book         | percent | passed |
+      | student1 | reader1  | The Red Kite | 90      | 1      |
+    When I am on the "Reader 1" "moodlereader activity" page logged in as teacher1
+    And I follow "Wait times between quizzes"
+    And I set the field "defaultduration[number]" to "3"
+    And I press "Save changes"
+    Then I should see "Wait times saved."
+    And I log out
+    When I am on the "Reader 1" "moodlereader activity" page logged in as student1
+    Then I should see "You can take your next quiz at"
+    And I press "Search"
+    And I should see "Blue Hills"
+    And "Take the quiz" "button" should not exist
+
+  Scenario: An administrator sorts the catalogue by title and changes a book's reading level for the site
+    When I log in as "admin"
+    And I navigate to "Plugins > Activity modules > Moodle Reader > Manage books" in site administration
+    And I click on "Sort by Book" "link"
+    Then "The Red Kite" "text" should appear after "Blue Hills" "text"
+    And I click on "Sort by Book" "link"
+    And "Blue Hills" "text" should appear after "The Red Kite" "text"
+    When I click on "Edit" "link" in the "Blue Hills" "table_row"
+    And I set the field "Reading level" to "3"
+    And I press "Save changes"
+    Then I should see "\"Blue Hills\" saved."
+    And I should see "Edited" in the "Blue Hills" "table_row"
+    And I should see "3" in the "Blue Hills" "table_row"
+    When I click on "Edit" "link" in the "Blue Hills" "table_row"
+    Then I should see "mreader.org: 1"
+    And I press "Use mreader.org's details"
+    And I should see "\"Blue Hills\" uses mreader.org's details again."
+    And I should not see "Edited" in the "Blue Hills" "table_row"

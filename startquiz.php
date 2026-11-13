@@ -27,6 +27,7 @@ require(__DIR__ . '/../../config.php');
 use mod_moodlereader\local\attempt;
 use mod_moodlereader\local\connection;
 use mod_moodlereader\local\reader;
+use mod_moodlereader\local\waits;
 
 $id = required_param('id', PARAM_INT);       // Course-module id.
 $bookid = required_param('book', PARAM_INT);  // Book id.
@@ -46,6 +47,18 @@ if (!connection::allows_launch()) {
 // Server-side availability gate: never trust the submitted book id.
 if (!$reader->book_is_available($bookid, $USER->id)) {
     throw new moodle_exception('booknotavailable', 'mod_moodlereader', $reader->view_url());
+}
+
+// Wait times between quizzes (not for a quiz already started, nor for a teacher trying one).
+$started = $DB->record_exists('moodlereader_attempts', [
+    'readerid' => $reader->get_instance()->id, 'userid' => $USER->id, 'bookid' => $bookid,
+    'state' => 'inprogress', 'deleted' => 0,
+]);
+if (!$started && !waits::exempt($reader)) {
+    $until = waits::until($reader, (int) $USER->id, waits::book_level($reader, $bookid));
+    if ($until > 0) {
+        redirect($reader->view_url(), waits::message($until), null, \core\output\notification::NOTIFY_WARNING);
+    }
 }
 
 $attempt = attempt::start($reader, $USER->id, $bookid);

@@ -79,6 +79,11 @@ if ($reader->can('manageusers')) {
         get_string('setgoals', 'mod_moodlereader'),
         ['class' => 'btn btn-secondary']
     );
+    $links[] = html_writer::link(
+        new moodle_url('/mod/moodlereader/waits.php', ['id' => $id]),
+        get_string('waits', 'mod_moodlereader'),
+        ['class' => 'btn btn-secondary']
+    );
 }
 if ($links) {
     echo html_writer::div(implode(' ', $links), 'mod-moodlereader-teachertools mb-3');

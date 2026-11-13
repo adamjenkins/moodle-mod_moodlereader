@@ -426,5 +426,35 @@ function xmldb_moodlereader_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026110900, 'moodlereader');
     }
 
+    if ($oldversion < 2026111300) {
+        // Wait times between quizzes, by default and per reading level (GitHub issue #4).
+        $table = new xmldb_table('moodlereader');
+        $field = new xmldb_field('waitlevel', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'lowerlevels');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        $table = new xmldb_table('moodlereader_waits');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('readerid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('level', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '-1');
+            $table->add_field('attempts', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '1');
+            $table->add_field('duration', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key('readerid', XMLDB_KEY_FOREIGN, ['readerid'], 'moodlereader', ['id']);
+            $table->add_index('readerid_level', XMLDB_INDEX_UNIQUE, ['readerid', 'level']);
+            $dbman->create_table($table);
+        }
+        // A book's details changed on this site, kept through the sync (GitHub issue #3).
+        $table = new xmldb_table('moodlereader_books');
+        $field = new xmldb_field('localedits', XMLDB_TYPE_TEXT, null, null, null, null, null, 'hidden');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_mod_savepoint(true, 2026111300, 'moodlereader');
+    }
+
     return true;
 }

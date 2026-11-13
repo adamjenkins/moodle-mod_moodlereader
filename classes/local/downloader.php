@@ -260,6 +260,8 @@ class downloader {
         if ((string) $existing->coveretag !== (string) $book->coveretag) {
             self::delete_cached_covers((int) $book->id);
         }
+        // Details changed on this site stay changed; mreader.org's values are recorded beside them.
+        bookedits::keep_through_sync($existing, $book);
         // Never override a teacher's curation of the 'hidden' flag on re-sync.
         $DB->update_record('moodlereader_books', $book);
         return (int) $book->id;

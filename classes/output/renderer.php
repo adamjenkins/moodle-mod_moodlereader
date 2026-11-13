@@ -145,6 +145,20 @@ class renderer extends \plugin_renderer_base {
 
         // The book search. A student only ever sees books they may take; a teacher sees every
         // book of the activity with whether this student may take it, and why not.
+        // Wait times by the student's reading level: say when the next quiz may start.
+        if (
+            !$teacherview && (int) ($instance->waitlevel ?? 0) === \mod_moodlereader\local\waits::BY_STUDENT
+                && !\mod_moodlereader\local\waits::exempt($reader)
+        ) {
+            $until = \mod_moodlereader\local\waits::until($reader, $userid);
+            if ($until > 0) {
+                $out .= $this->output->notification(
+                    s(\mod_moodlereader\local\waits::message($until)),
+                    \core\output\notification::NOTIFY_INFO,
+                    false
+                );
+            }
+        }
         if (!empty($instance->showsearch)) {
             [$filters, $searched, $hasfilter] = reader::request_search_filters(
                 $reader->search_languages($userid, $teacherview)
@@ -573,7 +587,29 @@ class renderer extends \plugin_renderer_base {
         ];
         $table->align = ['center', 'left', 'left', 'left', 'center', 'left', 'right', 'center'];
 
+        // Wait times between quizzes: when the student may start the next one, per level (computed once each).
+        // A quiz already started can always be resumed.
+        global $USER, $DB;
+        $waits = [];
+        $started = null;
+        $waitfor = function (stdClass $book) use ($reader, &$waits, &$started, $USER, $DB): int {
+            if (\mod_moodlereader\local\waits::exempt($reader)) {
+                return 0;
+            }
+            $started ??= array_flip($DB->get_fieldset_select(
+                'moodlereader_attempts',
+                'bookid',
+                "readerid = :readerid AND userid = :userid AND state = 'inprogress' AND deleted = 0",
+                ['readerid' => $reader->get_instance()->id, 'userid' => $USER->id]
+            ));
+            if (isset($started[(int) $book->id])) {
+                return 0;
+            }
+            $level = (int) $book->difficulty;
+            return $waits[$level] ??= \mod_moodlereader\local\waits::until($reader, (int) $USER->id, $level);
+        };
         foreach ($books as $book) {
+            $until = ($eligibility || empty($book->hasquiz)) ? 0 : $waitfor($book);
             $table->data[] = [
                 $this->book_cover($reader, $book, 40, 60),
                 format_string($book->name),
@@ -584,7 +620,9 @@ class renderer extends \plugin_renderer_base {
                 s(number_format((int) $book->words)),
                 $eligibility ? $this->eligibility_badge($eligibility, $book) : (empty($book->hasquiz)
                     ? html_writer::div(s(get_string('noquizseeteacher', 'mod_moodlereader')), 'small text-muted')
-                    : $this->take_quiz_button($reader, (int) $book->id)),
+                    : ($until > 0
+                        ? html_writer::div(s(\mod_moodlereader\local\waits::message($until)), 'small text-muted mr-wait')
+                        : $this->take_quiz_button($reader, (int) $book->id))),
             ];
         }
 

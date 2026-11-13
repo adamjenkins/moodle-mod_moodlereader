@@ -1,5 +1,22 @@
 # Changelog — mod_moodlereader
 
+## [Unreleased]
+
+### Added
+
+- Table `moodlereader_waits` (readerid, level (-1 default), attempts, duration; unique readerid+level)
+  and field `moodlereader.waitlevel` (0 student's level, 1 book's level), version 2026111300.
+  `classes/local/waits.php` (`until()`, `rules()`, `save()`, `book_level()`, `exempt()`), page
+  `waits.php` with `classes/form/waits_form.php` (capability `manageusers`). Enforced in `startquiz.php`
+  (not for an in-progress attempt, nor for `viewreports`), shown in the student's search results and
+  page, and in `eligibility::reason()`. Backup and restore (clamped), `delete_instance`, and the
+  mod_reader import (`reader_rates` type 0 with the delay action, group 0; level 0 = default).
+- Field `moodlereader_books.localedits` (JSON field => {local, remote}) and `classes/local/bookedits.php`;
+  `downloader::upsert()` keeps local values through a sync (`bookedits::keep_through_sync()`). Page
+  `admin/bookedit.php` with `classes/form/bookedit_form.php` (capability `managecatalogue`).
+- `admin/books.php`: `sort`/`dir` (allowlisted columns) on clickable headings, `ftitle` filter, the
+  "Edited" badge and an Edit button per row.
+
 ## [0.1.3] - 2026-11-11
 
 ### Changed
