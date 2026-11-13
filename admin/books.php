@@ -270,6 +270,11 @@ $multi = function (array $options, string $name, array $selected) use ($PAGE): s
     ]);
 };
 $filterinner = html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'filtered', 'value' => 1]);
+// The sort carries over when the filter changes.
+if ($sort !== '') {
+    $filterinner .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sort', 'value' => $sort]);
+    $filterinner .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'dir', 'value' => $dir]);
+}
 $filterinner .= $multirow(
     get_string('publisher', 'mod_moodlereader'),
     $multi($publishers, 'fpublisher', $fpublishers),
