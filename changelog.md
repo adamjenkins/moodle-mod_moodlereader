@@ -1,6 +1,6 @@
 # Changelog — mod_moodlereader
 
-## [Unreleased]
+## [0.1.4] - 2026-11-13
 
 ### Added
 
@@ -15,7 +15,11 @@
   `downloader::upsert()` keeps local values through a sync (`bookedits::keep_through_sync()`). Page
   `admin/bookedit.php` with `classes/form/bookedit_form.php` (capability `managecatalogue`).
 - `admin/books.php`: `sort`/`dir` (allowlisted columns) on clickable headings, `ftitle` filter, the
-  "Edited" badge and an Edit button per row.
+  "Edited" badge and an Edit button per row; the sort carries over when the filter changes.
+
+### Changed
+
+- Version 2026111301, release 0.1.4.
 
 ## [0.1.3] - 2026-11-11
 

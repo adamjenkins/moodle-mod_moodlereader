@@ -1,6 +1,6 @@
 # Changelog — mod_moodlereader
 
-## [Unreleased]
+## [0.1.4] - 2026-11-13
 
 - Wait times between quizzes (GitHub issue #4): on the new "Wait times between quizzes" page of an
   activity, a teacher allows no more than a number of quizzes within a time, by default and for single
@@ -10,9 +10,3 @@
   title, publisher, series, reading level and words for the site. Changes are kept through every
   sync, mreader.org's own value is shown beside a changed field, and "Use mreader.org's details"
   undoes them.
-
-## [0.1.3] - 2026-11-11
-
-- Manage books: the Publisher, Reading level and Language filters are now searchable pickers, each on
-  a row of its own. Type part of a name to narrow the list, and each choice shows as a tag you can
-  remove. Long publisher names no longer squeeze the list or need sideways scrolling.
